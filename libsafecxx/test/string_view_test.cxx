@@ -265,11 +265,20 @@ void string_view_slice_utf8_constructor() safe
     for (char32_t i = 0; i < 0x10ffff; ++i) {
       [char; 4] buf = {};
       auto str = to_utf8(^buf, i);
+      assert((*str)~length > 0);
 
       std2::string_view sv = str;
       assert(sv.size() > 0u);
       assert_eq(sv.data(), (*str)~as_pointer);
     }
+  }
+
+  {
+    const [char; dyn]^ str = "$£Иह€한𐍈";
+    std2::string_view sv = str;
+
+    assert_eq(sv.size(), 19u);
+    assert_eq(sv.data(), (*str)~as_pointer);
   }
 }
 

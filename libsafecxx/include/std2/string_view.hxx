@@ -119,7 +119,8 @@ public:
   {
   }
 
-  basic_string_view(const [value_type; dyn]^ str) safe
+  // TODO: forgetting `/a` will cause this code to compile when it shouldn't
+  basic_string_view(const [value_type; dyn]^/a str) safe
     : p_(str)
   {
     unsafe detail::verify_utf((*self.p_)~as_pointer, (*self.p_)~length);
