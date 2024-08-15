@@ -15,7 +15,7 @@ include(GenerateExportHeader)
 file(
   GLOB_RECURSE safe_cxx_headers
   CONFIGURE_DEPENDS
-  "include/*.hxx"
+  "include/*.h"
 )
 
 file(
@@ -48,6 +48,7 @@ add_library(SafeCXX::core ALIAS safe_cxx)
 option(SAFE_CXX_BUILD_TESTING "" OFF)
 if(SAFE_CXX_BUILD_TESTING)
   set_target_properties(safe_cxx PROPERTIES VERIFY_INTERFACE_HEADER_SETS ON)
+  target_compile_definitions(safe_cxx PUBLIC LIBSAFECXX_PANIC_THROWS)
   include(CTest)
   add_subdirectory(test)
 endif()

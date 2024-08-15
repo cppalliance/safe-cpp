@@ -6,74 +6,101 @@
 #pragma once
 #feature on safety
 
-#include <std2/string_constant.hxx>
+#include <std2/string_constant.h>
+#include <std2/source_location.h>
+#include <std2/__panic/codes.h>
 
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <string>
 
 namespace std2
 {
 namespace detail
 {
 
-inline void verify_utf(const char* str, std::size_t count)
+inline
+std::size_t verify_utf/(a)(const [char; dyn]^/a str) noexcept safe
 {
-  auto const* end = str + count;
-  for (auto pos = str; pos < end;) {
-    auto const c1 = *pos;
+  auto const len = (*str)~length;
+  std::size_t idx = 0;
+
+  for ( ; idx < len; ) {
+    auto const c1 = str[idx];
+
     if ((0x80 & c1) == 0) {
       // ascii byte
-      ++pos;
+      ++idx;
       continue;
     }
 
     // 2 byte codepoint
     // leading byte: 0b110xxxxx
     if ((0xc0 == (c1 & 0xe0))) {
-      if (end - pos < 2) throw "length error";
+      if (len - idx < 2) return idx;
 
       // invalid continuation byte
-      if (0x80 != (pos[1] & 0xc0)) throw "invalid continuation byte";
+      if (0x80 != (str[idx + 1] & 0xc0)) return idx;
 
-      pos += 2;
+      idx += 2;
       continue;
     }
 
     // 3 byte codepoint
     // leading byte: 0b1110xxxx
     if (0xe0 == (c1 & 0xf0)) {
-      if (end - pos < 3) throw "length error";
+      if (len - idx < 3) return idx;
 
       // invalid continuation byte
-      if (0x80 != (pos[1] & 0xc0)) throw "invalid continuation byte";
+      if (0x80 != (str[idx + 1] & 0xc0)) return idx;
 
       // invalid continuation byte
-      if (0x80 != (pos[2] & 0xc0)) throw "invalid continuation byte";
+      if (0x80 != (str[idx + 2] & 0xc0)) return idx;
 
-      pos += 3;
+      idx += 3;
       continue;
     }
 
     // 4 byte codepoint
     // leading byte: 0b11110xxx
     if (0xf0 == (c1 & 0xf8)) {
-      if (end - pos < 4) throw "length error";
+      if (len - idx < 4) return idx;
 
       // invalid continuation byte
-      if (0x80 != (pos[1] & 0xc0)) throw "invalid continuation byte";
+      if (0x80 != (str[idx + 1] & 0xc0)) return idx;
 
       // invalid continuation byte
-      if (0x80 != (pos[2] & 0xc0)) throw "invalid continuation byte";
+      if (0x80 != (str[idx + 2] & 0xc0)) return idx;
 
       // invalid continuation byte
-      if (0x80 != (pos[3] & 0xc0)) throw "invalid continuation byte";
+      if (0x80 != (str[idx + 3] & 0xc0)) return idx;
 
-      pos += 4;
+      idx += 4;
       continue;
     }
-    throw 1234;
+
+    return std::size_t(-1);
   }
+  return idx;
+}
+
+[[noreturn, safety::panic(panic_code::generic)]]
+inline
+void panic_impl(string_constant<char> msg, source_location loc = source_location::current()) safe
+{
+#if !defined(LIBSAFECXX_PANIC_THROWS)
+  const [char; dyn]^ text = msg.text();
+  unsafe __assert_fail(
+    std::string((*text)~as_pointer, (*text)~length).c_str(),
+    loc.file_name(),
+    loc.line(),
+    loc.function_name()
+  );
+#endif
+
+  // TODO: without this, Circle claims this function _does_ return and refuses to compile
+  throw "malformed utf";
 }
 
 } // namespace detail
@@ -112,6 +139,7 @@ public:
   using difference_type        = std::ptrdiff_t;
   static constexpr size_type npos = size_type(-1);
 
+public:
   basic_string_view() = delete;
 
   basic_string_view(string_constant<value_type> sc) noexcept safe
@@ -123,7 +151,8 @@ public:
   basic_string_view(const [value_type; dyn]^/a str) safe
     : p_(str)
   {
-    unsafe detail::verify_utf((*self.p_)~as_pointer, (*self.p_)~length);
+    auto pos = detail::verify_utf(str);
+    if (pos != (*str)~length) detail::panic_impl("invalid utf detected");
   }
 
   value_type const* data(self) noexcept safe {

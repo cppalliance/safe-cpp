@@ -4,8 +4,8 @@
 
 #feature on safety
 
-#include <std2/string_view.hxx>
-#include <std2/string_constant.hxx>
+#include <std2/string_view.h>
+#include <std2/string_constant.h>
 
 template<class T, class U>
 void assert_eq(const T^ t, const U^ u) safe
