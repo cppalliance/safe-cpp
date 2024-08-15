@@ -20,89 +20,6 @@ namespace std2
 namespace detail
 {
 
-inline
-std::size_t verify_utf/(a)(const [char; dyn]^/a str) noexcept safe
-{
-  auto const len = (*str)~length;
-  std::size_t idx = 0;
-
-  for ( ; idx < len; ) {
-    auto const c1 = str[idx];
-
-    if ((0x80 & c1) == 0) {
-      // ascii byte
-      ++idx;
-      continue;
-    }
-
-    // 2 byte codepoint
-    // leading byte: 0b110xxxxx
-    if ((0xc0 == (c1 & 0xe0))) {
-      if (len - idx < 2) return idx;
-
-      // invalid continuation byte
-      if (0x80 != (str[idx + 1] & 0xc0)) return idx;
-
-      idx += 2;
-      continue;
-    }
-
-    // 3 byte codepoint
-    // leading byte: 0b1110xxxx
-    if (0xe0 == (c1 & 0xf0)) {
-      if (len - idx < 3) return idx;
-
-      // invalid continuation byte
-      if (0x80 != (str[idx + 1] & 0xc0)) return idx;
-
-      // invalid continuation byte
-      if (0x80 != (str[idx + 2] & 0xc0)) return idx;
-
-      idx += 3;
-      continue;
-    }
-
-    // 4 byte codepoint
-    // leading byte: 0b11110xxx
-    if (0xf0 == (c1 & 0xf8)) {
-      if (len - idx < 4) return idx;
-
-      // invalid continuation byte
-      if (0x80 != (str[idx + 1] & 0xc0)) return idx;
-
-      // invalid continuation byte
-      if (0x80 != (str[idx + 2] & 0xc0)) return idx;
-
-      // invalid continuation byte
-      if (0x80 != (str[idx + 3] & 0xc0)) return idx;
-
-      idx += 4;
-      continue;
-    }
-
-    return std::size_t(-1);
-  }
-  return idx;
-}
-
-[[noreturn, safety::panic(panic_code::generic)]]
-inline
-void panic_impl(string_constant<char> msg, source_location loc = source_location::current()) safe
-{
-#if !defined(LIBSAFECXX_PANIC_THROWS)
-  const [char; dyn]^ text = msg.text();
-  unsafe __assert_fail(
-    std::string((*text)~as_pointer, (*text)~length).c_str(),
-    loc.file_name(),
-    loc.line(),
-    loc.function_name()
-  );
-#endif
-
-  // TODO: without this, Circle claims this function _does_ return and refuses to compile
-  throw "malformed utf";
-}
-
 } // namespace detail
 
 template<class CharT>
@@ -139,6 +56,89 @@ public:
   using difference_type        = std::ptrdiff_t;
   static constexpr size_type npos = size_type(-1);
 
+private:
+  [[noreturn, safety::panic(panic_code::generic)]]
+  static
+  void panic_impl(string_constant<char> msg, source_location loc = source_location::current()) safe
+  {
+  #if !defined(LIBSAFECXX_PANIC_THROWS)
+    const [char; dyn]^ text = msg.text();
+    unsafe __assert_fail(
+      std::string((*text)~as_pointer, (*text)~length).c_str(),
+      loc.file_name(),
+      loc.line(),
+      loc.function_name()
+    );
+  #else
+    throw "malformed utf";
+  #endif
+  }
+
+  static
+  size_type verify_utf/(a)(const [char; dyn]^/a str) noexcept safe
+  {
+    auto const len = (*str)~length;
+    size_type idx = 0;
+
+    for ( ; idx < len; ) {
+      auto const c1 = str[idx];
+
+      if ((0x80 & c1) == 0) {
+        // ascii byte
+        ++idx;
+        continue;
+      }
+
+      // 2 byte codepoint
+      // leading byte: 0b110xxxxx
+      if ((0xc0 == (c1 & 0xe0))) {
+        if (len - idx < 2) return idx;
+
+        // invalid continuation byte
+        if (0x80 != (str[idx + 1] & 0xc0)) return idx;
+
+        idx += 2;
+        continue;
+      }
+
+      // 3 byte codepoint
+      // leading byte: 0b1110xxxx
+      if (0xe0 == (c1 & 0xf0)) {
+        if (len - idx < 3) return idx;
+
+        // invalid continuation byte
+        if (0x80 != (str[idx + 1] & 0xc0)) return idx;
+
+        // invalid continuation byte
+        if (0x80 != (str[idx + 2] & 0xc0)) return idx;
+
+        idx += 3;
+        continue;
+      }
+
+      // 4 byte codepoint
+      // leading byte: 0b11110xxx
+      if (0xf0 == (c1 & 0xf8)) {
+        if (len - idx < 4) return idx;
+
+        // invalid continuation byte
+        if (0x80 != (str[idx + 1] & 0xc0)) return idx;
+
+        // invalid continuation byte
+        if (0x80 != (str[idx + 2] & 0xc0)) return idx;
+
+        // invalid continuation byte
+        if (0x80 != (str[idx + 3] & 0xc0)) return idx;
+
+        idx += 4;
+        continue;
+      }
+
+      return size_type(-1);
+    }
+    return idx;
+  }
+
 public:
   basic_string_view() = delete;
 
@@ -151,8 +151,8 @@ public:
   basic_string_view(const [value_type; dyn]^/a str) safe
     : p_(str)
   {
-    auto pos = detail::verify_utf(str);
-    if (pos != (*str)~length) detail::panic_impl("invalid utf detected");
+    auto pos = verify_utf(p_);
+    if (pos != (*str)~length) panic_impl("invalid utf detected");
   }
 
   value_type const* data(self) noexcept safe {
