@@ -75,8 +75,10 @@ private:
   }
 
   static
-  size_type verify_utf/(a)(const [char; dyn]^/a str) noexcept safe
+  size_type verify_utf(const [char; dyn]^/a str) noexcept safe
   {
+    static_assert(sizeof(char) == sizeof(char8_t));
+
     auto const len = (*str)~length;
     size_type idx = 0;
 
@@ -134,9 +136,85 @@ private:
         continue;
       }
 
-      return size_type(-1);
+      return npos;
     }
     return idx;
+  }
+
+  static
+  size_type verify_utf(const [char8_t; dyn]^/a str) noexcept safe
+  {
+    unsafe return verify_utf(
+      ^*__slice_pointer(
+        reinterpret_cast<char const*>((*str)~as_pointer),
+        (*str)~length));
+  }
+
+  static
+  size_type verify_utf(const [char16_t; dyn]^/a str) noexcept safe
+  {
+    size_type idx = 0;
+    auto const len = (*str)~length;
+
+    for( ; idx < len; ) {
+      auto const c1 = str[idx];
+
+      if (c1 < 0xd800 || c1 >= 0xe000) {
+        ++idx;
+        continue;
+      }
+
+      // leading code point
+      if (0xd800 == (0xfc00 & c1)) {
+        if (len - idx < 2) return idx;
+
+        // trailing code point
+        if(0xdc00 != (0xfc00 & str[idx + 1])) return idx;
+
+        idx += 2;
+        continue;
+      }
+
+      return npos;
+    }
+
+    return idx;
+  }
+
+  static
+  size_type verify_utf(const [char32_t; dyn]^/a str) noexcept safe
+  {
+    size_type idx = 0;
+    auto const len = (*str)~length;
+
+    for ( ; idx < len; ) {
+      auto const c1 = str[idx];
+      if (c1 < 0xd800 || (c1 > 0xdfff && c1 <= 0x10ffff)) {
+        ++idx;
+        continue;
+      }
+
+      return npos;
+    }
+
+    return idx;
+  }
+
+  static
+  size_type verify_utf(const [wchar_t; dyn]^/a str) noexcept safe
+  {
+    if constexpr (sizeof(wchar_t) == 2) {
+      unsafe return verify_utf(
+        ^*__slice_pointer(
+          reinterpret_cast<char16_t const*>((*str)~as_pointer),
+          (*str)~length));
+    } else {
+      static_assert(sizeof(wchar_t) == 4);
+      unsafe return verify_utf(
+        ^*__slice_pointer(
+          reinterpret_cast<char32_t const*>((*str)~as_pointer),
+          (*str)~length));
+    }
   }
 
 public:
