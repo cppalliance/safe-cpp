@@ -523,6 +523,50 @@ void string_view_slice_wstring_constructor()
     assert_eq(sv.size(), 5u);
     assert_eq(sv.data(), (*str)~as_pointer);
   }
+
+  {
+    const [wchar_t; dyn]^ str = L"한";
+    std2::wstring_view sv = str;
+    assert(sv.size() > 0);
+    assert_eq(sv.data(), (*str)~as_pointer);
+  }
+}
+
+void string_view_compare()
+{
+  {
+    std2::string_constant<char> str = "£";
+
+    std2::string_view sv1 = str;
+    std2::string_view sv2 = str;
+
+    assert(sv1 == sv2);
+    assert(!(sv1 != sv2));
+  }
+
+  {
+    std2::string_constant<char> str1 = "£";
+    std2::string_constant<char> str2 = "rawr";
+
+    std2::string_view sv1 = str1;
+    std2::string_view sv2 = str2;
+
+    assert(sv1 != sv2);
+    assert(!(sv1 == sv2));
+  }
+}
+
+void string_view_slice()
+{
+  {
+    std2::string_constant<char> str = "£";
+    std2::string_view sv = str;
+
+    auto s = sv.as_slice();
+
+    assert_eq((*s)~length, sv.size());
+    assert_eq((*s)~as_pointer, sv.data());
+  }
 }
 
 int main()
@@ -533,4 +577,6 @@ int main()
   string_view_slice_utf16_constructor();
   string_view_slice_utf32_constructor();
   string_view_slice_wstring_constructor();
+  string_view_compare();
+  string_view_slice();
 }
