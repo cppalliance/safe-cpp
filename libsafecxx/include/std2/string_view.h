@@ -59,7 +59,7 @@ public:
 
   bool operator==(self, basic_string_view rhs) noexcept safe;
 
-  const [value_type; dyn]^/a as_slice(self) noexcept safe;
+  const [value_type; dyn]^/a slice(self) noexcept safe;
 };
 
 } // namespace std2
@@ -303,7 +303,7 @@ public:
     unsafe return !std::memcmp(self.data(), rhs.data(), sizeof(value_type) * self.size());
   }
 
-  const [value_type; dyn]^/a as_slice(self) noexcept safe {
+  const [value_type; dyn]^/a slice(self) noexcept safe {
     return self.p_;
   }
 

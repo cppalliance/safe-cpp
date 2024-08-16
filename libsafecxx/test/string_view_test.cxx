@@ -5,36 +5,12 @@
 #feature on safety
 
 #include <std2/string_view.h>
+
+#include "helpers.h"
 #include <std2/string_constant.h>
-
-template<class T, class U>
-void assert_eq(const T^ t, const U^ u) safe
-{
-  if (*t != *u) throw "unequal values";
-}
-
-void assert(bool b) safe
-{
-  if (!b) throw "failed boolean assertion";
-}
-
-template<class F>
-void assert_throws(F f) // safe
-{
-  bool threw = false;
-  try {
-    f();
-  } catch(...) {
-    threw = true;
-  }
-  assert(threw);
-}
 
 void string_view_constructor() safe
 {
-  // TODO: this segfaults, should eventually be fixed
-  // std2::string_constant<char> sc("rawr");
-
   std2::string_constant<char> sc = "hello, world!";
   std2::string_view sv = sc;
   assert_eq(sv.size(), (*sc.text())~length);
@@ -562,7 +538,7 @@ void string_view_slice()
     std2::string_constant<char> str = "£";
     std2::string_view sv = str;
 
-    auto s = sv.as_slice();
+    auto s = sv.slice();
 
     assert_eq((*s)~length, sv.size());
     assert_eq((*s)~as_pointer, sv.data());
