@@ -58,12 +58,12 @@ public:
     ++self->size_;
   }
 
-  const [value_type; dyn]^ slice(const self^) noexcept safe {
-    unsafe return slice_from_raw_parts(self.data(), self.size());
+  [value_type; dyn]^ slice(self^) noexcept safe {
+    unsafe return ^*__slice_pointer(self.data(), self.size());
   }
 
-  [value_type; dyn]^ slice(self^) noexcept safe {
-    unsafe return slice_from_raw_parts(self.data(), self.size());
+  const [value_type; dyn]^ slice(const self^) noexcept safe {
+    unsafe return ^*__slice_pointer(static_cast<const value_type*>(self.data()), self.size());
   }
 
   value_type^ operator[](self^, size_type i) noexcept safe {
@@ -73,6 +73,7 @@ public:
 
 private:
 
+  static
   void relocate_array(value_type* dst, value_type const* src, size_type n) {
     // TODO: we should add a relocation check here
     // this code likely isn't sound for types with non-trivial/non-defaulted
@@ -84,10 +85,10 @@ private:
     size_type cap = self.capacity();
     size_type ncap = cap ? 2 * cap : 1;
 
-    void* p;
+    value_type* p;
     unsafe {
-      p = ::operator new(ncap * sizeof(value_type));
-      std::memcpy(p, self.data(), self.size() * sizeof(value_type));
+      p = static_cast<value_type*>(::operator new(ncap * sizeof(value_type)));
+      relocate_array(p, self.data(), self.capacity());
       ::operator delete(self->p_);
     }
 
