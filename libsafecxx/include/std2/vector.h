@@ -31,6 +31,10 @@ public:
   {
   }
 
+  ~vector() safe {
+    unsafe ::operator delete(p_);
+  }
+
   value_type* data(self^) noexcept safe {
     return self->p_;
   }
