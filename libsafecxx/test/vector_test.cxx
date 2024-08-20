@@ -6,6 +6,9 @@
 
 #include <std2/vector.h>
 #include <std2/box.h>
+#include <std2/string_view.h>
+
+#include <string>
 
 #include "helpers.h"
 
@@ -27,8 +30,11 @@ void vector_constructor() safe
       assert_eq(s[1], 2);
       assert_eq(s[2], 3);
 
-      s[0] = 4;
-      assert_eq((^vec)[0], 4);
+      s[0] = 17;
+      assert_eq((^vec)[0], 17);
+
+      (^vec)[0] = 4;
+      assert_eq(vec[0], 4);
     }
 
     {
@@ -36,6 +42,12 @@ void vector_constructor() safe
       assert_eq(s[0], 4);
       assert_eq(s[1], 2);
       assert_eq(s[2], 3);
+    }
+
+    {
+      const std2::vector<int>^ v = ^vec;
+      const int^ x = (*v)[0];
+      assert_eq(*x, 4);
     }
   }
 
@@ -74,13 +86,13 @@ void vector_constructor() safe
 }
 
 template<std2::iterator T>
-void check_definition(const T^ t)
+void check_definition(const T^ t) safe
 {
   using item_type =
     typename impl<std2::slice_iterator<const int>, std2::iterator>::item_type;
 }
 
-void vector_iterator()
+void vector_iterator() safe
 {
   {
     std2::vector<int> v = {};
@@ -96,11 +108,11 @@ void vector_iterator()
     assert(v.empty());
     assert(b);
 
-    (^v).push_back(1);
-    (^v).push_back(2);
-    (^v).push_back(3);
-    (^v).push_back(4);
-    (^v).push_back(5);
+    v^.push_back(1);
+    v^.push_back(2);
+    v^.push_back(3);
+    v^.push_back(4);
+    v^.push_back(5);
 
     assert_eq(v.size(), 5u);
 
@@ -113,8 +125,43 @@ void vector_iterator()
   }
 }
 
+void vector_string_view() safe
+{
+  unsafe std::string s1 = "hello, world!";
+  unsafe std::string s2 = "walking home in the moonlight";
+  unsafe std::string s3 = "catching glimpses of my past life";
+
+  unsafe std2::string_view sv1 = std2::slice_from_raw_parts(s1.data(), s1.size());
+  unsafe std2::string_view sv2 = std2::slice_from_raw_parts(s2.data(), s2.size());
+  unsafe std2::string_view sv3 = std2::slice_from_raw_parts(s3.data(), s3.size());
+
+  std2::vector<std2::string_view> strs = {};
+  strs^.push_back(sv1);
+  strs^.push_back(sv2);
+  strs^.push_back(sv3);
+
+  assert_eq(strs.size(), 3u);
+
+  const std2::vector<std2::string_view>^ v = ^strs;
+  const std2::string_view^ sv = (*v)[0];
+  assert_eq(sv, sv1);
+}
+
+void vector_box() safe
+{
+  std2::vector<std2::box<int>> xs = {};
+
+  for (int i = 0; i < 16; ++i) {
+    xs^.push_back(std2::box(1));
+  }
+
+  assert_eq(xs.size(), 16u);
+}
+
 int main()
 {
   vector_constructor();
   vector_iterator();
+  vector_string_view();
+  vector_box();
 }

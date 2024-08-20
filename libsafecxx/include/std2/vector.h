@@ -32,8 +32,8 @@ public:
   {
   }
 
-  ~vector() safe {
-    unsafe ::operator delete(p_);
+  ~vector(self) safe {
+    unsafe ::operator delete(self.p_);
   }
 
   slice_iterator<const value_type> iter(const self^) noexcept safe {
@@ -60,6 +60,10 @@ public:
     return self->capacity_;
   }
 
+  bool empty(const self^) noexcept safe {
+    return self.size() == 0;
+  }
+
   void push_back(self^, T t) safe {
     if (self.capacity() == self.size()) { self.grow(); }
 
@@ -80,8 +84,9 @@ public:
     unsafe return ^self.data()[i];
   }
 
-  bool empty(const self^) noexcept safe {
-    return self.size() == 0;
+  const value_type^ operator[](const self^, size_type i) noexcept safe {
+    if (i >= self.size()) panic_bounds("vector subscript is out-of-bounds");
+    unsafe return ^self.data()[i];
   }
 
 private:
