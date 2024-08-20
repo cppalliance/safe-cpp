@@ -46,7 +46,7 @@ void vector_constructor() safe
 
     {
       const std2::vector<int>^ v = ^vec;
-      const int^ x = (*v)[0];
+      const int^ x = v[0];
       assert_eq(*x, 4);
     }
   }
@@ -81,6 +81,25 @@ void vector_constructor() safe
       (void)q;
 
       assert_eq(**q, 1);
+    }
+  }
+
+  {
+    std2::vector<int> xs = { 1, 2, 3, 4, 5 };
+    assert_eq(xs.size(), 5u);
+    for (int i = 0; i < 5; ++i) {
+      auto idx = static_cast<std::size_t>(i);
+      assert_eq(xs[idx], i + 1);
+    }
+  }
+
+  {
+    std2::vector<std2::box<int>> xs =
+      { std2::box<int>(1), std2::box<int>(2), std2::box<int>(3), std2::box<int>(4), std2::box<int>(5) };
+    assert_eq(xs.size(), 5u);
+    for (int i = 0; i < 5; ++i) {
+      auto idx = static_cast<std::size_t>(i);
+      assert_eq(*xs[idx], i + 1);
     }
   }
 }
@@ -143,7 +162,7 @@ void vector_string_view() safe
   assert_eq(strs.size(), 3u);
 
   const std2::vector<std2::string_view>^ v = ^strs;
-  const std2::string_view^ sv = (*v)[0];
+  const std2::string_view^ sv = v[0];
   assert_eq(sv, sv1);
 }
 

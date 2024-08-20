@@ -9,9 +9,11 @@
 #include <std2/iterator.h>
 #include <std2/panic.h>
 #include <std2/slice.h>
+#include <std2/initializer_list.h>
 
 #include <cstddef>
 #include <cstring>
+#include <memory>
 
 #include <cstdio>
 
@@ -32,8 +34,31 @@ public:
   {
   }
 
-  ~vector(self) safe {
-    unsafe ::operator delete(self.p_);
+  vector(initializer_list<value_type> ilist) safe
+    : vector()
+  {
+    self^.reserve(ilist.size());
+    unsafe relocate_array(self^.data(), ilist.data(), ilist.size());
+    self.size_ = ilist.size();
+
+    unsafe ilist^.advance(ilist.size());
+  }
+
+  ~vector() safe {
+    // TODO: std::destroy_n() doesn't seem to like `int^` as a value_type
+    // eventually we should fix this
+
+    auto const* end = self.data() + self.size();
+    auto* pos = self^.data();
+
+    unsafe {
+      while (pos < end) {
+        auto t = __rel_read(pos);
+        drp t;
+        ++pos;
+      }
+    }
+    unsafe ::operator delete(p_);
   }
 
   slice_iterator<const value_type> iter(const self^) noexcept safe {
@@ -89,6 +114,20 @@ public:
     unsafe return ^self.data()[i];
   }
 
+  void reserve(self^, size_type n) safe {
+    if (n <= self.capacity()) return;
+
+    value_type* p;
+    unsafe {
+      p = static_cast<value_type*>(::operator new(n * sizeof(value_type)));
+      relocate_array(p, self.data(), self.size());
+      ::operator delete(self->p_);
+    }
+
+    self->p_ = p;
+    self->capacity_ = n;
+  }
+
 private:
 
   static
@@ -102,16 +141,7 @@ private:
   void grow(self^) safe {
     size_type cap = self.capacity();
     size_type ncap = cap ? 2 * cap : 1;
-
-    value_type* p;
-    unsafe {
-      p = static_cast<value_type*>(::operator new(ncap * sizeof(value_type)));
-      relocate_array(p, self.data(), self.capacity());
-      ::operator delete(self->p_);
-    }
-
-    self->p_ = (value_type*)p;
-    self->capacity_ = ncap;
+    self.reserve(ncap);
   }
 
   value_type* p_;
