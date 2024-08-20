@@ -39,3 +39,4 @@ endfunction()
 
 safe_cxx_compile_fail_test(string_view1 "use of sv depends on expired loan")
 safe_cxx_compile_fail_test(box_incomplete "member type incomplete is incomplete")
+safe_cxx_compile_fail_test(vector1 "use of strs depends on expired loan")
