@@ -5,6 +5,7 @@
 #feature on safety
 
 #include <std2/vector.h>
+#include <std2/box.h>
 
 #include "helpers.h"
 
@@ -43,27 +44,77 @@ void vector_constructor() safe
     {
       std2::vector<int^> vec = {};
       vec^.push_back(^x);
+      assert_eq(vec.size(), 1u);
 
-      // TODO: should this compile?
-      // this works in Rust:
-      // let mut x = 1_i32;
-      // let mut vec = Vec::<&mut i32>::new();
-      //
-      // vec.push(&mut x);
-      //
-      // let xs : &[&mut i32] = vec.as_slice();
-      // let _rawr: &&mut i32 = &xs[0];
-      // const [int^; dyn]^ elems = vec.slice();
+      {
+        const [int^; dyn]^ elems = vec.slice();
+        assert_eq(*elems[0], 1);
+      }
 
       [int^; dyn]^ elems = (^vec).slice();
       *elems[0] = 20;
     }
-
     assert_eq(x, 20);
+  }
+
+  {
+    int x = 1;
+    {
+      int^ p = ^x;
+      std2::vector<int^^> vec = {};
+      vec^.push_back(^p);
+      assert_eq(vec.size(), 1u);
+
+      int^ const^ q = vec.slice()[0];
+      (void)q;
+
+      assert_eq(**q, 1);
+    }
+  }
+}
+
+template<std2::iterator T>
+void check_definition(const T^ t)
+{
+  using item_type =
+    typename impl<std2::slice_iterator<const int>, std2::iterator>::item_type;
+}
+
+void vector_iterator()
+{
+  {
+    std2::vector<int> v = {};
+    auto it = v.iter();
+
+    check_definition(^it);
+
+    auto m_val = (^it).std2::iterator::next();
+    bool b = match (m_val) -> bool {
+      .none => true;
+      .some(x) => false;
+    };
+    assert(v.empty());
+    assert(b);
+
+    (^v).push_back(1);
+    (^v).push_back(2);
+    (^v).push_back(3);
+    (^v).push_back(4);
+    (^v).push_back(5);
+
+    assert_eq(v.size(), 5u);
+
+    int sum = 0;
+    for (int x : v.iter()) {
+      sum += x;
+    }
+
+    assert_eq(sum, 1 + 2 + 3 + 4 + 5);
   }
 }
 
 int main()
 {
   vector_constructor();
+  vector_iterator();
 }

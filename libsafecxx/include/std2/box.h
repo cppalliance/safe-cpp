@@ -5,7 +5,7 @@ namespace std2
 {
 
 template<class T+>
-class box
+class [[safety::niche_zero]] box
 {
   T* p_;
   T __phantom_data;

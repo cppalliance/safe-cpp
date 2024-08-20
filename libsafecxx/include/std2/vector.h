@@ -6,6 +6,7 @@
 #pragma once
 #feature on safety
 
+#include <std2/iterator.h>
 #include <std2/panic.h>
 #include <std2/slice.h>
 
@@ -35,6 +36,14 @@ public:
     unsafe ::operator delete(p_);
   }
 
+  slice_iterator<const value_type> iter(const self^) noexcept safe {
+    return slice_iterator<const value_type>(self.slice());
+  }
+
+  slice_iterator<value_type> iter(self^) noexcept safe {
+    return slice_iterator<value_type>(self.slice());
+  }
+
   value_type* data(self^) noexcept safe {
     return self->p_;
   }
@@ -55,20 +64,24 @@ public:
     if (self.capacity() == self.size()) { self.grow(); }
 
     unsafe __rel_write(self->p_ + self->size_, rel t);
-    ++self->size_;
+   ++self->size_;
   }
 
   [value_type; dyn]^ slice(self^) noexcept safe {
-    unsafe return ^*__slice_pointer(self.data(), self.size());
+    unsafe return slice_from_raw_parts(self.data(), self.size());
   }
 
   const [value_type; dyn]^ slice(const self^) noexcept safe {
-    unsafe return ^*__slice_pointer(static_cast<const value_type*>(self.data()), self.size());
+    unsafe return slice_from_raw_parts(self.data(), self.size());
   }
 
   value_type^ operator[](self^, size_type i) noexcept safe {
     if (i >= self.size()) panic_bounds("vector subscript is out-of-bounds");
     unsafe return ^self.data()[i];
+  }
+
+  bool empty(const self^) noexcept safe {
+    return self.size() == 0;
   }
 
 private:
@@ -99,6 +112,7 @@ private:
   value_type* p_;
   size_type capacity_;
   size_type size_;
+  // value_type __phantom_data;
 };
 
 } // namespace std2
