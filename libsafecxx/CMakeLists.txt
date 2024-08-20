@@ -24,13 +24,14 @@ file(
   "src/*.cxx"
 )
 
-add_library(safe_cxx ${safe_cxx_sources})
+# add_library(safe_cxx ${safe_cxx_sources})
+add_library(safe_cxx INTERFACE)
 
-target_include_directories(safe_cxx PUBLIC include)
+target_include_directories(safe_cxx INTERFACE include)
 
 target_link_libraries(
   safe_cxx
-  PUBLIC
+  INTERFACE
 )
 
 target_sources(
@@ -40,15 +41,12 @@ target_sources(
   FILES ${safe_cxx_headers}
 )
 
-generate_export_header(safe_cxx)
-target_include_directories(safe_cxx PUBLIC ${CMAKE_BINARY_DIR})
-
 add_library(SafeCXX::core ALIAS safe_cxx)
 
 option(SAFE_CXX_BUILD_TESTING "" OFF)
 if(SAFE_CXX_BUILD_TESTING)
   set_target_properties(safe_cxx PROPERTIES VERIFY_INTERFACE_HEADER_SETS ON)
-  target_compile_definitions(safe_cxx PUBLIC LIBSAFECXX_PANIC_THROWS)
+  target_compile_definitions(safe_cxx INTERFACE LIBSAFECXX_PANIC_THROWS)
   include(CTest)
   add_subdirectory(test)
 endif()
