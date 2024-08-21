@@ -15,7 +15,7 @@ endfunction()
 file(
   GLOB safe_cxx_test_sources
   CONFIGURE_DEPENDS
-  "*_test.cxx"
+  "*.cxx"
 )
 
 foreach(test_source ${safe_cxx_test_sources})

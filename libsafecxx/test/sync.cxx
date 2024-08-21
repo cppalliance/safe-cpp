@@ -26,9 +26,9 @@ static_assert(impl<int, std2::sync>);
 
 // Mutable borrows T^ are send if T is sync.
 static_assert(impl<int^, std2::send>);
-static_assert(!impl<IsSend^, std2::send>);
+static_assert(impl<IsSend^, std2::send>);
 static_assert(!impl<NotSend^, std2::send>);
-static_assert(impl<IsSync^, std2::send>);
+static_assert(!impl<IsSync^, std2::send>);
 static_assert(!impl<NotSync^, std2::send>);
 
 // Shared borrows const T^ are send if T is sync.
@@ -71,7 +71,7 @@ static_assert(!impl<[NotSync; dyn], std2::sync>);
 
 // Test auto send/sync on classes.
 template<typename... Ts>
-struct MyClass { 
+struct MyClass {
   // Useng member pack expansion, but the send/sync test also looks at
   // base classes.
   Ts... members;
@@ -84,3 +84,5 @@ static_assert(!impl<MyClass<NotSend, const int^, double>, std2::send>);
 // A class is sync if all its subobjects are send.
 static_assert(impl<MyClass<IsSync, const int^, double>, std2::sync>);
 static_assert(!impl<MyClass<NotSync, const int^, double>, std2::sync>);
+
+int main(){}
