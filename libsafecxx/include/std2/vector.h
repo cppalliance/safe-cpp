@@ -20,6 +20,7 @@
 namespace std2
 {
 
+// TODO: what's the syntax for making vector conditionally send/sync when T is?
 template<class T+>
 class vector
 {
