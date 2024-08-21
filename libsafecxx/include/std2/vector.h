@@ -48,10 +48,10 @@ public:
     // TODO: std::destroy_n() doesn't seem to like `int^` as a value_type
     // eventually we should fix this
 
-    auto const* end = self.data() + self.size();
-    auto* pos = self^.data();
-
     unsafe {
+      auto const* end = self.data() + self.size();
+      auto* pos = self^.data();
+
       while (pos < end) {
         auto t = __rel_read(pos);
         drp t;

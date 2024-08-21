@@ -32,7 +32,7 @@ class slice_iterator/(a)
 
 public:
   slice_iterator([T; dyn]^/a s) noexcept safe
-    : p_((*s)~as_pointer), end_((*s)~as_pointer + (*s)~length)
+    : p_((*s)~as_pointer), unsafe end_((*s)~as_pointer + (*s)~length)
   {
   }
 

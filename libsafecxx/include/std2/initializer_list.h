@@ -21,7 +21,7 @@ class initializer_list/(a) {
   explicit
   initializer_list([T; dyn]^/a data) noexcept safe :
     _cur((*data)~as_pointer),
-    _end((*data)~as_pointer + (*data)~length) { }
+    unsafe _end((*data)~as_pointer + (*data)~length) { }
 
 public:
   // compiler-provided
