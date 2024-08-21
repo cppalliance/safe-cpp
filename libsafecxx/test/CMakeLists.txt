@@ -95,9 +95,10 @@ function(safe_cxx_compile_fail_test testname fail_regex)
   add_test(
     NAME "safecxx-compile-fail-${testname}"
     COMMAND "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target "compile-fail-${testname}" --config $<CONFIG>)
-    set_property(TEST "safecxx-compile-fail-${testname}" PROPERTY PASS_REGULAR_EXPRESSION "${fail_regex}")
+  set_property(TEST "safecxx-compile-fail-${testname}" PROPERTY PASS_REGULAR_EXPRESSION "${fail_regex}")
 endfunction()
 
 safe_cxx_compile_fail_test(string_view1 "use of sv depends on expired loan")
 safe_cxx_compile_fail_test(box_incomplete "member type incomplete is incomplete")
 safe_cxx_compile_fail_test(vector1 "use of strs depends on expired loan")
+safe_cxx_compile_fail_test(vector2 "use of it depends on expired loan")
