@@ -24,6 +24,67 @@ foreach(test_source ${safe_cxx_test_sources})
   safe_cxx_test(${test_filename})
 endforeach()
 
+function(safe_cxx_lang_fail_test testname)
+  cmake_path(SET test_path ${testname})
+  cmake_path(GET test_path STEM test_filename)
+
+  add_library("lang-fail-${test_filename}" STATIC EXCLUDE_FROM_ALL "${testname}")
+  set(test_name "lang-fail-${test_filename}")
+  target_link_libraries(
+    "${test_name}"
+    PRIVATE
+      SafeCXX::core
+  )
+
+  add_test(
+    NAME "safecxx-lang-fail-${test_filename}"
+    COMMAND "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target "${test_name}" --config $<CONFIG>)
+
+  set_property(TEST "safecxx-lang-fail-${test_filename}" PROPERTY WILL_FAIL TRUE)
+endfunction()
+
+function(safe_cxx_panic_fail_test testname)
+  cmake_path(SET test_path ${testname})
+  cmake_path(GET test_path STEM test_filename)
+
+  set(test_name "panic-fail-${test_filename}")
+  add_executable("${test_name}" "${testname}" "compile-fail/abort_handler.cxx")
+  target_link_libraries(
+    "${test_name}"
+    PRIVATE
+      SafeCXX::core
+  )
+
+  add_test(
+    NAME "safecxx-panic-fail-${test_filename}"
+    COMMAND "${test_name}"
+  )
+
+  set_property(TEST "safecxx-panic-fail-${test_filename}" PROPERTY WILL_FAIL TRUE)
+endfunction()
+
+file(
+  GLOB_RECURSE safe_cxx_lang_fail_test_sources
+  CONFIGURE_DEPENDS
+  RELATIVE "${CMAKE_CURRENT_LIST_DIR}"
+  "${CMAKE_CURRENT_LIST_DIR}/compile-fail/unsafe/*.cxx"
+)
+
+file(
+  GLOB_RECURSE safe_cxx_panic_fail_test_sources
+  CONFIGURE_DEPENDS
+  RELATIVE "${CMAKE_CURRENT_LIST_DIR}"
+  "${CMAKE_CURRENT_LIST_DIR}/compile-fail/panic/*.cxx"
+)
+
+foreach(testname ${safe_cxx_lang_fail_test_sources})
+  safe_cxx_lang_fail_test("${testname}")
+endforeach()
+
+foreach(testname ${safe_cxx_panic_fail_test_sources})
+  safe_cxx_panic_fail_test("${testname}")
+endforeach()
+
 function(safe_cxx_compile_fail_test testname fail_regex)
   add_library("compile-fail-${testname}" STATIC EXCLUDE_FROM_ALL "compile-fail/${testname}.cxx")
   target_link_libraries(
