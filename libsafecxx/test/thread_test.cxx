@@ -25,7 +25,21 @@ int add(int x, int y) safe
   return z;
 }
 
+struct send_callable
+{
+  int x_;
 
+  send_callable() safe
+    : x_{42}
+  {}
+
+  int operator()(self, int x) noexcept safe {
+    self.x_ = 24;
+    return self.x_ + x;
+  }
+};
+
+static_assert(send_callable~is_send);
 
 void thread_constructor() safe
 {
@@ -40,6 +54,11 @@ void thread_constructor() safe
 
   {
     std2::thread t(add, 1, 2);
+  }
+
+  {
+    std2::thread t(send_callable{}, 24);
+    t^.join();
   }
 
   // throw a sleep in here so that detached threads run to completion (hopefully)

@@ -31,18 +31,25 @@ public:
     {
     }
 
-
   public:
     ~lock_guard() safe {
       unsafe m_->mtx_.get()&->unlock();
     }
 
-    T^ operator*(self^) noexcept safe {
+    T const^ borrow(self const^) noexcept safe {
       unsafe return ^*self->m_->data_.get();
     }
 
-    T const^ operator*(self const^) noexcept safe {
+    T^ borrow(self^) noexcept safe {
       unsafe return ^*self->m_->data_.get();
+    }
+
+    T^ operator*(self^) noexcept safe {
+      return self.borrow();
+    }
+
+    T const^ operator*(self const^) noexcept safe {
+      return self.borrow();
     }
   };
 
@@ -51,6 +58,8 @@ public:
     , unsafe mtx_()
   {
   }
+
+  operator rel(mutex) = delete;
 
   lock_guard lock(self const^) safe  {
     unsafe self->mtx_.get()&->lock();
