@@ -30,7 +30,7 @@ class thread
 
     // TODO: someday learn this tuple syntax
     auto tup = p rel.into_inner();
-    tup.0(rel tup.1.[:] ...);
+    mut tup.0(rel tup.1.[:] ...);
   }
 
 public:
@@ -43,7 +43,7 @@ public:
   requires(
     F~is_send &&
     (Args~is_send && ...) &&
-    safe(f rel.(rel args...)))
+    safe(mut f(rel args...)))
     : unsafe t_()
   {
     using tuple_type = (F, (Args...,));
