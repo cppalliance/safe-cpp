@@ -15,7 +15,7 @@ class manually_drop
   T t_;
 
 public:
-  manually_drop(T t) safe
+  manually_drop(T t) noexcept safe
     : t_(rel t)
   {
   }
@@ -24,7 +24,7 @@ public:
 };
 
 template<class T+>
-void forget(T t) safe
+void forget(T t) noexcept safe
 {
   manually_drop<T>(rel t);
 }
