@@ -67,7 +67,7 @@ public:
   // Unsafe call to advance. Use this after relocating data out of
   // data().
   void advance(self^, std::size_t size) noexcept {
-    self->_cur += size;
+    self->_cur += static_cast<std::ptrdiff_t>(size);
   }
 };
 
