@@ -14,7 +14,9 @@ namespace std2
 {
 
 template<class T+>
-class mutex
+class
+[[unsafe::send(T~is_send), unsafe::sync(T~is_send)]]
+mutex
 {
   unsafe_cell<T> data_;
   unsafe_cell<std::mutex> mtx_;

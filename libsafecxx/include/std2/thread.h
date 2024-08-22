@@ -43,7 +43,7 @@ public:
   requires(
     F~is_send &&
     (Args~is_send && ...) &&
-    safe(f(rel args...)))
+    safe(f rel.(rel args...)))
     : unsafe t_()
   {
     using tuple_type = (F, (Args...,));
