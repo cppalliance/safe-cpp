@@ -33,9 +33,9 @@ struct send_callable
     : x_{42}
   {}
 
-  int operator()(self, int x) noexcept safe {
-    self.x_ = 24;
-    return self.x_ + x;
+  int operator()(self^, int x) noexcept safe {
+    self->x_ = 24;
+    return self->x_ + x;
   }
 };
 
