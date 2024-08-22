@@ -8,6 +8,7 @@
 
 #include <std2/box.h>
 #include <std2/tuple.h>
+#include <std2/utility.h>
 
 #include <thread>
 
@@ -16,28 +17,21 @@
 namespace std2
 {
 
-interface send {};
-
 class thread
 {
   std::thread t_;
 
   template<class F, class ...Args>
-  struct invoker
+  static
+  void call((F, (Args...,))* p_tup) safe
   {
-    using tuple_type = (F, (Args...,));
+    box<(F, (Args...,))> p;
+    unsafe p = p_tup;
 
-    static
-    void call(tuple_type* p_tup) safe
-    {
-      box<tuple_type> p;
-      unsafe p = p_tup;
-
-      // TODO: someday learn this tuple syntax
-      auto tup = p rel.into_inner();
-      tup.0(rel tup.1.[:] ...);
-    }
-  };
+    // TODO: someday learn this tuple syntax
+    auto tup = p rel.into_inner();
+    tup.0(rel tup.1.[:] ...);
+  }
 
 public:
 
@@ -59,7 +53,7 @@ public:
     // must catch the case where a clever stdlib dev thinks they can
     // replace p.get() with `p rel.leak()` here, which causes a memory
     // leak upon `std::thread::thread` throwing
-    unsafe t_ = std::thread(&invoker<F, Args...>::call, p.get());
+    unsafe t_ = std::thread(&call<F, Args...>, p.get());
 
     forget(rel p);
   }

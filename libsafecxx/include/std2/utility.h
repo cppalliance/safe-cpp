@@ -9,6 +9,9 @@
 namespace std2
 {
 
+interface send {};
+interface sync {};
+
 template<class T+>
 class manually_drop
 {
@@ -28,5 +31,22 @@ void forget(T t) noexcept safe
 {
   manually_drop<T>(rel t);
 }
+
+template<class T+>
+class [[unsafe::sync(false)]] unsafe_cell
+{
+  T t_;
+
+public:
+  unsafe_cell() = default;
+  unsafe_cell(T t) noexcept safe
+    : t_(rel t)
+  {
+  }
+
+  T* get(self const^) noexcept safe {
+    return const_cast<T*>(addr self->t_);
+  }
+};
 
 } // namespace std2

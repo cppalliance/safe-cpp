@@ -2,12 +2,15 @@
 # Distributed under the Boost Software License, Version 1.0. (See accompanying
 # file LICENSE.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+find_package(Threads REQUIRED)
+
 function(safe_cxx_test testname)
   add_executable(${testname} ${testname}.cxx)
   target_link_libraries(
     ${testname}
     PRIVATE
       SafeCXX::core
+      Threads::Threads
   )
   add_test(NAME safecxx-${testname} COMMAND ${testname})
 endfunction()
@@ -34,6 +37,7 @@ function(safe_cxx_lang_fail_test testname)
     "${test_name}"
     PRIVATE
       SafeCXX::core
+      Threads::Threads
   )
 
   add_test(
@@ -53,6 +57,7 @@ function(safe_cxx_panic_fail_test testname)
     "${test_name}"
     PRIVATE
       SafeCXX::core
+      Threads::Threads
   )
 
   add_test(
@@ -91,6 +96,7 @@ function(safe_cxx_compile_fail_test testname fail_regex)
     "compile-fail-${testname}"
     PRIVATE
       SafeCXX::core
+      Threads::Threads
   )
   add_test(
     NAME "safecxx-compile-fail-${testname}"
@@ -102,3 +108,5 @@ safe_cxx_compile_fail_test(string_view1 "use of sv depends on expired loan")
 safe_cxx_compile_fail_test(box_incomplete "member type incomplete is incomplete")
 safe_cxx_compile_fail_test(vector1 "use of strs depends on expired loan")
 safe_cxx_compile_fail_test(vector2 "use of it depends on expired loan")
+safe_cxx_compile_fail_test(mutex1 "use of \\*x depends on expired loan")
+safe_cxx_compile_fail_test(mutex2 "cannot convert prvalue const int\\^ to int\\^")

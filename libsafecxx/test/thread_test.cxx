@@ -5,24 +5,36 @@
 #feature on safety
 
 #include <std2/thread.h>
+#include <std2/mutex.h>
 
 #include <cstdio>
 
+#include "helpers.h"
+
+static std2::mutex<int> const mtx = 1337;
+
 int add(int x, int y) safe
 {
-  return x + y;
+  auto z = x + y;
+  int^ r;
+  {
+    auto guard = mtx.lock();
+    r = guard^.operator*();
+    *r = z;
+  }
+  return z;
 }
 
-struct [[unsafe::send]] lmao {};
 
-void tester(lmao) safe
-{
-}
 
 void thread_constructor() safe
 {
   {
     std2::thread t(add, 1, 2);
+
+    int r = *mtx.lock();
+    if (r != 1337) assert_eq(r, 1 + 2);
+
     t^.join();
   }
 
