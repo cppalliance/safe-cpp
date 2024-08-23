@@ -39,3 +39,7 @@ Several integral math operations signal floating-point unit errors. Languages ma
 It's unsafe to subscript a pointer. But it's safe to subscript an array or slice object. 
 
 ### Library panic
+
+## Type-based safety
+
+The `unsafe` type qualifier.
