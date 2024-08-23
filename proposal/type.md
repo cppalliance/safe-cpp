@@ -12,7 +12,7 @@ using namespace std2;
 
 int main() safe {
   // No default construct. p is uninitialized.
-  unique_ptr<string> p;
+  box<string> p;
 
   // Ill-formed: p is uninitialized.
   println(*p);
@@ -26,7 +26,7 @@ safety: unique1.cxx:11:12
 cannot use uninitialized object p
 ```
 
-The `std2::unique_ptr` has no default state. It's safe against [null pointer type safety bugs](intro.md#2-type-safety-null-variety). A `unique_ptr` that's declared without a constructor is not default initialized. It's uninitialized. It's illegal to use until it's been assigned to.
+The `std2::box` has no default state. It's safe against [null pointer type safety bugs](intro.md#2-type-safety-null-variety). A `box` that's declared without a constructor is not default initialized. It's uninitialized. It's illegal to use until it's been assigned to.
 
 ```cpp
 #feature on safety
@@ -34,12 +34,12 @@ The `std2::unique_ptr` has no default state. It's safe against [null pointer typ
 
 using namespace std2;
 
-void f(unique_ptr<string> p) safe { }
+void f(box<string> p) safe { }
 
 int main() safe {
   // No default construct. p is uninitialized.
-  unique_ptr<string> p;
-  p = unique_ptr<string>::make("Hello");
+  box<string> p;
+  p = box<string>::make("Hello");
   println(*p);
 
   // Relocate to another function.
@@ -57,7 +57,7 @@ safety: unique2.cxx:18:12
 cannot use uninitialized object p
 ```
 
-Once we assign to `p`, we can use it. But we can't `std::move` into another function, because move semantics put the operand into its default state, and we're stipulating that the unique_ptr has no default state. Fortunately, the new object model provides for _relocation_, which moves the contents of the object into a value, and sets the source to uninitialized. The destructor on the old object never gets run, because that old declaration no longer owns the object. Ownership has changed with the relocation.
+Once we assign to `p`, we can use it. But we can't `std::move` into another function, because move semantics put the operand into its default state, and we're stipulating that the box has no default state. Fortunately, the new object model provides for _relocation_, which moves the contents of the object into a value, and sets the source to uninitialized. The destructor on the old object never gets run, because that old declaration no longer owns the object. Ownership has changed with the relocation.
 
 It's a feature, not a defect, that the compiler errors when you use an uninitialized or potentially uninitialized object. The alternative is a type safety error, such as a null pointer dereference undefined behavior.
 
@@ -76,7 +76,7 @@ Why do I make both copy and relocation explicit? I want to make it easy for user
 
 Local objects start off uninitialized. They're initialized when first assigned to. Then they're uninitialized again when relocated from. If you want to _destruct_ an object prior to it going out of scope, use _drp-expression_. Unlike Rust's `drop` API,[^drop] this works even on objects that are only potentially initialized (was uninitialized on some control flow paths) or partially initialized (has some uninitialized subobjects).
 
-Consider a function like `std::unique_ptr::reset`.[^unique_ptr-reset] It destructs the existing object, if one is engaged, and sets the unique_ptr to its null state. But in our safe version, unique_ptr doesn't have a default state. It doesn't supply the `reset` member function. Instead, users just drop it, running its destructor and leaving it uninitialized.
+Consider a function like `std::unique_ptr::reset`.[^unique_ptr-reset] It destructs the existing object, if one is engaged, and sets the unique_ptr to its null state. But in our safe version, box doesn't have a default state. It doesn't supply the `reset` member function. Instead, users just drop it, running its destructor and leaving it uninitialized.
 
 You've noticed the nonsense spellings for these keywords. Why not call them `move`, `copy` and `drop`? I wanted to avoid shadowing those common identifiers and improve results when searching code or the web.
 
