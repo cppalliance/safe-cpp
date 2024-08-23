@@ -6,9 +6,11 @@
 #pragma once
 #feature on safety
 
+#include <std2/box.h>
 #include <std2/utility.h>
 
 #include <mutex>
+#include <new>
 
 namespace std2
 {
@@ -18,8 +20,19 @@ class
 [[unsafe::send(T~is_send), unsafe::sync(T~is_send)]]
 mutex
 {
+  using mutex_type = unsafe_cell<std::mutex>;
+
   unsafe_cell<T> data_;
-  unsafe_cell<std::mutex> mtx_;
+  box<mutex_type> mtx_;
+
+  static
+  box<mutex_type>
+  init_mtx()
+  {
+    auto p = static_cast<mutex_type*>(::operator new(sizeof(mutex_type)));
+    new(p) mutex_type();
+    return box<mutex_type>(p);
+  }
 
 public:
   class lock_guard/(a)
@@ -33,9 +46,9 @@ public:
     {
     }
 
-  public:
+    public:
     ~lock_guard() safe {
-      unsafe m_->mtx_.get()&->unlock();
+      unsafe m_->mtx_->get()&->unlock();
     }
 
     T const^ borrow(self const^) noexcept safe {
@@ -57,14 +70,15 @@ public:
 
   mutex(T data) noexcept safe
     : data_(rel data)
-    , unsafe mtx_()
+    , unsafe mtx_(init_mtx())
   {
   }
 
-  operator rel(mutex) = delete;
+  mutex(mutex const^) = delete;
 
   lock_guard lock(self const^) safe  {
-    unsafe self->mtx_.get()&->lock();
+    auto *r = self->mtx_->get();
+    unsafe self->mtx_->get()&->lock();
     return lock_guard(self);
   }
 };

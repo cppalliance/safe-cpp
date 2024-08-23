@@ -7,6 +7,7 @@
 #include <std2/thread.h>
 #include <std2/mutex.h>
 #include <std2/vector.h>
+#include <std2/arc.h>
 
 #include <cstdio>
 
@@ -14,12 +15,12 @@
 
 static std2::mutex<int> const mtx = 1337;
 
-int add(int x, int y) safe
+int add(std2::arc<std2::mutex<int>> mtx, int x, int y) safe
 {
   auto z = x + y;
   int^ r;
   {
-    auto guard = mtx.lock();
+    unsafe auto guard = mtx.lock();
     r = guard^.operator*();
     *r = z;
   }
@@ -61,7 +62,7 @@ void thread_constructor() safe
   {
     std2::thread t(add, 1, 2);
 
-    int r = *mtx.lock();
+    unsafe int r = *mtx.lock();
     if (r != 1337) assert_eq(r, 1 + 2);
 
     t^.join();
@@ -86,16 +87,28 @@ static_assert(std2::mutex<send_callable>~is_sync);
 static_assert(!std2::mutex<nonsend_callable>~is_send);
 static_assert(!std2::mutex<nonsend_callable>~is_sync);
 
-void mutex_test() safe
+void adder(std2::mutex<int> const^/static m) safe
 {
-  int x = 13;
-  static std2::mutex<int^> const lock = ^x;
+  unsafe std::this_thread::sleep_for(std::chrono::milliseconds(250));
+  for (int i = 0; i < 1'000'000; ++i) {
+    auto guard = m.lock();
+    int^ x = ^*guard^.borrow();
+    *x += 1;
+  }
+};
 
+void mutex_test()
+{
   std2::vector<std2::thread> threads = {};
-  threads^.push_back(std2::thread([]()safe{}));
+  std2::arc<std2::mutex<int>> sp(std2::mutex<int>(1337));
+
+  int const num_threads = 8;
+  for (int i = 0; i < num_threads; ++i) {
+    // threads^.push_back(std2::thread(adder, ^mtx));
+  }
 }
 
-int main() safe
+int main()
 {
   thread_constructor();
   mutex_test();

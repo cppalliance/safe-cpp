@@ -24,6 +24,10 @@ public:
   }
 
   ~manually_drop() = trivial;
+
+  void destroy(self^) noexcept {
+    self->t_^.~T();
+  }
 };
 
 template<class T+>

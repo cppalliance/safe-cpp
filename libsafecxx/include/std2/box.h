@@ -45,6 +45,14 @@ public:
     unsafe return ^*self->p_;
   }
 
+  T^ operator->(self^) noexcept safe {
+    unsafe return ^*self->p_;
+  }
+
+  const T^ operator->(self const^) noexcept safe {
+    unsafe return ^*self->p_;
+  }
+
   T* get(self const^) noexcept safe {
     return self->p_;
   }

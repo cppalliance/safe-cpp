@@ -21,16 +21,15 @@ class thread
 {
   std::thread t_;
 
-  template<class F, class ...Args>
+  template<class F+, class ...Args+>
   static
-  void call((F, (Args...,))* p_tup) safe
+  void call/(where F: static, Args...:static)((F, (Args...,))* p_tup) safe
   {
     box<(F, (Args...,))> p;
     unsafe p = p_tup;
 
-    // TODO: someday learn this tuple syntax
     auto tup = p rel.into_inner();
-    mut tup.0(rel tup.1.[:] ...);
+    mut tup.0 rel.(rel tup.1.[:] ...);
   }
 
 public:
@@ -38,8 +37,8 @@ public:
   thread() = delete;
   thread(thread const^) safe = delete;
 
-  template<class F, class ...Args>
-  thread(F f, Args... args) safe
+  template<class F+, class ...Args+>
+  thread/(where F: static, Args...: static)(F f, Args... args) safe
   requires(
     F~is_send &&
     (Args~is_send && ...) &&

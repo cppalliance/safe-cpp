@@ -110,7 +110,12 @@ safe_cxx_compile_fail_test(vector1 "use of strs depends on expired loan")
 safe_cxx_compile_fail_test(vector2 "use of it depends on expired loan")
 safe_cxx_compile_fail_test(mutex1 "use of \\*x depends on expired loan")
 safe_cxx_compile_fail_test(mutex2 "cannot convert prvalue const int\\^ to int\\^")
-safe_cxx_compile_fail_test(mutex3 "operator rel for std2::mutex<int> is deleted")
+
+# TODO: for this test, determine if we can ever bring it back into the main suite
+# we seem to have to make the mutex relocatble for now but hopefully this can be
+# changed in the future once we pin down argument-forwarding concstructors
+# safe_cxx_compile_fail_test(mutex3 "operator rel for std2::mutex<int> is deleted")
+
 safe_cxx_compile_fail_test(thread1 "std2::thread::thread fails requires-clause")
 safe_cxx_compile_fail_test(thread2 "std2::thread::thread fails requires-clause")
 safe_cxx_compile_fail_test(thread3 "std2::thread::thread fails requires-clause")
