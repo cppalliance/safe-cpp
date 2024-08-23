@@ -46,7 +46,7 @@ public:
     safe(mut f(rel args...)))
     : unsafe t_()
   {
-    static_assert(~__is_lambda(F), "lambdas in std2::thread not yet supported by toolchain");
+    static_assert(!__is_lambda(F), "lambdas in std2::thread not yet supported by toolchain");
     using tuple_type = (F, (Args...,));
 
     box<tuple_type> p = (rel f, (rel args... ,));
