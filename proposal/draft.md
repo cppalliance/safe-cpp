@@ -99,7 +99,7 @@ Line 10: `mut vec.push_back(x);` - Push a value onto the vector. What's the `mut
 
 Line 12: `unsafe printf("%d\n", x);` - Call `printf`. It's a very unsafe function. Since we're in a safe context, we have to escape with the `unsafe` keyword. Safe C++ doesn't lock off any parts of the C++ language. You're free to shoot yourself in the foot, provided you sign the waiver in the form of the `unsafe` keyword. `unsafe` means that you swear to follow the preconditions of the function, rather than relying on the compiler to ensure those preconditions for you.
 
-If `main` checks out syntatically, its AST is lowered to MIR, where it is borrow checked. The hidden iterator that powers the ranged-for loop stays initialized during execution of the loop. The `push_back` _invalidates_ that iterator, by mutating a place (the vector) that the iterator has a constraint on. When the value `x` is next loaded out of the iterator, the borrow checker raises an error: `mutable borrow of vec between its shared borrow and its use`. The borrow checker prevents Circle compiling a program that may have exhibited undefined behavior. This is all done at compile time, with no impact on your program's size or speed.
+If `main` checks out syntatically, its AST is lowered to MIR, where it is borrow checked. The hidden iterator that powers the ranged-for loop stays initialized during execution of the loop. The `push_back` _invalidates_ that iterator, by mutating a place (the vector) that the iterator has a constraint on. When the value `x` is next loaded out of the iterator, the borrow checker raises an error: `mutable borrow of vec between its shared borrow and its use`. The borrow checker prevents Safe C++ from compiling a program that may have exhibited undefined behavior. This is all done at compile time, with no impact on your program's size or speed.
 
 This sample is only a few lines, but it introduces several new mechanisms and types. Security experts keep reminding us that **C++ is very unsafe**. It takes a systematic effort to supply a superset of the language with a safe subset that has enough flexibility to remain expressive.
 
@@ -130,7 +130,7 @@ It seems natural, in the year 2024, to pass UNICODE code points to functions tha
 
 Rust's approach to safety[^safe-unsafe-meaning] is about defining responsibility for enforcing preconditions. In a safe context, the user can call safe functions without compromising program soundness. Failure to read the docs may risk correctness, but it won't risk undefined behavior. When the user wants to call an unsafe function from a safe context, they _explicitly assume responsibility_ for sound usage of that unsafe function. The user writes the `unsafe` token as a kind of contract: the user has read the terms and conditions of the unsafe function and affirms that it's not being called in a way that violates its preconditions.
 
-Who is to blame when undefined behavior is detected, the caller or the callee? ISO C++ does not have an answer, making it unreliable. But Rust's safety model does: whoever wrote the `unsafe` token is at fault. Safe C++ adopts the same principle. Code is divided into unsafe and safe contexts. Unsafe operations may only occur in unsafe contexts. Dropping from a safe context to an unsafe context requires use of the `unsafe` keyword. This leaves an artifact that makes for easy audits: reviewers search for the `unsafe` keyword and focus their attention there first.
+Who is to blame when undefined behavior is detected, the caller or the callee? ISO C++ does not have an answer, making it an unreliable language. But Rust's safety model does: whoever typed out the `unsafe` token is at fault. Safe C++ adopts the same principle. Code is divided into unsafe and safe contexts. Unsafe operations may only occur in unsafe contexts. Dropping from a safe context to an unsafe context requires use of the `unsafe` keyword. This leaves an artifact that makes for easy audits: reviewers search for the `unsafe` keyword and focus their attention there first.
 
 Consider the design of an `std2::isprint` function. If it's marked `safe`, it must be sound for all integer arguments. If it's called with an argument that is out of its supported range, it must fail in a deterministic way: it return an error code, it could throw an exception or it could panic and abort. The designer of the function doesn't have to think very hard about soundness, they just have to follow the rules. Inside the `std2::isprint` implementation, there's probably a lookup table with capabilities for each supported character. If the lookup table is accessed with a slice, an out-of-bounds access will implicitly generate a bounds check and panic and abort on failure. If the lookup table is accessed through a pointer, the implementer writes the `unsafe` keyword, drops to the unsafe context and subscripts the pointer. The `unsafe` keyword is the programmer's oath that the subsequent unsafe operations are correct. It's obligatory for the library to test the integer argument against the range of the array and error if it's out-of-bounds before subscripting the pointer.
 
@@ -287,7 +287,7 @@ int main() safe {
 }
 ```
 
-Choice types are Circle's type-safe offering. They're just like Rust's enums,[^rust-enum] one of features most credited for that language's enviable ergonomics. Accessing members of a choice object requires testing for the active type with a _match-expression_. If the match succeeds, a new declaration is bound to the corresponding payload, and that declaration is visible in the scope following the `=>`.
+Choice types are Safe C++'s type-safe offering. They're just like Rust's enums,[^rust-enum] one of features most credited for that language's enviable ergonomics. Accessing members of a choice object requires testing for the active type with a _match-expression_. If the match succeeds, a new declaration is bound to the corresponding payload, and that declaration is visible in the scope following the `=>`.
 
 The compiler also performs exhaustiveness testing. Users must name all the alternatives, or use a wildcard `_` to default the unnamed ones.
 
@@ -302,3 +302,126 @@ TODO
 ### 5. Runtime checks
 
 TODO
+
+
+
+
+
+
+
+## The `safe` context
+
+Operations in the safe context are guaranteed not to cause undefined behavior. This protection is enforced with a number of methods. Some operations linked to undefined behavior can't be vetted by the frontend, during MIR analysis or with panics at runtime. Attempting to use them in the safe context makes the program ill-formed. These operations are:
+
+* Dereference of pointers and legacy references. This may result in use-after-free undefined behaviors. Prefer using borrows, which exhibit lifetime safety thanks to the brorow checker.
+* Pointer offsets. Advancing a pointer past the end or the beginning of its allocation is undefined behavior. Prefer using slices, which include bounds information.
+* Pointer difference. Taking the difference of pointers into different allocations is undefined behavior.
+* Accessing fields of unions. Legacy unions present a potential type safety hazard. Prefer using choice types.
+* Accessing non-const objects with static storage duration. This is a data race hazard, as different users may be writing to and reading from the same memory simultaneously. This is even a hazard with thread_local storage, as the law of exclusivity cannot be guaranteed within a single thread.
+* Inline ASM. The compiler generally isn't equipped to determine if inline ASM is safe, so its usage in the safe context is banned.
+* Calling unsafe functions. This is banned because the unsafe function may involve any of the above operations.
+
+Some operations are banned even in unsafe contexts. The compiler lowers function definitions to mid-level IR (MIR) and performs initialization analysis and borrow checking. These are data flow analyses, and they may expose problems with your code. These issues make the program ill-formed, regardless of the safe context:
+
+* Use of uninitialized, partially initialized or potentially initialized objects is ill-formed. This is checked by initialization analysis.
+* A conflicting action on an overlapping place with an in-scope loan is a borrow checker error. This reports potential use-after-free bugs. The law of exclusivity is enforced as part of this check.
+* Free region errors. The borrow checker must confirm that lifetimes on function parameters do not outlive the constraints defined on the function's declaration. This ensures that the caller and callee agree on the lifetimes of arguments and result objects. It permits inter-procedural live analysis without attempting very expensive whole-program analysis.
+
+Some operations are potentially unsound, but can be checked at runtime. They are checked for soundness, and if they fail, the program panics and aborts. There are there cases of this:
+
+* Integer division by 0.
+* Integer division of INT_MIN by -1.
+* Out of bounds subscripting an array or slice.
+
+### _safe-specifier_
+
+Similar to the _noexcept-specifier_,[^noexcept-spec] function types and declarations may be marked with a _safe-specifier_. Place this after the _noexcept-specifier_. 
+
+```cpp
+// `safe` is part of the function type.
+using F1 = void(int);
+using F2 = void(int) safe;
+using F3 = void(int) noexcept;
+using F4 = void(int) noexcept safe;
+```
+
+`safe` is part of the function's type, so function's with different _safe-specifiers_ always compare differently.
+
+
+```cpp
+// `safe` is part of the function type.
+static_assert(F1 != F2);
+static_assert(F3 != F4);
+```
+
+As with _noexcept-specifier_, the safeness of a function's type can be stripped when converting function pointers. It's unsound to add a _safe-specifier_ during conversion, so that's prohibit. But it's okay to strip `safe`, just as it's permitted to strip `noexcept`.
+
+```cpp
+// You can strip off `safe` in function pointers.
+static_assert(std::is_convertible_v<F2*, F1*>);
+static_assert(std::is_convertible_v<F4*, F3*>);
+
+// You can strip off both `noexcept` and `safe`.
+static_assert(std::is_convertible_v<F4*, F1*>);
+
+// You can't add safe. That's unsafe.
+static_assert(!std::is_convertible_v<F1*, F2*>);
+static_assert(!std::is_convertible_v<F3*, F4*>);
+```
+
+Declaring functions with value-dependent _safe-specifiers_ is supported, although I haven't found a strong motivation for doing this. Right now, it's there for completeness.
+
+```cpp
+template<bool IsSafe>
+struct foo_t {
+  // Value-dependent safe-specifier
+  void func() safe(IsSafe);
+};
+```
+
+### _safe-operator_
+
+You can query the safeness of an expression in an unevaluated context with the _safe-operator_. It's analagous to the existing _noexcept-operator_.[^noexcept-operator] This is very useful when paired with _requires-clause_,[^requires-clause] as it lets you constrain inputs based on the safeness of a callable.
+
+```cpp
+#feature on safety
+
+template<typename F, typename... Args>
+void spawn(F f, Args... args) safe requires(safe(f(args...)));
+
+struct Foo {
+  // The int overload is safe.
+  void operator()(const self^, int) safe;
+
+  // The double overload is unsafe.
+  void operator()(const self^, double);
+};
+
+int main() safe {
+  Foo obj { };
+  spawn(obj, 1);   // OK
+  spawn(obj, 1.1); // Ill-formed. Fails requires-clause.
+}
+```
+
+Consider a `spawn` function that takes a callable `f` and a set of arguments `args`. The function is marked `safe`. Transitively, the callable, when invoked with the provided arguments, must also be a safe operation. But we can't stipulate `safe` on the type `F`, because it may not be a function type. In this example it's a class with two overloaded call operators.
+
+When the user provides an integer argument, the _requires-clause_ substitutes to `safe(f(1))`, which is true, because the best viable candidate for the function call is `void operator()(const self^, int) safe;`. That's a safe function.
+
+When the user provides a floating-point argument, the _requires-clause_ substitutes to `safe(f(1.1))`, which is false, because the best viable candidate is `void operator()(const self^, double);`. That's not a safe function.
+
+These kind of constraints are idiomatic in C++ but not found, or even supported, in Rust, which uses early-checked traits to provide generics.
+
+[^noexcept-operator]: [Noexcept operator](https://en.cppreference.com/w/cpp/language/noexcept)
+
+[^requires-clause]: [Requires clauses](https://en.cppreference.com/w/cpp/language/constraints#Requires_clauses)
+
+### _unsafe-block_
+
+
+
+## The `unsafe` type qualifier
+
+## _using-unsafe-declaration_
+
+# rubbish
