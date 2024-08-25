@@ -26,7 +26,7 @@ public:
   box(T t) safe
     : unsafe p_(static_cast<T*>(::operator new(sizeof(T))))
   {
-    unsafe __rel_write(p_, rel t);
+    unsafe { __rel_write(p_, rel t); }
   }
 
   ~box() safe
