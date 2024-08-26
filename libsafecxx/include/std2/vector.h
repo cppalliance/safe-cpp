@@ -10,6 +10,7 @@
 #include <std2/panic.h>
 #include <std2/slice.h>
 #include <std2/initializer_list.h>
+#include <std2/optional.h>
 
 #include <cstddef>
 #include <cstring>
@@ -20,7 +21,47 @@
 namespace std2
 {
 
-// TODO: what's the syntax for making vector conditionally send/sync when T is?
+template<class T+>
+class vector;
+
+template<class T+>
+class into_iterator
+{
+  using value_type = T;
+
+  friend class vector<T>;
+
+  value_type* unsafe origin_;
+  value_type* unsafe p_;
+  value_type* end_;
+
+
+  public:
+  into_iterator(value_type* p, value_type* end)
+    : origin_(p)
+    , p_(p)
+    , end_(end)
+  {
+  }
+
+  ~into_iterator() safe {
+    while (p_ < end_) {
+      unsafe { auto t = __rel_read(p_++); }
+      (void)t;
+    }
+    unsafe { ::operator delete(origin_); }
+  }
+
+  optional<value_type> next(self^) noexcept safe {
+    if (self->p_ < self->end_) {
+      unsafe { return .some(__rel_read(self->p_++)); }
+    } else {
+      return .none;
+    }
+  }
+};
+
+// TODO: make vector conditionally Send/Sync
 template<class T+>
 class vector
 {
@@ -150,6 +191,38 @@ private:
   size_type capacity_;
   size_type size_;
   // value_type __phantom_data;
+};
+
+template<class T>
+impl into_iterator<T>: iterator
+{
+  using item_type = T;
+
+  optional<item_type> next(self^) safe override {
+    return self.next();
+  }
+};
+
+template<class T>
+impl vector<T>: make_iter {
+  using iter_type = slice_iterator<T const>;
+  using iter_mut_type = slice_iterator<T>;
+  using into_iter_type  = into_iterator<T>;
+
+  iter_type iter(self const^) noexcept safe override {
+    return slice_iterator<const T>(self->slice());
+  }
+
+  iter_mut_type iter(self^) noexcept safe override {
+    return slice_iterator<T>(self^->slice());
+  }
+
+  into_iter_type iter(self) noexcept safe override {
+    auto p = self^.data();
+    auto len = self.size();
+    forget(rel self);
+    unsafe { return into_iter_type(p, p + len); }
+  }
 };
 
 } // namespace std2

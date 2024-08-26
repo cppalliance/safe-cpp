@@ -110,12 +110,14 @@ void mutex_test()
 
   int const num_threads = 8;
   for (int i = 0; i < num_threads; ++i) {
-    // threads^.push_back(std2::thread(adder, cpy sp));
+    threads^.push_back(std2::thread(adder, cpy sp));
   }
 
-  // for(auto^ t : threads) {
-  //   t^.join();
-  // }
+  for(std2::thread t : rel threads) {
+    t^.join();
+  }
+
+  assert_eq(*sp->lock()^.borrow(), num_threads * 1'000'000);
 }
 
 int main()
