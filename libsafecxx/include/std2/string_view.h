@@ -68,6 +68,7 @@ public:
 
 #include <std2/string_constant.h>
 #include <std2/source_location.h>
+#include <std2/slice.h>
 #include <std2/__panic/codes.h>
 
 #include <cstddef>
@@ -200,10 +201,12 @@ private:
   static
   size_type verify_utf(const [char8_t; dyn]^/a str) noexcept safe
   {
-    unsafe return verify_utf(
-      ^*__slice_pointer(
+    unsafe {
+      auto const^ s = slice_from_raw_parts(
         reinterpret_cast<char const*>((*str)~as_pointer),
-        (*str)~length));
+        (*str)~length);
+    }
+    return verify_utf(s);
   }
 
   static
@@ -260,16 +263,21 @@ private:
   size_type verify_utf(const [wchar_t; dyn]^/a str) noexcept safe
   {
     if constexpr (sizeof(wchar_t) == 2) {
-      unsafe return verify_utf(
-        ^*__slice_pointer(
+      unsafe {
+        auto const^ s = slice_from_raw_parts(
           reinterpret_cast<char16_t const*>((*str)~as_pointer),
-          (*str)~length));
+          (*str)~length) ;
+      }
+      return verify_utf(s);
     } else {
       static_assert(sizeof(wchar_t) == 4);
-      unsafe return verify_utf(
-        ^*__slice_pointer(
+
+      unsafe {
+        auto const^ s = slice_from_raw_parts(
           reinterpret_cast<char32_t const*>((*str)~as_pointer),
-          (*str)~length));
+          (*str)~length) ;
+      }
+      return verify_utf(s);
     }
   }
 
@@ -300,7 +308,7 @@ public:
     if(self.size() != rhs.size()) {
       return false;
     }
-    unsafe return !std::memcmp(self.data(), rhs.data(), sizeof(value_type) * self.size());
+    unsafe { return !std::memcmp(self.data(), rhs.data(), sizeof(value_type) * self.size()); }
   }
 
   const [value_type; dyn]^/a slice(self) noexcept safe {

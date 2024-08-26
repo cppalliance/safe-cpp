@@ -22,22 +22,26 @@ namespace std2
 inline void panic(
   str msg, source_location loc = source_location::current()) noexcept safe
 {
-  unsafe __assert_fail(
-    std::string(msg.data(), msg.size()).c_str(),
-    loc.file_name(),
-    loc.line(),
-    loc.function_name());
+  unsafe {
+    __assert_fail(
+      std::string(msg.data(), msg.size()).c_str(),
+      loc.file_name(),
+      loc.line(),
+      loc.function_name());
+  }
 }
 
 [[noreturn, safety::panic(panic_code::bounds)]]
 inline void panic_bounds(
   str msg, source_location loc = source_location::current()) noexcept safe
 {
-  unsafe __assert_fail(
-    std::string(msg.data(), msg.size()).c_str(),
-    loc.file_name(),
-    loc.line(),
-    loc.function_name());
+  unsafe {
+    __assert_fail(
+      std::string(msg.data(), msg.size()).c_str(),
+      loc.file_name(),
+      loc.line(),
+      loc.function_name());
+  }
 }
 
 } // namespace std2

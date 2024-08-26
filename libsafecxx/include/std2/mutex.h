@@ -48,15 +48,15 @@ public:
 
     public:
     ~lock_guard() safe {
-      unsafe m_->mtx_->get()&->unlock();
+      unsafe { m_->mtx_->get()&->unlock(); }
     }
 
     T const^ borrow(self const^) noexcept safe {
-      unsafe return ^*self->m_->data_.get();
+      unsafe { return ^*self->m_->data_.get(); }
     }
 
     T^ borrow(self^) noexcept safe {
-      unsafe return ^*self->m_->data_.get();
+      unsafe { return ^*self->m_->data_.get(); }
     }
 
     T^ operator*(self^) noexcept safe {
@@ -78,7 +78,7 @@ public:
 
   lock_guard lock(self const^) safe  {
     auto *r = self->mtx_->get();
-    unsafe self->mtx_->get()&->lock();
+    unsafe { self->mtx_->get()&->lock();}
     return lock_guard(self);
   }
 };

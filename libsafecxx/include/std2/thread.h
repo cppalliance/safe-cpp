@@ -19,14 +19,13 @@ namespace std2
 
 class thread
 {
-  std::thread t_;
+  std::thread unsafe t_;
 
   template<class F+, class ...Args+>
   static
   void call/(where F: static, Args...:static)((F, (Args...,))* p_tup) safe
   {
-    box<(F, (Args...,))> p;
-    unsafe p = p_tup;
+    unsafe { box<(F, (Args...,))> p = p_tup; }
 
     auto tup = p rel.into_inner();
     mut tup.0 rel.(rel tup.1.[:] ...);
@@ -53,22 +52,18 @@ public:
     // must catch the case where a clever stdlib dev thinks they can
     // replace p.get() with `p rel.leak()` here, which causes a memory
     // leak upon `std::thread::thread` throwing
-    unsafe t_ = std::thread(&call<F, Args...>, p.get());
-
+    unsafe { t_ = std::thread(&call<F, Args...>, p.get()); }
     forget(rel p);
   }
 
   ~thread() safe {
-    unsafe {
-      // TODO: figure out why we need `t_&.` to access `detach()`
-      if (t_.joinable()) {
-        t_&.detach();
-      }
+    if (t_.joinable()) {
+      t_&.detach();
     }
   }
 
   void join(self^) safe {
-    unsafe self->t_&.join();
+    self->t_&.join();
   }
 };
 

@@ -26,7 +26,7 @@ auto slice_from_raw_parts/(a)(T* p, std::size_t n) -> [T; dyn]^/a {
 template<class T>
 class slice_iterator/(a)
 {
-  T* p_;
+  T* unsafe p_;
   T* end_;
   T^/a __phantom_data;
 
@@ -38,7 +38,7 @@ public:
 
   optional<T^/a> next(self^) noexcept safe {
     if (self->p_ == self->end_) { return .none; }
-    unsafe return .some(^*self->p_++);
+    return .some(^*self->p_++);
   }
 };
 

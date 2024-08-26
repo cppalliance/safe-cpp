@@ -28,6 +28,10 @@ public:
   void destroy(self^) noexcept {
     self->t_^.~T();
   }
+
+  T const^ get(self const^) noexcept safe {
+    return ^self->t_;
+  }
 };
 
 template<class T+>

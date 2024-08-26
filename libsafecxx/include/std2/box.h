@@ -14,7 +14,7 @@ namespace std2
 template<class T+>
 class [[safety::niche_zero]] box
 {
-  T* p_;
+  T* unsafe p_;
   T __phantom_data;
 
 public:
@@ -38,19 +38,19 @@ public:
   }
 
   T^ operator*(self^) noexcept safe {
-    unsafe return ^*self->p_;
+    return ^*self->p_;
   }
 
   const T^ operator*(const self^) noexcept safe {
-    unsafe return ^*self->p_;
+    return ^*self->p_;
   }
 
   T^ operator->(self^) noexcept safe {
-    unsafe return ^*self->p_;
+    return ^*self->p_;
   }
 
   const T^ operator->(self const^) noexcept safe {
-    unsafe return ^*self->p_;
+    return ^*self->p_;
   }
 
   T* get(self const^) noexcept safe {
@@ -64,9 +64,8 @@ public:
   }
 
   T into_inner(self) noexcept safe {
-    T t;
-    unsafe t = __rel_read(self.p_);
-    unsafe ::operator delete(self.p_);
+    unsafe { T t = __rel_read(self.p_); }
+    unsafe { ::operator delete(self.p_); }
     return rel t;
   }
 };

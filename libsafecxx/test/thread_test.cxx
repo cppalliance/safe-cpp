@@ -13,14 +13,12 @@
 
 #include "helpers.h"
 
-static std2::mutex<int> const mtx = 1337;
-
 int add(std2::arc<std2::mutex<int>> mtx, int x, int y) safe
 {
   auto z = x + y;
   int^ r;
   {
-    unsafe auto guard = mtx.lock();
+    auto guard = mtx->lock();
     r = guard^.operator*();
     *r = z;
   }
@@ -59,18 +57,26 @@ struct [[unsafe::send(false)]] nonsend_callable
 
 void thread_constructor() safe
 {
-  {
-    std2::thread t(add, 1, 2);
+  std2::arc<std2::mutex<int>> mtx = std2::mutex<int>(1337);
 
-    unsafe int r = *mtx.lock();
+  static_assert(decltype(add)~is_send);
+  static_assert(std2::mutex<int>~is_send);
+  static_assert(std2::mutex<int>~is_sync);
+  static_assert(std2::arc<std2::mutex<int>>~is_send);
+  static_assert(std2::arc<std2::mutex<int>>~is_sync);
+
+  {
+    std2::thread t(add, cpy mtx, 1, 2);
+
+    unsafe int r = *mtx->lock();
     if (r != 1337) assert_eq(r, 1 + 2);
 
     t^.join();
   }
 
-  {
-    std2::thread t(add, 1, 2);
-  }
+  // {
+  //   std2::thread t(add, cpy mtx, 1, 2);
+  // }
 
   {
     std2::thread t(send_callable{}, 24);
@@ -79,7 +85,7 @@ void thread_constructor() safe
 
   // throw a sleep in here so that detached threads run to completion (hopefully)
   // and then valgrind won't complain about any mem leaks
-  unsafe std::this_thread::sleep_for(std::chrono::seconds(1));
+  unsafe { std::this_thread::sleep_for(std::chrono::seconds(1)); }
 }
 
 static_assert(std2::mutex<send_callable>~is_send);
@@ -87,11 +93,11 @@ static_assert(std2::mutex<send_callable>~is_sync);
 static_assert(!std2::mutex<nonsend_callable>~is_send);
 static_assert(!std2::mutex<nonsend_callable>~is_sync);
 
-void adder(std2::mutex<int> const^/static m) safe
+void adder(std2::arc<std2::mutex<int>> m) safe
 {
-  unsafe std::this_thread::sleep_for(std::chrono::milliseconds(250));
+  unsafe { std::this_thread::sleep_for(std::chrono::milliseconds(250)); }
   for (int i = 0; i < 1'000'000; ++i) {
-    auto guard = m.lock();
+    auto guard = m->lock();
     int^ x = ^*guard^.borrow();
     *x += 1;
   }
@@ -100,12 +106,16 @@ void adder(std2::mutex<int> const^/static m) safe
 void mutex_test()
 {
   std2::vector<std2::thread> threads = {};
-  std2::arc<std2::mutex<int>> sp(std2::mutex<int>(1337));
+  std2::arc<std2::mutex<int>> sp = std2::mutex<int>(1337);
 
   int const num_threads = 8;
   for (int i = 0; i < num_threads; ++i) {
-    // threads^.push_back(std2::thread(adder, ^mtx));
+    // threads^.push_back(std2::thread(adder, cpy sp));
   }
+
+  // for(auto^ t : threads) {
+  //   t^.join();
+  // }
 }
 
 int main()

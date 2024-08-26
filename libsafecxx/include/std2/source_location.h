@@ -56,11 +56,11 @@ public:
   }
 
   constexpr const char* file_name(const self^) noexcept safe {
-    unsafe return self->_file_name;
+    return self->_file_name;
   }
 
   constexpr const char* function_name(const self^) noexcept safe {
-    unsafe return self->_function_name;
+    return self->_function_name;
   }
 
   constexpr uint32_t line(const self^) noexcept safe {
@@ -72,8 +72,8 @@ public:
   }
 
 private:
-  char const* _file_name;
-  char const* _function_name;
+  char const* unsafe _file_name;
+  char const* unsafe _function_name;
   uint32_t _line;
   uint32_t _column;
 };

@@ -8,14 +8,18 @@
 
 #include <std2/atomic.h>
 
+#include <cstdio>
+
 namespace std2
 {
 
 template<class T+>
-class arc
+class
+[[unsafe::send(T~is_send && T~is_sync), unsafe::sync(T~is_send && T~is_sync)]]
+arc
 {
   struct arc_inner;
-  arc_inner* p_;
+  arc_inner* unsafe p_;
 
   struct arc_inner
   {
@@ -27,35 +31,38 @@ class arc
       : data_(rel data)
       , strong_(1)
       , weak_(1)
-    {}
+    {
+    }
   };
 
 public:
   arc(T t) safe
   {
-    unsafe p_ = static_cast<arc_inner*>(::operator new(sizeof(arc_inner)));
+    unsafe { p_ = static_cast<arc_inner*>(::operator new(sizeof(arc_inner))); }
     new(p_) arc_inner(rel t);
   }
 
   arc(arc const^ rhs) safe
-    : p_(rhs.p_)
+    : p_(rhs->p_)
   {
-    unsafe ++p_->strong_;
+    ++p_->strong_;
   }
 
   ~arc() safe
   {
-    std::size_t s;
-    unsafe s = --p_->strong_;
+    std::size_t s = --p_->strong_;
     if (s == 0) {
-      unsafe p_->data_^.destroy();
+      unsafe { p_->data_^.destroy(); }
 
-      std::size_t w;
-      unsafe w = --p_->weak_;
+      std::size_t w = --p_->weak_;
       if (w == 0) {
-        unsafe ::operator delete(p_);
+        unsafe { ::operator delete(p_); }
       }
     }
+  }
+
+  T const^ operator->(self const^) noexcept safe {
+    return ^*self->p_->data_.get();
   }
 };
 

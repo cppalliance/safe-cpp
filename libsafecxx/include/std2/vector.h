@@ -35,14 +35,14 @@ public:
   {
   }
 
-  vector(initializer_list<value_type> ilist) safe
+  vector(initializer_list<value_type> unsafe ilist) safe
     : vector()
   {
     self^.reserve(ilist.size());
-    unsafe relocate_array(self^.data(), ilist.data(), ilist.size());
+    unsafe { relocate_array(self^.data(), ilist.data(), ilist.size()); }
     self.size_ = ilist.size();
 
-    unsafe ilist^.advance(ilist.size());
+    ilist^.advance(ilist.size());
   }
 
   ~vector() safe {
@@ -58,8 +58,9 @@ public:
         drp t;
         ++pos;
       }
+
+      ::operator delete(p_);
     }
-    unsafe ::operator delete(p_);
   }
 
   slice_iterator<const value_type> iter(const self^) noexcept safe {
@@ -93,26 +94,26 @@ public:
   void push_back(self^, T t) safe {
     if (self.capacity() == self.size()) { self.grow(); }
 
-    unsafe __rel_write(self->p_ + self->size_, rel t);
+    unsafe { __rel_write(self->p_ + self->size_, rel t); }
    ++self->size_;
   }
 
   [value_type; dyn]^ slice(self^) noexcept safe {
-    unsafe return slice_from_raw_parts(self.data(), self.size());
+    unsafe { return slice_from_raw_parts(self.data(), self.size()); }
   }
 
   const [value_type; dyn]^ slice(const self^) noexcept safe {
-    unsafe return slice_from_raw_parts(self.data(), self.size());
+    unsafe { return slice_from_raw_parts(self.data(), self.size()); }
   }
 
   value_type^ operator[](self^, size_type i) noexcept safe {
     if (i >= self.size()) panic_bounds("vector subscript is out-of-bounds");
-    unsafe return ^self.data()[i];
+    unsafe { return ^self.data()[i]; }
   }
 
   const value_type^ operator[](const self^, size_type i) noexcept safe {
     if (i >= self.size()) panic_bounds("vector subscript is out-of-bounds");
-    unsafe return ^self.data()[i];
+    unsafe { return ^self.data()[i]; }
   }
 
   void reserve(self^, size_type n) safe {
@@ -145,7 +146,7 @@ private:
     self.reserve(ncap);
   }
 
-  value_type* p_;
+  value_type* unsafe  p_;
   size_type capacity_;
   size_type size_;
   // value_type __phantom_data;

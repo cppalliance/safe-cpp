@@ -26,27 +26,27 @@ to_utf8([char; 4]^ s, char32_t ucs) safe
 {
   if(ucs <= 0x007f) {
     s[0] = (char)ucs;
-    unsafe return ^*__slice_pointer((*s)~as_pointer, 1);
+    unsafe { return std2::slice_from_raw_parts((*s)~as_pointer, 1); }
 
   } else if(ucs <= 0x07ff) {
     s[0] = static_cast<char>(0xc0 | (ucs>> 6));
     s[1] = static_cast<char>(0x80 | (0x3f & ucs));
-    unsafe return ^*__slice_pointer((*s)~as_pointer, 2);
+    unsafe { return std2::slice_from_raw_parts((*s)~as_pointer, 2); }
 
   } else if(ucs <= 0xffff) {
     s[0] = static_cast<char>(0xe0 | (ucs>> 12));
     s[1] = static_cast<char>(0x80 | (0x3f & (ucs>> 6)));
     s[2] = static_cast<char>(0x80 | (0x3f & ucs));
-    unsafe return ^*__slice_pointer((*s)~as_pointer, 3);
+    unsafe { return std2::slice_from_raw_parts((*s)~as_pointer, 3); }
 
   } else if (ucs <= 0x10ffff) {
     s[0] = static_cast<char>(0xf0 | (ucs>> 18));
     s[1] = static_cast<char>(0x80 | (0x3f & (ucs>> 12)));
     s[2] = static_cast<char>(0x80 | (0x3f & (ucs>> 6)));
     s[3] = static_cast<char>(0x80 | (0x3f & ucs));
-    unsafe return ^*__slice_pointer((*s)~as_pointer, 4);
+    unsafe { return std2::slice_from_raw_parts((*s)~as_pointer, 4); }
   }
-  unsafe return ^*__slice_pointer((*s)~as_pointer, 0);
+  unsafe { return std2::slice_from_raw_parts((*s)~as_pointer, 0); }
 }
 
 const [char8_t; dyn]^
@@ -54,27 +54,27 @@ to_utf8([char8_t; 4]^ s, char32_t ucs) safe
 {
   if(ucs <= 0x007f) {
     s[0] = (char8_t)ucs;
-    unsafe return ^*__slice_pointer((*s)~as_pointer, 1);
+    unsafe { return std2::slice_from_raw_parts((*s)~as_pointer, 1); }
 
   } else if(ucs <= 0x07ff) {
     s[0] = static_cast<char8_t>(0xc0 | (ucs>> 6));
     s[1] = static_cast<char8_t>(0x80 | (0x3f & ucs));
-    unsafe return ^*__slice_pointer((*s)~as_pointer, 2);
+    unsafe { return std2::slice_from_raw_parts((*s)~as_pointer, 2); }
 
   } else if(ucs <= 0xffff) {
     s[0] = static_cast<char8_t>(0xe0 | (ucs>> 12));
     s[1] = static_cast<char8_t>(0x80 | (0x3f & (ucs>> 6)));
     s[2] = static_cast<char8_t>(0x80 | (0x3f & ucs));
-    unsafe return ^*__slice_pointer((*s)~as_pointer, 3);
+    unsafe { return std2::slice_from_raw_parts((*s)~as_pointer, 3); }
 
   } else if (ucs <= 0x10ffff) {
     s[0] = static_cast<char8_t>(0xf0 | (ucs>> 18));
     s[1] = static_cast<char8_t>(0x80 | (0x3f & (ucs>> 12)));
     s[2] = static_cast<char8_t>(0x80 | (0x3f & (ucs>> 6)));
     s[3] = static_cast<char8_t>(0x80 | (0x3f & ucs));
-    unsafe return ^*__slice_pointer((*s)~as_pointer, 4);
+    unsafe { return std2::slice_from_raw_parts((*s)~as_pointer, 4); }
   }
-  unsafe return ^*__slice_pointer((*s)~as_pointer, 0);
+  unsafe { return std2::slice_from_raw_parts((*s)~as_pointer, 0); }
 }
 
 const [char16_t; dyn]^
@@ -82,17 +82,17 @@ to_utf16([char16_t; 2]^ s, char32_t ucs) safe
 {
   if (ucs <= 0xffff) {
     s[0] = static_cast<char16_t>(ucs);
-    unsafe return ^*__slice_pointer((*s)~as_pointer, 1);
+    unsafe { return std2::slice_from_raw_parts((*s)~as_pointer, 1); }
   }
 
   if (ucs <= 0x10ffff) {
     ucs -= 0x10000;
     s[0] = static_cast<char16_t>(0xd800 + (ucs >> 10));
     s[1] = static_cast<char16_t>(0xdc00 + (ucs & 0x03ff));
-    unsafe return ^*__slice_pointer((*s)~as_pointer, 2);
+    unsafe { return std2::slice_from_raw_parts((*s)~as_pointer, 2); }
   }
 
-  unsafe return ^*__slice_pointer((*s)~as_pointer, 0);
+  unsafe { return std2::slice_from_raw_parts((*s)~as_pointer, 0); }
 }
 
 void string_view_slice_ordinary_utf8_constructor() safe
@@ -109,11 +109,13 @@ void string_view_slice_ordinary_utf8_constructor() safe
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
     // outside valid range
-    unsafe assert_throws([]() {
-      char const str[] = { (char)0xff };
-      std2::string_view sv = str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        char const str[] = { (char)0xff };
+        std2::string_view sv = str;
+        (void)sv;
+      });
+    }
   }
 
   // 2 byte code points
@@ -135,22 +137,26 @@ void string_view_slice_ordinary_utf8_constructor() safe
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
     // invalid lengths
-    unsafe assert_throws([]() {
-      char const str[] = { (char)0xcf };
-      std2::string_view sv = str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        char const str[] = { (char)0xcf };
+        std2::string_view sv = str;
+        (void)sv;
+      });
+    }
   }
 
   {
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
     // invalid continuation
-    unsafe assert_throws([]() {
-      char const str[] = { (char)0xcf, (char)0xcf };
-      std2::string_view sv = str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        char const str[] = { (char)0xcf, (char)0xcf };
+        std2::string_view sv = str;
+        (void)sv;
+      });
+    }
   }
 
   // 3 byte code points
@@ -172,44 +178,52 @@ void string_view_slice_ordinary_utf8_constructor() safe
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
     // invalid length
-    unsafe assert_throws([]() {
-      char const str[] = { (char)0xed };
-      std2::string_view sv = str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        char const str[] = { (char)0xed };
+        std2::string_view sv = str;
+        (void)sv;
+      });
+    }
   }
 
   {
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
     // invalid length
-    unsafe assert_throws([]() {
-      char const str[] = { (char)0xed, (char)0x95 };
-      std2::string_view sv = str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        char const str[] = { (char)0xed, (char)0x95 };
+        std2::string_view sv = str;
+        (void)sv;
+      });
+    }
   }
 
   {
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
     // invalid continuation
-    unsafe assert_throws([]() {
-      char const str[] = { (char)0xed, (char)0x95, (char)0xcc };
-      std2::string_view sv = str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        char const str[] = { (char)0xed, (char)0x95, (char)0xcc };
+        std2::string_view sv = str;
+        (void)sv;
+      });
+    }
   }
 
   {
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
     // invalid continuation
-    unsafe assert_throws([]() {
-      char const str[] = { 	(char)0xed, (char)0xc5, (char)0x9c };
-      std2::string_view sv = str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        char const str[] = { 	(char)0xed, (char)0xc5, (char)0x9c };
+        std2::string_view sv = str;
+        (void)sv;
+      });
+    }
   }
 
   // 4 byte code points
@@ -231,55 +245,65 @@ void string_view_slice_ordinary_utf8_constructor() safe
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
     // invalid length
-    unsafe assert_throws([]() {
-      char const str[] = { 	(char)0xf0};
-      std2::string_view sv = str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        char const str[] = { 	(char)0xf0};
+        std2::string_view sv = str;
+        (void)sv;
+      });
+    }
   }
 
   {
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
     // invalid length
-    unsafe assert_throws([]() {
-      char const str[] = { 	(char)0xf0, (char)0x90, };
-      std2::string_view sv = str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        char const str[] = { 	(char)0xf0, (char)0x90, };
+        std2::string_view sv = str;
+        (void)sv;
+      });
+    }
   }
 
   {
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
     // invalid continuation
-    unsafe assert_throws([]() {
-      char const str[] = { 	(char)0xf0, (char)0xc0, (char)0x8d, (char)0x88, };
-      std2::string_view sv = str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        char const str[] = { 	(char)0xf0, (char)0xc0, (char)0x8d, (char)0x88, };
+        std2::string_view sv = str;
+        (void)sv;
+      });
+    }
   }
 
   {
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
     // invalid continuation
-    unsafe assert_throws([]() {
-      char const str[] = { 	(char)0xf0, (char)0x90, (char)0xcd, (char)0x88, };
-      std2::string_view sv = str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        char const str[] = { 	(char)0xf0, (char)0x90, (char)0xcd, (char)0x88, };
+        std2::string_view sv = str;
+        (void)sv;
+      });
+    }
   }
 
   {
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
     // invalid continuation
-    unsafe assert_throws([]() {
-      char const str[] = { 	(char)0xf0, (char)0x90, (char)0x8d, (char)0xc8, };
-      std2::string_view sv = str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        char const str[] = { 	(char)0xf0, (char)0x90, (char)0x8d, (char)0xc8, };
+        std2::string_view sv = str;
+        (void)sv;
+      });
+    }
   }
 
   // prove we can parse the entire utf space
@@ -315,7 +339,7 @@ void string_view_slice_utf8_constructor() safe
   }
 }
 
-void string_view_slice_utf16_constructor()
+void string_view_slice_utf16_constructor() safe
 {
   // ascii
   {
@@ -374,33 +398,39 @@ void string_view_slice_utf16_constructor()
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
     // length error
-    unsafe assert_throws([]() {
-      const char16_t str[] = { (char16_t)0xd801 };
-      std2::u16string_view sv =  str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        const char16_t str[] = { (char16_t)0xd801 };
+        std2::u16string_view sv =  str;
+        (void)sv;
+      });
+    }
   }
 
   {
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
     // invalid leading surrogate
-    unsafe assert_throws([]() {
-      const char16_t str[] = { (char16_t)0xf801, (char16_t)0xdc37 };
-      std2::u16string_view sv =  str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        const char16_t str[] = { (char16_t)0xf801, (char16_t)0xdc37 };
+        std2::u16string_view sv =  str;
+        (void)sv;
+      });
+    }
   }
 
   {
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
     // invalid trailing surrogate
-    unsafe assert_throws([]() {
-      const char16_t str[] = { (char16_t)0xd801, (char16_t)0xfc37 };
-      std2::u16string_view sv =  str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        const char16_t str[] = { (char16_t)0xd801, (char16_t)0xfc37 };
+        std2::u16string_view sv =  str;
+        (void)sv;
+      });
+    }
   }
 
   {
@@ -436,25 +466,29 @@ void string_view_slice_utf16_constructor()
   {
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
-    unsafe assert_throws([]() {
-      const char16_t str[] = { (char16_t)0xd800 };
-      std2::u16string_view sv =  str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        const char16_t str[] = { (char16_t)0xd800 };
+        std2::u16string_view sv =  str;
+        (void)sv;
+      });
+    }
   }
 
     {
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
-    unsafe assert_throws([]() {
-      const char16_t str[] = { (char16_t)0xdfff };
-      std2::u16string_view sv =  str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        const char16_t str[] = { (char16_t)0xdfff };
+        std2::u16string_view sv =  str;
+        (void)sv;
+      });
+    }
   }
 }
 
-void string_view_slice_utf32_constructor()
+void string_view_slice_utf32_constructor() safe
 {
   // prove we can parse the entire utf space
   {
@@ -472,25 +506,29 @@ void string_view_slice_utf32_constructor()
   {
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
-    unsafe assert_throws([]() {
-      const char32_t str[] = { (char32_t)0xd800 };
-      std2::u32string_view sv =  str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        const char32_t str[] = { (char32_t)0xd800 };
+        std2::u32string_view sv =  str;
+        (void)sv;
+      });
+    }
   }
 
     {
     // TODO: figure out how to get safe lambdas so we can make this safe too
 
-    unsafe assert_throws([]() {
-      const char32_t str[] = { (char32_t)0xdfff };
-      std2::u32string_view sv =  str;
-      (void)sv;
-    });
+    unsafe {
+      assert_throws([]() {
+        const char32_t str[] = { (char32_t)0xdfff };
+        std2::u32string_view sv =  str;
+        (void)sv;
+      });
+    }
   }
 }
 
-void string_view_slice_wstring_constructor()
+void string_view_slice_wstring_constructor() safe
 {
   // ascii
   {
@@ -508,7 +546,7 @@ void string_view_slice_wstring_constructor()
   }
 }
 
-void string_view_compare()
+void string_view_compare() safe
 {
   {
     std2::string_constant<char> str = "£";
@@ -532,7 +570,7 @@ void string_view_compare()
   }
 }
 
-void string_view_slice()
+void string_view_slice() safe
 {
   {
     std2::string_constant<char> str = "£";
@@ -545,7 +583,7 @@ void string_view_slice()
   }
 }
 
-int main()
+int main() safe
 {
   string_view_constructor();
   string_view_slice_ordinary_utf8_constructor();

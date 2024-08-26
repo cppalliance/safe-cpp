@@ -6,6 +6,7 @@
 #pragma once
 #feature on safety
 
+#include <std2/slice.h>
 #include <cstddef>
 
 namespace std2
@@ -14,8 +15,8 @@ namespace std2
 template<class T+>
 class initializer_list/(a) {
   // Point to byte data on the stack.
-  T* _cur;
-  T* _end;
+  T* unsafe _cur;
+  T* unsafe _end;
   T^/a __phantom_data;
 
   explicit
@@ -38,16 +39,16 @@ public:
   }
 
   [T; dyn]^ slice(self^) noexcept safe {
-    unsafe return ^*__slice_pointer(self->_cur, self->size());
+    unsafe { return slice_from_raw_parts(self->_cur, self->size()); }
   }
 
   const [T; dyn]^ slice(const self^) noexcept safe {
-    unsafe return ^*__slice_pointer(self->_cur, self->size());
+    unsafe { return slice_from_raw_parts(self->_cur, self->size()); }
   }
 
   optional<T> next(self^) noexcept safe {
     if(self->_cur != self->_end)
-      unsafe return .some(__rel_read(self->_cur++));
+      return .some(__rel_read(self->_cur++));
     else
       return .none;
   }
@@ -61,7 +62,7 @@ public:
   }
 
   std::size_t size(const self^) noexcept safe {
-    unsafe return (std::size_t)(self->_end - self->_cur);
+    return (std::size_t)(self->_end - self->_cur);
   }
 
   // Unsafe call to advance. Use this after relocating data out of

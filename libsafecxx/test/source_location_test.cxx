@@ -22,7 +22,7 @@ void source_location() safe
 {
   char buf[] = {'l','m','a','o'};
   auto loc = std2::source_location::current(buf);
-  unsafe printf("%s\n", loc.file_name());
+  unsafe { printf("%s\n", loc.file_name()); }
 }
 
 int main() {

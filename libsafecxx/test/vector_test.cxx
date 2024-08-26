@@ -115,6 +115,7 @@ void vector_iterator() safe
 {
   {
     std2::vector<int> v = {};
+    // v.data()[0];
     auto it = v.iter();
 
     check_definition(^it);
@@ -146,13 +147,13 @@ void vector_iterator() safe
 
 void vector_string_view() safe
 {
-  unsafe std::string s1 = "hello, world!";
-  unsafe std::string s2 = "walking home in the moonlight";
-  unsafe std::string s3 = "catching glimpses of my past life";
+  unsafe { std::string s1 = "hello, world!"; }
+  unsafe { std::string s2 = "walking home in the moonlight"; }
+  unsafe { std::string s3 = "catching glimpses of my past life"; }
 
-  unsafe std2::string_view sv1 = std2::slice_from_raw_parts(s1.data(), s1.size());
-  unsafe std2::string_view sv2 = std2::slice_from_raw_parts(s2.data(), s2.size());
-  unsafe std2::string_view sv3 = std2::slice_from_raw_parts(s3.data(), s3.size());
+  unsafe { std2::string_view sv1 = std2::slice_from_raw_parts(s1.data(), s1.size()); }
+  unsafe { std2::string_view sv2 = std2::slice_from_raw_parts(s2.data(), s2.size()); }
+  unsafe { std2::string_view sv3 = std2::slice_from_raw_parts(s3.data(), s3.size()); }
 
   std2::vector<std2::string_view> strs = {};
   strs^.push_back(sv1);
