@@ -4,10 +4,7 @@
 
 #feature on safety
 
-#include <std2/thread.h>
-#include <std2/mutex.h>
-#include <std2/vector.h>
-#include <std2/arc.h>
+#include <std2.h>
 
 #include <cstdio>
 
@@ -99,7 +96,7 @@ void adder(std2::arc<std2::mutex<int>> m) safe
   unsafe { std::this_thread::sleep_for(std::chrono::milliseconds(250)); }
   for (int i = 0; i < 100'000; ++i) {
     auto guard = m->lock();
-    int^ x = ^*guard^.borrow();
+    int^ x = mut guard.borrow();
     *x += 1;
   }
 };

@@ -8,6 +8,7 @@
 
 #include <std2/slice.h>
 #include <cstddef>
+#include <memory>
 
 namespace std2
 {
