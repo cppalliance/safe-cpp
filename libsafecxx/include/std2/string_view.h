@@ -120,12 +120,12 @@ private:
   {
   #if !defined(LIBSAFECXX_PANIC_THROWS)
     const [char; dyn]^ text = msg.text();
-    unsafe __assert_fail(
+    unsafe { __assert_fail(
       std::string((*text)~as_pointer, (*text)~length).c_str(),
       loc.file_name(),
       loc.line(),
       loc.function_name()
-    );
+    ); }
   #else
     throw "malformed utf";
   #endif
