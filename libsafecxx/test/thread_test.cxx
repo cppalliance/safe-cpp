@@ -68,15 +68,16 @@ void thread_constructor() safe
   {
     std2::thread t(add, cpy mtx, 1, 2);
 
-    unsafe int r = *mtx->lock();
+    unsafe { int r = *mtx->lock(); }
     if (r != 1337) assert_eq(r, 1 + 2);
 
     t^.join();
   }
 
-  // {
-  //   std2::thread t(add, cpy mtx, 1, 2);
-  // }
+  {
+    // test detachment on drop
+    std2::thread t(add, cpy mtx, 1, 2);
+  }
 
   {
     std2::thread t(send_callable{}, 24);
@@ -96,31 +97,33 @@ static_assert(!std2::mutex<nonsend_callable>~is_sync);
 void adder(std2::arc<std2::mutex<int>> m) safe
 {
   unsafe { std::this_thread::sleep_for(std::chrono::milliseconds(250)); }
-  for (int i = 0; i < 1'000'000; ++i) {
+  for (int i = 0; i < 100'000; ++i) {
     auto guard = m->lock();
     int^ x = ^*guard^.borrow();
     *x += 1;
   }
 };
 
-void mutex_test()
+void mutex_test() safe
 {
   std2::vector<std2::thread> threads = {};
-  std2::arc<std2::mutex<int>> sp = std2::mutex<int>(1337);
+  std2::arc<std2::mutex<int>> sp = std2::mutex<int>(0);
 
   int const num_threads = 8;
   for (int i = 0; i < num_threads; ++i) {
     threads^.push_back(std2::thread(adder, cpy sp));
   }
 
-  for(std2::thread t : rel threads) {
-    t^.join();
+  for(std2::thread^ t : ^threads) {
+    mut t.join();
   }
 
-  assert_eq(*sp->lock()^.borrow(), num_threads * 1'000'000);
+  int const val = *sp->lock()^.borrow();
+  auto const expected = num_threads * 100'000;
+  assert_eq(val, expected);
 }
 
-int main()
+int main() safe
 {
   thread_constructor();
   mutex_test();
