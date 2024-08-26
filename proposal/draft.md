@@ -496,7 +496,9 @@ int main() safe {
 }
 ```
 
-In this example, the unsafe String constructor is called in the safe main function. That's permitted because substitution of `unsafe String` into Vec's template parameter creates a push_back specialization with an `unsafe String` function parameter. Safe C++ allows unsafe constructors to initialize unsafe types in an unsafe context. 
+In this example, the unsafe String constructor is called in the safe main function. That's permitted because substitution of `unsafe String` into Vec's template parameter creates a push_back specialization with an `unsafe String` function parameter. Safe C++ allows unsafe constructors to initialize unsafe types in an unsafe context.
+
+Permitting unsafe operations with unsafe specialization is far preferable to using conditional _unsafe-specifiers_ on the class template's member functions. We want the vector to keep its safe interface so that it can be used by safe callers. This device allows member functions to remain safe without resorting to _unsafe-blocks_ in the implementations. There's a single use of the `unsafe` token, which makes for simple audits during code review.
 
 ```cpp
 int main() safe {
@@ -547,7 +549,9 @@ This program is well-formed. As with the previous example, there's a direct init
 
 ### Exempted calls
 
-In order to be more accommodating of mixing unsafe with safe code, the unsafe qualifier has very liberal transitive properties. A function invoked with an unsafe-qualified object or argument, or a constructor that initializes an unsafe type, are _exempted calls_. 
+In order to be more accommodating of mixing unsafe with safe code, the unsafe qualifier has very liberal transitive properties. A function invoked with an unsafe-qualified object or argument, or a constructor that initializes an unsafe type, are _exempted calls_. When performing overload resolution for exempted calls, function parameters of candidates become unsafe qualified. This permits copy initialization of 
+
+TODO
 
 ### _using-unsafe-declaration_
 
@@ -1381,6 +1385,48 @@ box<T> make_box(Ts... args) safe where(T:T(rel args...));
 ```
 
 There's a unique tooling aspect to this. To evaluate the implied constraints of the outlives expression, we have lower the expression to MIR, create new region variables for the locals, generate constraints, solve the constraint equation, and propagate region end points up to the function's lifetime parameters.
+
+### Unsafe type qualifier suppression 
+
+### Relocation out of dereferences
+
+```rust
+fn swap<T>(
+    a: &mut T,
+    b: &mut T,
+) {
+    let tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+```
+
+```cpp
+template<typename T>
+void swap(T^ a, T^ b) noexcept safe {
+  T tmp = rel *a;
+  *a = rel *b;
+  *b = rel tmp;
+}
+```
+
+This code doesn't compile under Rust or Safe C++ because the operand of the relocation is a dereference, which is not an _owned place_. This defeats the abilities of initialization analysis
+
+```cpp
+template<typename T>
+void bad_swap(T^ a, T^ b, T ^c) noexcept safe {
+  T tmp = rel *a;
+  a = c;
+  *a = rel *b;   // Doesn't really restore the moved-out place
+  *b = rel tmp;
+}
+```
+
+
+
+
+https://smallcultfollowing.com/babysteps/blog/2024/05/02/unwind-considered-harmful/#unwinding-puts-limits-on-the-borrow-checker
+
 
 ### Function parameter ownership
 
