@@ -18,7 +18,7 @@ The government papers are backed by industry research. Microsoft's bug telemetry
 
 * Mar. 4, 2024 - **Secure by Design: Google's Perspective on Memory Safety**[^secure-by-design]
 
-Security professionals loudly advocate that projects migrate away from C++ and start using memory safe languages. But the scale of the problem is daunting. C++ powers products that have generated trillions of dollars of value. There are a lot of C++ programmers and a lot of C++ code. Given how wide-spread C and C++ code is, what can industry really do to improve software quality and reduce vulnerabilities? What are the options for introducing new memory safe code into existing projects and hardening software that already exists?
+Security professionals urge projects to migrate away from C++ and adopt memory safe languages. But the scale of the problem is daunting. C++ powers software that has generated trillions of dollars of value. There are a lot of C++ programmers and a lot of C++ code. Given how wide-spread C and C++ code is, what can industry really do to improve software quality and reduce vulnerabilities? What are the options for introducing new memory safe code into existing projects and hardening software that already exists?
 
 There's only one systems-level/non-garbage collected language that provides rigorous memory safety. That's the Rust language.[^rust-language] But while they play in the same space, C++ and Rust are idiomatically very different with limited interop capability, making incremental migration from C++ to Rust a slow, painstaking process.
 
@@ -58,6 +58,8 @@ The argument for Safe C++: it provides the same rigorous safety guarantees as Ru
 
 The goal is to write robust, sound software. Rust is a proven tool to achieve that. Safe C++ could be another viable tool. What's not viable is to continue investing in unsafe, vulnerability-ridden code.
 
+[^borrow-checking]: [The Rust RFC Book - Non-lexical lifetimes](https://rust-lang.github.io/rfcs/2094-nll.html)
+
 ### Properties of Safe C++
 
 * A superset of C++ with a _safe subset_. Undefined behavior is prohibited from originating in the safe subset.
@@ -78,7 +80,7 @@ int main() safe {
     if(x % 2)
       mut vec.push_back(x);
 
-    unsafe { printf("%d\n", x); }
+    println(x);
   }
 }
 ```
@@ -86,7 +88,7 @@ int main() safe {
 SHOW OUTPUT
 ```
 
-Consider this demonstration of Safe C++ that catches iterator invalidation, which would lead to a use-after-free bug. Let's break it down line by line:
+Consider this demonstration of Safe C++ that catches iterator invalidation, a kind of use-after-free bug. Let's break it down line by line:
 
 Line 1: `#feature on safety` - Turn on the new safety-related keywords within this file. Other files in your translation unit are unaffected. This is how Safe C++ avoids breaking existing code--everything is opt-in, including the new keywords and syntax. The safety feature changes the object model for function definitions, enabling object relocation, partial and deferred initialization. It lowers function definitions to mid-level intermediate representation (MIR)[^mir], on which borrow checking is performed to flag potential use-after-free bugs on checked references.
 
@@ -131,7 +133,7 @@ Consider an old libc function, `std::isprint`,[^isprint] that exhibits unsafe de
 
 It seems natural, in the year 2024, to pass UNICODE code points to functions that are typed with `int` and deal with characters. While the mistake is the caller's for not reading the documentation and following the preconditions, this design goes against human nature. Do not rely on the programmer to closely read the docs before using your function. The safe context provided by memory safe languages prevents usage or authoring of functions like `std::isprint` which exhibit undefined behavior when called with invalid arguments.
 
-Rust's approach to safety[^safe-unsafe-meaning] is about defining responsibility for enforcing preconditions. In a safe context, the user can call safe functions without compromising program soundness. Failure to read the docs may risk correctness, but it won't risk undefined behavior. When the user wants to call an unsafe function from a safe context, they _explicitly assume responsibility_ for sound usage of that unsafe function. The user writes the `unsafe` token as a kind of contract: the user has read the terms and conditions of the unsafe function and affirms that it's not being called in a way that violates its preconditions.
+Rust's approach to safety[^safe-unsafe-meaning] centers on defining responsibility for enforcing preconditions. In a safe context, the user can call safe functions without compromising program soundness. Failure to read the docs may risk correctness, but it won't risk undefined behavior. When the user wants to call an unsafe function from a safe context, they _explicitly take responsibility_ for sound usage of that unsafe function. The user writes the `unsafe` token as a kind of contract: the user has read the terms and conditions of the unsafe function and affirms that it's not being called in a way that violates its preconditions.
 
 Who is to blame when undefined behavior is detected, the caller or the callee? ISO C++ does not have an answer, making it an unreliable language. But Rust's safety model does: whoever typed out the `unsafe` token is at fault. Safe C++ adopts the same principle. Code is divided into unsafe and safe contexts. Unsafe operations may only occur in unsafe contexts. Dropping from a safe context to an unsafe context requires use of the `unsafe` keyword. This leaves an artifact that makes for easy audits: reviewers search for the `unsafe` keyword and focus their attention there first.
 
@@ -308,6 +310,20 @@ TODO
 
 
 
+## Tour of Safe C++
+
+Put at least 10 examples and describe their opreations. It's best to focus on the code early.
+
+
+From st louis ISO talk:
+
+1. safe1.cxx - out-of-bounds panic
+1. sv1.cxx - dangling string_view
+1. sv3.cxx - 
+1. iter2.cxx - iterator invalidation
+1. safe3.cxx - deref
+
+
 
 
 
@@ -432,7 +448,7 @@ The `unsafe` token is required to escape the safe context and perform operations
 SHOW unsafe { }
 ```
 
-### The `unsafe` type qualifier
+## The `unsafe` type qualifier
 
 The Rust ecosystem was built from the bottom-up prioritizing safe code. Consequently, there's so little unsafe code that the _unsafe-block_ is generally sufficient for interfacing with it. By contrast, there are many billions of lines of unsafe C++ in the wild. The _unsafe-block_ isn't powerful enough to interface our safe and unsafe assets, as we'd be writing _unsafe-blocks_ everywhere, making a noisy mess. Worse, we'd be unable to use unsafe types from safe function templates, since the template definition wouldn't know it was dealing with unsafe template parameters. Because of the ecosystem difference, Rust does not provide guidance for this problem, and we're left to our own devices.
 
@@ -440,21 +456,98 @@ The Rust ecosystem was built from the bottom-up prioritizing safe code. Conseque
 
 C++ has `const` and `volatile` type qualifiers. C++ compilers also support the `_Atomic` type qualifier,[^atomic-types] through C11. Safe C++ adds the `unsafe` type qualifier. Declare an object or data member with the `unsafe` qualifier and use it freely _even in safe contexts_. The `unsafe` token means the same thing here as it does with _unsafe-blocks_: the programmer is declaring responsibility for upholding the conditions of the object. Blame lies with the `unsafe` wielder.
 
+Naming an `unsafe` object yields an lvalue expression of the unsafe type. What are the effects of the unsafe qualifier on an expression?
+
+* Calling unsafe member functions on unsafe-qualified objects is permitted.
+* Calling unsafe functions where a function argument is unsafe-qualified is permitted.
+* Unsafe constructors may initialize unsafe types.
+
 ```cpp
 unsafe-qualifier examples
 ```
 
-Naming an `unsafe` object yields an lvalue expression of the unsafe type. Calling unsafe member functions on expressions with `unsafe` types is permitted in the unsafe context. In fact, calling unsafe functions or performing unsafe operations on unsafe-qualified types is "safe" for the purpose of _safe-operator_.
+ Calling unsafe member functions on expressions with `unsafe` types is permitted in the unsafe context. Calling initializers of `unsafe` types is also permitted. In fact, these operations on unsafe types are "safe" for the purpose of _safe-operator_.
+
+Expressions carry noexcept and safe information which is outside of the type's expression; this information is moved transitively between subexpressions and feeds the _noexcept-_- and _safe-operator_. Why make unsafe a type qualifier, which represents a significant change to the type system, rather than some other kind of property of an object or member declaration, propagate it like the noexcept and safe flags? 
+
+The answer is that template specialization works on types and it doesn't work on these other kinds of properties. A template argument with an unsafe qualifier instantiates a template with an unsafe qualifier on the corresponding template parameter. The unsafe qualifier drills through templates in a way that other language entities don't.
 
 ```cpp
+#feature on safety 
 
+template<typename T+>
+struct Vec {
+  Vec() safe;
+  void push_back(self^, T obj) safe;
+};
+
+struct String {
+  String(const char*); // Unsafe ctor.
+};
+
+int main() safe {
+  // Vec has a safe constructor.
+  Vec<unsafe String> vec { };
+
+  // void Vec<unsafe String>::push_back(self^, unsafe String) safe;
+  // Copy initialization of the `unsafe String` function parameter is 
+  // permitted.
+  mut vec.push_back("A string");
+}
 ```
 
-### unsafe qualifier and templates
+In this example, the unsafe String constructor is called in the safe main function. That's permitted because substitution of `unsafe String` into Vec's template parameter creates a push_back specialization with an `unsafe String` function parameter. Safe C++ allows unsafe constructors to initialize unsafe types in an unsafe context. 
 
-Show std2::vector<std::string> usage.
+```cpp
+int main() safe {
+  // Vec has a safe constructor.
+  Vec<unsafe String> vec { };
+
+  // void Vec<unsafe String>::push_back(self^, unsafe String) safe;
+  // This is ill-formed. We can't invoke the unsafe String constructor
+  // to initialize an unsafe type.
+  mut vec.push_back(String("A string"));
+}
+```
+
+This code is ill-formed. We've established that it's permitted to copy initialize into the push_back call, since its function parameter is `unsafe String`, but direct initialization of `String` is not allowed. The constructor chosen for direct initialization is unsafe, but the type it's initializing is not. The compiler is right to reject this program because the user is plainly calling an unsafe constructor in a safe context, without a mitigating _unsafe-block_ or unsafe qualifier.
+
+```cpp
+#feature on safety 
+
+template<typename T+>
+struct Vec {
+  Vec() safe;
+  void push_back(self^, T obj) safe;
+
+  template<typename... Ts>
+  void emplace_back(self^, Ts... obj) safe {
+    // Direct initialization with the String(const char*) ctor.
+    // This compiles, because T is unsafe-qualified.
+    self.push_back(T(rel obj...));
+  }
+};
+
+struct String {
+  String(const char*); // Unsafe ctor.
+};
+
+int main() safe {
+  // Vec has a safe constructor.
+  Vec<unsafe String> vec { };
+
+  // void Vec<unsafe String>::emplace_back(self^, const char*) safe;
+  mut vec.emplace_back("A string");
+}
+```
+
+This program is well-formed. As with the previous example, there's a direct initialization of a String object using its unsafe constructor. But this time it's allowed, because the type being initialized is `T`, which is substituted with `unsafe String`: unsafe constructors are permitted to initialize unsafe types. 
 
 [^atomic-types]: [_Atomic types](https://en.cppreference.com/w/c/language/atomic)
+
+### Exempted calls
+
+In order to be more accommodating of mixing unsafe with safe code, the unsafe qualifier has very liberal transitive properties. A function invoked with an unsafe-qualified object or argument, or a constructor that initializes an unsafe type, are _exempted calls_. 
 
 ### _using-unsafe-declaration_
 
@@ -464,9 +557,13 @@ There's one widely deployed solution to lifetime safety: garbage collection. In 
 
 Garbage collection requires storing objects on the _heap_. But C++ is about _manual memory management_. We need to track references to objects on the _stack_ as well as on the heap. As the stack unwinds objects are destroyed. We can't extend their duration beyond their lexical scopes. Borrow checking[^borrow-checking] is a kind of compile-time analysis that prevents using a reference after an object has gone out of scope. That is, it solves use-after-free and iterator invalidation bugs.
 
+[^tracing-gc]: [Tracing garbage collection](https://en.wikipedia.org/wiki/Tracing_garbage_collection)
+
+[^arc]: [Automatic reference counting](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/automaticreferencecounting/)
+
 ### Use-after-free
 
-`std::string_view`[^string_view] was added to C++ as a safer alternatives to passing character pointers around. Unfortunately, it's so safe unsafe that its said to _encourage_ use-after-free bugs.[^string-view-use-after-free]
+`std::string_view`[^string_view] was added to C++ as a safer alternatives to passing character pointers around. Unfortunately, it's so safe unsafe that its reported to _encourage_ use-after-free bugs.[^string-view-use-after-free]
 
 ```cpp
 #include <iostream>
@@ -489,11 +586,11 @@ $ ./string_view
 
 This design is full of sharp edges. It should not have made the ISO Standard. But C++ didn't have great alternatives, since it lacks borrow checking, which is the technology that flags these problems.
 
-Safe C++ allows us to author lifetime-aware string_view types that provide memory safety. The compiler prohibits uses of dangling views.
+Safe C++ allows us to author lifetime-aware `string_view` types that provide memory safety. The compiler prohibits uses of dangling views.
 
 ```cpp
 #feature on safety
-#include "std2.h"
+#include <std2/string.h>
 
 int main() safe {
   std2::string s = "Hellooooooooooooooo ";
@@ -515,7 +612,11 @@ loan created at str0.cxx:6:28
 
 The compiler flags the use of the dangling view, `println(sv)`. It marks the invalidating action, the drop of the temporary string. And it indicates where the loan was created, which is the conversion to `string_view` right after the string concatenation. See the [error reporting](lifetime.md#error-reporting) section for details on lifetime diagnostics.
 
+[^string_view]: [std::basic_string_view](https://en.cppreference.com/w/cpp/string/basic_string_view)
+
 [^string-view-use-after-free]: [std::string_view encourages use-after-free; the Core Guidelines Checker doesn't complain](https://github.com/isocpp/CppCoreGuidelines/issues/1038)
+
+[^string_conversion]: [std::string::operator string_view](https://en.cppreference.com/w/cpp/string/basic_string/operator_basic_string_view)
 
 ### Iterator invalidation
 
@@ -569,6 +670,10 @@ int main() {
 Borrows are checked references. It's a compile-time error to use a borrow after the data it refers to has gone out of scope. Consider the set of all live references at each point in the program. Is there an invalidating action on a place referred to by one of these live references? If so, that's a contradiction that makes the program ill-formed. In this example, the contradiction occurs when `y` goes out of scope, because at that point, `ref` is a live reference to it. What makes `ref` live at that point?--The last `f(*ref)` expression in the program.
 
 It's not enough to compute liveness of references. To determine the invalidating actions, it's important to know which place the live borrow refers to. `ref` is live until the end of the function, but `x` going out of scope is not an invalidating function, because `ref` doesn't refer to `x` anymore. We need data structures that indicate not just when a borrow is live, but to which places it may refer.
+
+[^dataflow-analysis]: [Data-flow analysis](https://en.wikipedia.org/wiki/Data-flow_analysis)
+
+[^live-analysis]: [Live-variable analysis](https://en.wikipedia.org/wiki/Live-variable_analysis)
 
 ### Systems of constraints
 
@@ -798,7 +903,7 @@ template<typename T>
 void f/(a, b where a : b)(T^/a x, const T^/b y) { }
 ```
 
-Rust uses single-quotes to introduce lifetime parameters and lifetime arguments. That wasn't a realistic choice for me, because C supports multi-character literals.[^character-literal] This cursed feature, in which literals like `'abcd'` evaluate to constants of type `int`, makes lexing Rust-style lifetime arguments very messy.
+Rust uses single-quotes to introduce lifetime parameters and lifetime arguments. That's not a workable choice for us, because C supports multi-character literals.[^character-literal] This cursed feature, in which literals like `'abcd'` evaluate to constants of type `int`, makes lexing Rust-style lifetime arguments very messy.
 
 ```cpp
 template<typename T>
@@ -829,6 +934,8 @@ The _where-clause_ establishes the relationship that `/a` outlives `/b`. Does th
 
 Lifetime parameters and _where-clauses_ are a facility for instructing the borrow checker. The obvious mental model is that the lifetimes of references are connected to the scope of the objects they point to. But this is not accurate. Think about lifetimes as defining rules that can't be violated, with the borrow checker looking for contradictions of these rules.
 
+[^character-literal]: [Character literal](https://en.cppreference.com/w/cpp/language/character_literal)
+
 ### Free regions
 
 ### Lifetime canonicalization
@@ -858,33 +965,17 @@ static_assert(F2 != F4);
 
 Lifetime parameterizations are part of the function's type. But different textual parameterizations may still result in the same type! `F1` and `F2` have different parameterizations and are different types. But `F2` and `F3` have different parameterizations yet are the same type. Likewise, `F4` and `F5` are the same type, even though `F4` has two lifetime parameters and two outlives constraints.
 
-The compiler maps all non-dependent types to canonical types. When comparing types for equality, it compares the pointers to their canonical types. This is necessary to support typedefs and alias templates that appear in functions--we need to strip away those inessential details and get to the canonical types within. The lifetime parameterizations the user writes also map to canonical parameterizations.
+The compiler maps all non-dependent types to canonical types. When comparing types for equality, it compares the pointers to their canonical types. This is necessary to support typedefs and alias templates that appear in functions--we need to strip away those inessential details and get to the canonical types within. The lifetime parameterizations the user writes also map to canonical pameterizations.
 
 Think about lifetime parameterizations as a directed graph. Lifetime parameters are the nodes and outlives constraints define the edges. The compiler finds the strongly connected components[^scc] of this graph. That is, it identifies all cycles and reduces them into SCC nodes. In `F4`, the `/a` and `/b` lifetime parameters constrain one another, and there are collapsed into a strongly connected component. The canonical function type is encoded using SCCs as lifetime parameters. Both `F4` and `F5` map to the same canonical type, and therefore compare the same.
 
 During the type relation pass that generates lifetime constraints for function calls in the MIR, arguments and result object regions are constrained to regions of the canonical type's SCCs, rather than the lifetime parameters of the declared type. This reduces the number of regions the borrow checker solves for. But the big reason for this process is to permit writing compatible functions even in the face lifetime normalization.  
 
+[^scc]: [Strongly connected component](https://en.wikipedia.org/wiki/Strongly_connected_component)
+
 ### Lifetimes and templates
 
 ### Lifetime normalization
-
-[^tracing-gc]: [Tracing garbage collection](https://en.wikipedia.org/wiki/Tracing_garbage_collection)
-
-[^arc]: [Automatic reference counting](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/automaticreferencecounting/)
-
-[^borrow-checking]: [The Rust RFC Book - Non-lexical lifetimes](https://rust-lang.github.io/rfcs/2094-nll.html)
-
-[^string_view]: [std::basic_string_view](https://en.cppreference.com/w/cpp/string/basic_string_view)
-
-[^string_conversion]: [std::string::operator string_view](https://en.cppreference.com/w/cpp/string/basic_string/operator_basic_string_view)
-
-[^dataflow-analysis]: [Data-flow analysis](https://en.wikipedia.org/wiki/Data-flow_analysis)
-
-[^live-analysis]: [Live-variable analysis](https://en.wikipedia.org/wiki/Live-variable_analysis)
-
-[^character-literal]: [Character literal](https://en.cppreference.com/w/cpp/language/character_literal)
-
-[^scc]: [Strongly connected component](https://en.wikipedia.org/wiki/Strongly_connected_component)
 
 ## Explicit mutation
 
@@ -1054,6 +1145,10 @@ _Object postfix_ tokens, along with the various reference-binding operators, pro
 
 [^two-phase]: [Two-phase borrows](https://rustc-dev-guide.rust-lang.org/borrow_check/two_phase_borrows.html#two-phase-borrows)
 
+### The mutable context
+
+
+
 ## Relocation object model
 
 A core enabling feature of Safe C++ is the new object model. It supports relocation/destructive move of local objects, which is necessary for satisfying type safety. Additionally, _all mutations are explicit_. This is nice in its own right, but it's really important for distinguishing between mutable and shared borrows.
@@ -1124,13 +1219,13 @@ I think implicit relocation is too surprising for C++ users. We're more likely t
 * `rel x` - relocate `x` into a new value. `x` is set as uninitialized.
 * `cpy x` - copy construct `x` into a new value. `x` remains initialized.
 
-If an object is _trivially constructible_, then you don't need either of these tokens. The compiler will copy your value. Both expressions produce prvalues of the lvalue operand type. 
+If an object is _trivially copyable_, as all scalars are, then you don't need either of these tokens. The compiler will copy your value. Both _rel-_ and _cpy-expressions_ produce prvalues of the operand's type. 
 
 Why do I make both copy and relocation explicit? I want to make it easy for users to choose the more efficient option. If a type is not trivially copyable, you can opt into an expensive copy with _cpy-expression_. This avoids performance bugs, where an object undergoes an expensive copy just because the user didn't know it was there. Or, if you don't want to copy, use _rel-expression_, which is efficient but destroys the old object, without destructing it.
 
 * `drp x` - call the destructor on an object and set as uninitialized.
 
-Local objects start off uninitialized. They're initialized when first assigned to. Then they're uninitialized again when relocated from. If you want to _destruct_ an object prior to it going out of scope, use _drp-expression_. Unlike Rust's `drop` API,[^drop] this works even on objects that are only potentially initialized (was uninitialized on some control flow paths) or partially initialized (has some uninitialized subobjects).
+Local objects start off uninitialized. They're initialized when first assigned to. Then they're uninitialized again when relocated from. If you want to _destruct_ an object prior to it going out of scope, use _drp-expression_. Unlike Rust's `drop` API,[^drop] this works even on objects that are pinned or are only potentially initialized (was uninitialized on some control flow paths) or partially initialized (has some uninitialized subobjects).
 
 Consider a function like `std::unique_ptr::reset`.[^unique_ptr-reset] It destructs the existing object, if one is engaged, and sets the unique_ptr to its null state. But in our safe version, box doesn't have a default state. It doesn't supply the `reset` member function. Instead, users just drop it, running its destructor and leaving it uninitialized.
 
@@ -1139,6 +1234,8 @@ You've noticed the nonsense spellings for these keywords. Why not call them `mov
 [^copy-trait]: [`Copy` in `std::marker`](https://doc.rust-lang.org/std/marker/trait.Copy.html)
 
 [^clone-trait]: [`Clone` in `std::clone`](https://doc.rust-lang.org/std/clone/trait.Clone.html)
+
+[^pin]: [Module `std::pin`](https://doc.rust-lang.org/std/pin/index.html)
 
 [^drop]: [`drop` in `std::ops`](https://doc.rust-lang.org/std/ops/trait.Drop.html)
 
@@ -1261,3 +1358,29 @@ TODO
 ## Choice types
 
 ### Pattern matching
+
+## Thread safety
+
+## Interior mutability
+
+## Implementation guidance
+
+## Unresolved or unimplemented design issues
+
+### _expression-outlives-constraint_
+
+C++ variadics don't convey lifetime constraints from the function's return type to its parameters. Calls like `make_unique` and `emplace_back` take parameters `Ts... args` and return an unrelated type `T`. This may trigger the borrow checker, because the implementation of the function will produce free regions with unrelated endpoints. It's not a soundness issue, but it is a serious usability issue.
+
+We need an _expression-outlives-constraint_, a programmatic version of _outlives-constrant_ `/(where a : b)`. It consists of an _expression_ in an unevaluated context, which names the actual function parameters and harvests the lifetime constraints (and variances?) implied by those expressions. We should name function parameters rather than declvals of their types, because they may be borrows with additional constraints than their template lifetime parameters have.
+
+In order to name the function parameters, we'll need a trailing _expression-lifetime-constraint_ syntax. Something like,
+
+```cpp
+template<typename T+, typename... Ts+>
+box<T> make_box(Ts... args) safe where(T:T(rel args...));
+```
+
+There's a unique tooling aspect to this. To evaluate the implied constraints of the outlives expression, we have lower the expression to MIR, create new region variables for the locals, generate constraints, solve the constraint equation, and propagate region end points up to the function's lifetime parameters.
+
+### Function parameter ownership
+
