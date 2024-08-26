@@ -454,23 +454,45 @@ The Rust ecosystem was built from the bottom-up prioritizing safe code. Conseque
 
 **Safe C++'s answer to safe/unsafe interoperability is to make safeness part of the type system.**
 
-C++ has `const` and `volatile` type qualifiers. C++ compilers also support the `_Atomic` type qualifier,[^atomic-types] through C11. Safe C++ adds the `unsafe` type qualifier. Declare an object or data member with the `unsafe` qualifier and use it freely _even in safe contexts_. The `unsafe` token means the same thing here as it does with _unsafe-blocks_: the programmer is declaring responsibility for upholding the conditions of the object. Blame lies with the `unsafe` wielder.
+C++ has `const` and `volatile` type qualifiers. C++ compilers also support the `_Atomic` type qualifier,[^atomic-types] through C11. Safe C++ adds the `unsafe` type qualifier. Declare an object or data member with the unsafe qualifier and use it freely _even in safe contexts_. The `unsafe` token means the same thing here as it does with _unsafe-blocks_: the programmer is declaring responsibility for upholding the conditions of the object. Blame lies with the `unsafe` wielder.
 
-Naming an `unsafe` object yields an lvalue expression of the unsafe type. What are the effects of the unsafe qualifier on an expression?
+Naming an unsafe object yields an lvalue expression of the unsafe type. What are the effects of the unsafe qualifier on an expression?
 
 * Calling unsafe member functions on unsafe-qualified objects is permitted.
 * Calling unsafe functions where a function argument is unsafe-qualified is permitted.
 * Unsafe constructors may initialize unsafe types.
 
-```cpp
-unsafe-qualifier examples
-```
-
- Calling unsafe member functions on expressions with `unsafe` types is permitted in the unsafe context. Calling initializers of `unsafe` types is also permitted. In fact, these operations on unsafe types are "safe" for the purpose of _safe-operator_.
+Calling unsafe member functions on expressions with unsafe types is permitted in the unsafe context. Calling initializers of unsafe types is also permitted. In fact, these operations on unsafe types are "safe" for the purpose of _safe-operator_.
 
 Expressions carry noexcept and safe information which is outside of the type's expression; this information is moved transitively between subexpressions and feeds the _noexcept-_- and _safe-operator_. Why make unsafe a type qualifier, which represents a significant change to the type system, rather than some other kind of property of an object or member declaration, propagate it like the noexcept and safe flags? 
 
 The answer is that template specialization works on types and it doesn't work on these other kinds of properties. A template argument with an unsafe qualifier instantiates a template with an unsafe qualifier on the corresponding template parameter. The unsafe qualifier drills through templates in a way that other language entities don't.
+
+```cpp
+int main() safe {
+  // Requires unsafe type specifier because std::string's dtor is unsafe.
+  std2::vector<unsafe std::string> vec;
+
+  // Construct an std::string from a const char* (unsafe)
+  // Pass by relocation (unsafe)
+  mut vec.push_back("Foo");
+  
+  // Pass const char*
+  // Construct inside emplace_back (unsafe)
+  mut vec.push_back("Bar");
+
+  // Append Bar to the end of Foo (unsafe)
+  mut vec[0] += vec[1]; 
+
+  std2::println(vec[0]);
+}
+```
+
+We want to use the new memory-safe vector with the legacy string type. The new vector is borrow checked, eliminating use-after-free and iterator invalidation defects. It presents a safe interface. But the old string is pre-safety. All its member functions are unsafe. If we want to specialize the new vector on the old string, we need to mark it `unsafe`. 
+
+The unsafe type qualifier propagates through the instantiated vector. The expressions returned through the `operator[]` accessor are unsafe qualified, so we can call unsafe member functions on the string, even in main's safe context.
+
+Let's simplify the example above and study it in detail.
 
 ```cpp
 #feature on safety 
@@ -499,6 +521,8 @@ int main() safe {
 In this example, the unsafe String constructor is called in the safe main function. That's permitted because substitution of `unsafe String` into Vec's template parameter creates a push_back specialization with an `unsafe String` function parameter. Safe C++ allows unsafe constructors to initialize unsafe types in an unsafe context.
 
 Permitting unsafe operations with unsafe specialization is far preferable to using conditional _unsafe-specifiers_ on the class template's member functions. We want the vector to keep its safe interface so that it can be used by safe callers. This device allows member functions to remain safe without resorting to _unsafe-blocks_ in the implementations. There's a single use of the `unsafe` token, which makes for simple audits during code review.
+
+Placing the unsafe token on the _template-argument-list_, where the class template gets used, is also far safer than enclosing operations on the template parameter type in _unsafe-blocks_ inside the template. In the former case, the user of the container can read its preconditions and swear that the precondidions are met. In the latter case, the template isn't able to make any statements about properly using the template type, because it doesn't know what that type is. The `unsafe` token should go with the caller, not the callee.
 
 ```cpp
 int main() safe {
@@ -683,7 +707,7 @@ It's not enough to compute liveness of references. To determine the invalidating
 
 NLL borrow checking,[^borrow-checking] is Rust's intentive method for testing invalidating actions against live borrows in the presence of control flow, re-assignments and function calls. The algorithm involves generating a system of lifetime constraints which map borrow variables back to _loans_, growing points until all the constraints are satisfied, and then testing invalidating actions against all loans in scope. 
 
-A loan is the action that forms a reference to a place. In the example above, there are two loans: `^x` and `^y`. Solving the constraint equation extends the liveness of loans `^x` for and `^y` up until the point of the last dereferences to them. When `y` goes out of scope, it doesn't invalidate the loan `^x`, because that's not live. But it does invalidate the loan `^y`, which is lifetime extended by the final `f(*ref)` expression.
+A loan is the action that forms a borrow to a place. In the example above, there are two loans: `^x` and `^y`. Solving the constraint equation extends the liveness of loans `^x` for and `^y` up until the point of the last dereferences to them. When `y` goes out of scope, it doesn't invalidate the loan `^x`, because that's not live. But it does invalidate the loan `^y`, which is lifetime extended by the final `f(*ref)` expression.
 
 Liveness is stored in bit vectors called `regions`. There's a region for loans `^x` and `^y` and there's a region for variables with borrow types, such as `ref`. There are also regions for user-defined types with lifetime parameters, such as `string_view`.
 
@@ -1421,9 +1445,6 @@ void bad_swap(T^ a, T^ b, T ^c) noexcept safe {
   *b = rel tmp;
 }
 ```
-
-
-
 
 https://smallcultfollowing.com/babysteps/blog/2024/05/02/unwind-considered-harmful/#unwinding-puts-limits-on-the-borrow-checker
 
