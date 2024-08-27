@@ -57,13 +57,12 @@ public:
   }
 
   ~thread() safe {
-    if (t_.joinable()) {
-      t_&.detach();
-    }
+    t_&.detach();
   }
 
-  void join(self^) safe {
-    self->t_&.join();
+  void join(self) safe {
+    self.t_&.join();
+    forget(rel self);
   }
 };
 

@@ -68,17 +68,22 @@ void thread_constructor() safe
     unsafe { int r = *mtx->lock(); }
     if (r != 1337) assert_eq(r, 1 + 2);
 
-    t^.join();
+    t rel.join();
+  }
+
+  // test detachment on drop
+  {
+    std2::thread t(add, cpy mtx, 1, 2);
+    unsafe { std::this_thread::sleep_for(std::chrono::milliseconds(250)); }
   }
 
   {
-    // test detachment on drop
-    std2::thread t(add, cpy mtx, 1, 2);
+    std2::thread t(add, cpy mtx, 2, 1);
   }
 
   {
     std2::thread t(send_callable{}, 24);
-    t^.join();
+    t rel.join();
   }
 
   // throw a sleep in here so that detached threads run to completion (hopefully)
@@ -111,8 +116,8 @@ void mutex_test() safe
     threads^.push_back(std2::thread(adder, cpy sp));
   }
 
-  for(std2::thread^ t : ^threads) {
-    mut t.join();
+  for(std2::thread t : rel threads) {
+    t rel.join();
   }
 
   int const val = *sp->lock()^.borrow();
