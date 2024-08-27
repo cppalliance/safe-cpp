@@ -121,3 +121,4 @@ safe_cxx_compile_fail_test(mutex2 "cannot convert prvalue const int\\^ to int\\^
 safe_cxx_compile_fail_test(thread1 "std2::thread::thread fails requires-clause")
 safe_cxx_compile_fail_test(thread2 "std2::thread::thread fails requires-clause")
 safe_cxx_compile_fail_test(thread3 "std2::thread::thread fails requires-clause")
+safe_cxx_compile_fail_test(thread4 "x constrained to live as long as static, but x does not live that long")

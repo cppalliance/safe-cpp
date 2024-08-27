@@ -14,6 +14,7 @@
 #include <std2/mutex.h>
 #include <std2/optional.h>
 #include <std2/panic.h>
+#include <std2/shared_mutex.h>
 #include <std2/slice.h>
 #include <std2/source_location.h>
 #include <std2/string_constant.h>

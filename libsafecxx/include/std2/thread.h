@@ -47,7 +47,7 @@ public:
     static_assert(!__is_lambda(F), "lambdas in std2::thread not yet supported by toolchain");
     using tuple_type = (F, (Args...,));
 
-    box<tuple_type> p = (rel f, (rel args... ,));
+    box<tuple_type> p{(rel f, (rel args... ,))};
     // TODO: have the thread constructor throw here somehow
     // must catch the case where a clever stdlib dev thinks they can
     // replace p.get() with `p rel.leak()` here, which causes a memory
@@ -62,7 +62,6 @@ public:
 
   void join(self) safe {
     self.t_&.join();
-    forget(rel self);
   }
 };
 

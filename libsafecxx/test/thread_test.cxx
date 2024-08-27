@@ -125,8 +125,70 @@ void mutex_test() safe
   assert_eq(val, expected);
 }
 
+void shared_mutex_test() safe
+{
+  using value_type = std2::box<int>;
+  using mutex_type = std2::shared_mutex<value_type>;
+
+  static_assert(mutex_type~is_send);
+  static_assert(mutex_type~is_sync);
+
+  static int const num_iters = 100'000;
+  static int const num_writer_threads = 4;
+  static int const num_reader_threads = 8;
+  static int const value = num_writer_threads * num_iters;
+
+  std2::vector<std2::thread> threads = {};
+  std2::arc<mutex_type> sp = mutex_type(std2::box(0));
+
+  using fn_type = void(*)(std2::arc<mutex_type>) safe;
+
+  auto writer = [](std2::arc<mutex_type> sp) safe {
+    unsafe { std::this_thread::sleep_for(std::chrono::milliseconds(250)); }
+
+    for (int i = 0; i < num_iters; ++i) {
+      unsafe { std::this_thread::yield(); }
+
+      auto guard = sp->lock();
+      value_type^ v = mut guard.borrow();
+      mut *v.borrow() += 1;
+    }
+  };
+
+  auto reader = [](std2::arc<mutex_type> sp) safe {
+    unsafe { std::this_thread::sleep_for(std::chrono::milliseconds(250)); }
+
+    int v = 0;
+    do {
+      unsafe { std::this_thread::yield(); }
+
+      auto guard = sp->lock_shared();
+      value_type const^ v2 = *guard;
+      v = **v2;
+    } while(v < value);
+  };
+
+  unsafe { fn_type fp1 = +writer; }
+  unsafe { fn_type fp2 = +reader; }
+
+  for (int i = 0; i < num_writer_threads; ++i) {
+    mut threads.push_back(std2::thread(fp1, cpy sp));
+  }
+
+  for (int i = 0; i < num_reader_threads; ++i) {
+    mut threads.push_back(std2::thread(fp2, cpy sp));
+  }
+
+  for(std2::thread t : rel threads) {
+    t rel.join();
+  }
+
+  assert_eq(**sp->lock_shared(), value);
+}
+
 int main() safe
 {
   thread_constructor();
   mutex_test();
+  shared_mutex_test();
 }
