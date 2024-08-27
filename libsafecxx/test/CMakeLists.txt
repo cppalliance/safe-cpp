@@ -105,7 +105,9 @@ function(safe_cxx_compile_fail_test testname fail_regex)
 endfunction()
 
 safe_cxx_compile_fail_test(string_view1 "use of sv depends on expired loan")
-safe_cxx_compile_fail_test(box_incomplete "member type incomplete is incomplete")
+safe_cxx_compile_fail_test(box_incomplete "class incomplete is incomplete")
+safe_cxx_compile_fail_test(box1 "cannot convert prvalue int to std2::box<int>")
+
 safe_cxx_compile_fail_test(vector1 "use of strs depends on expired loan")
 safe_cxx_compile_fail_test(vector2 "use of it depends on expired loan")
 safe_cxx_compile_fail_test(mutex1 "use of \\*x depends on expired loan")

@@ -8,13 +8,8 @@
 
 struct incomplete;
 
-std2::box<incomplete> make_incomplete() safe;
-
-void tester() safe
-{
-  auto p = make_incomplete();
-}
-
 int main()
 {
+  std2::box<std2::box<int>> p{std2::box<int>{1337}};
+  mut *p = 7331;
 }

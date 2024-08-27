@@ -12,7 +12,9 @@ namespace std2
 {
 
 template<class T+>
-class [[safety::niche_zero]] box
+class
+[[safety::niche_zero, unsafe::send(T~is_send), unsafe::sync(T~is_sync)]]
+box
 {
   T* unsafe p_;
   T __phantom_data;
@@ -23,6 +25,7 @@ public:
   {
   }
 
+  explicit
   box(T t) safe
     : unsafe p_(static_cast<T*>(::operator new(sizeof(T))))
   {
@@ -37,12 +40,20 @@ public:
     }
   }
 
-  T^ operator*(self^) noexcept safe {
+  T^ borrow(self^) noexcept safe {
     return ^*self->p_;
   }
 
-  const T^ operator*(const self^) noexcept safe {
+  T const^ borrow(self const^) noexcept safe {
     return ^*self->p_;
+  }
+
+  T^ operator*(self^) noexcept safe {
+    return self.borrow();
+  }
+
+  const T^ operator*(const self^) noexcept safe {
+    return self.borrow();
   }
 
   T^ operator->(self^) noexcept safe {
