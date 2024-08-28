@@ -107,6 +107,8 @@ endfunction()
 safe_cxx_compile_fail_test(string_view1 "use of sv depends on expired loan")
 safe_cxx_compile_fail_test(box_incomplete "class incomplete is incomplete")
 safe_cxx_compile_fail_test(box1 "cannot convert prvalue int to std2::box<int>")
+safe_cxx_compile_fail_test(unsafe_cell1 "cannot convert prvalue std2::box<int> to std2::unsafe_cell<std2::box<int>>")
+safe_cxx_compile_fail_test(manually_drop1 "cannot convert prvalue std2::box<int> to std2::manually_drop<std2::box<int>>")
 
 safe_cxx_compile_fail_test(vector1 "use of strs depends on expired loan")
 safe_cxx_compile_fail_test(vector2 "use of it depends on expired loan")

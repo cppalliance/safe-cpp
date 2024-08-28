@@ -18,6 +18,7 @@ class manually_drop
   T t_;
 
 public:
+  explicit
   manually_drop(T t) noexcept safe
     : t_(rel t)
   {
@@ -47,6 +48,8 @@ class [[unsafe::sync(false)]] unsafe_cell
 
 public:
   unsafe_cell() = default;
+
+  explicit
   unsafe_cell(T t) noexcept safe
     : t_(rel t)
   {
