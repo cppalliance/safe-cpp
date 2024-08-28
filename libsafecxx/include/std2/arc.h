@@ -36,6 +36,7 @@ arc
   };
 
 public:
+  explicit
   arc(T t) safe
   {
     unsafe { p_ = static_cast<arc_inner*>(::operator new(sizeof(arc_inner))); }

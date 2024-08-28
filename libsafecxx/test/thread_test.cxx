@@ -109,7 +109,7 @@ void adder(std2::arc<std2::mutex<int>> m) safe
 void mutex_test() safe
 {
   std2::vector<std2::thread> threads = {};
-  std2::arc<std2::mutex<int>> sp = std2::mutex<int>(0);
+  std2::arc<std2::mutex<int>> sp{std2::mutex(0)};
 
   int const num_threads = 8;
   for (int i = 0; i < num_threads; ++i) {
@@ -139,7 +139,7 @@ void shared_mutex_test() safe
   static int const value = num_writer_threads * num_iters;
 
   std2::vector<std2::thread> threads = {};
-  std2::arc<mutex_type> sp = mutex_type(std2::box(0));
+  std2::arc<mutex_type> sp{mutex_type(std2::box(0))};
 
   using fn_type = void(*)(std2::arc<mutex_type>) safe;
 
