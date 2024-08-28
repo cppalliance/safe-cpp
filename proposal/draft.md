@@ -1390,6 +1390,61 @@ TODO
 
 ## Interior mutability
 
+Recall the law of exclusivity, the program-wide invariant that guarantees a resource isn't mutated while another user access it. How does this square with the use of shared pointers, which enables shared ownership of a mutable resource? How does it support threaded programs, where access to shared mutable state is gated by a mutex?
+
+Shared mutable access exists in this safety model, but the way it's enabled involves some trickery. Rust has a blessed type, `UnsafeCell`[^unsafe-cell], which encapsulates an object and provides mutable access to it, _through a shared reference_. 
+
+```rust
+pub const fn get(&self) -> *mut T 
+```
+
+This is an official way of stripping away const. While the function is safe, it returns a raw pointer, which is unsafe to dereference. Rust includes a number of library types which wrap `UnsafeCell` and implement their own deconfliction strategies to prevent violations of exclusivity. 
+
+* `std::Cell<T>`[^cell] provides get and set methods to read out the current value and store new values into the protected resource. Since `Cell` can't be used across threads, there's no risk of violating exclusivity.
+* `std::RefCell<T>`[^ref-cell] is a single-threaded multiple-read, single-write lock. If the caller requests a mutable reference to the interior object, the implementation checks its counter, and if the object is not locked, it establishes a mutable lock and returns a mutable borrow. If the caller requests a shared reference to the interior object, the implementation checks that there is no live mutable borrow, and if there isn't, increments the counter. When users are done with the borrow, they have to release the lock, which decrements the reference count. If the user's request can't be serviced, the `RefCell` can either gracefully with an error code, or it can panic and abort.
+* `std::Mutex<T>`[^mutex] provides mutable borrows to the interior data across threads. A mutex synchronization object deconflicts access, so there's only one live borrow at a time.
+* `std::RwLock<T>`[^rwlock] is the threaded multiple-read, single-write lock. The interface is similar to RefCell's, but it uses a mutex for deconfliction, so clients can sit on the lock until their request is serviced.
+
+Safe C++ provides `std2::unsafe_cell` in its standard library. It provides the same interior mutability strategy as Rust:
+
+```cpp
+template<class T+>
+class [[unsafe::sync(false)]] unsafe_cell
+{
+  T t_;
+
+public:
+  unsafe_cell() = default;
+  unsafe_cell(T t) noexcept safe
+    : t_(rel t)
+  {
+  }
+
+  T* get(self const^) noexcept safe {
+    return const_cast<T*>(addr self->t_);
+  }
+};
+```
+
+Forming a pointer to the mutable inner state through a shared borrow is _safe_, but dereferencing that pointer is unsafe. Safe C++ implements `std2::cell`, `std2::ref_cell`, `std2::mutex` and `std2::shared_mutex`, which provide safe member functions to access interior state through their deconfliction strategies.
+
+
+
+
+
+EXAMPLE OF CELL ?
+
+
+
+Safe C++ and Rust and equate exclusive access with mutable types and shared access with const types. This is an economical choice, because one type qualifier, const, also determines exclusivity. But this awkward cast-away-const model of interior mutability is the logical consequence. 
+
+[^unsafe-cell]: [UnsafeCell](https://doc.rust-lang.org/std/cell/struct.UnsafeCell.html)
+[^cell]: [Cell](https://doc.rust-lang.org/std/cell/struct.Cell.html)
+[^ref-cell]: [RefCell](https://doc.rust-lang.org/std/cell/struct.RefCell.html)
+[^mutex]: [Mutex](https://doc.rust-lang.org/std/sync/struct.Mutex.html)
+[^rwlock]: [RwLock](https://doc.rust-lang.org/std/sync/struct.RwLock.html)
+[^ante]: [Ante Shared Interior Mutability](https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability)
+
 ## Implementation guidance
 
 ## Unresolved or unimplemented design issues
