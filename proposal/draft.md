@@ -20,11 +20,11 @@ The government papers are backed by industry research. Microsoft's bug telemetry
 
 Security professionals urge projects to migrate away from C++ and adopt memory safe languages. But the scale of the problem is daunting. C++ powers software that has generated trillions of dollars of value. There are a lot of C++ programmers and a lot of C++ code. Given how wide-spread C and C++ code is, what can industry really do to improve software quality and reduce vulnerabilities? What are the options for introducing new memory safe code into existing projects and hardening software that already exists?
 
-There's only one systems-level/non-garbage collected language that provides rigorous memory safety. That's the Rust language.[^rust-language] But while they play in the same space, C++ and Rust are idiomatically very different with limited interop capability, making incremental migration from C++ to Rust a slow, painstaking process.
+There's only one systems-level/non-garbage collected language that provides rigorous memory safety. That's the Rust language.[^rust-language] But while they play in the same space, C++ and Rust are different languages with limited interop capability, making incremental migration from C++ to Rust a slow, painstaking process.
 
 Rust lacks function overloading, templates and inheritance. C++ lacks traits, relocation and lifetime parameters. These discrepancies are responsible for an impedence mismatch when interfacing the two languages. Most code generators for inter-language bindings do not even attempt to represent the features of one language in terms of the features of another. They typically identify a number of special vocabulary types,[^vocabulary-types] which have first-class ergonomics, and limit functionality of other constructs.
 
-The foreignness of Rust for career C++ developers along with the inadequacies of interop tools makes hardening C++ applications by rewriting critical sections in Rust very difficult. Why is there no in-language solution to memory safety? _Why not a Safe C++?_
+The foreignness of Rust for career C++ developers along with the friction of interop tools makes hardening C++ applications by rewriting critical sections in Rust difficult. Why is there no in-language solution to memory safety? _Why not a Safe C++?_
 
 [^nsa-guidance]: [NSA Releases Guidance on How to Protect Against Software Memory Safety Issues](https://www.nsa.gov/Press-Room/News-Highlights/Article/Article/3215760/nsa-releases-guidance-on-how-to-protect-against-software-memory-safety-issues/)
 
@@ -50,9 +50,11 @@ The foreignness of Rust for career C++ developers along with the inadequacies of
 
 The goal of the authors is to define a superset of C++ with a _rigorously safe subset_. Begin a new project, or take an existing one, and start writing safe code in C++. Code in the safe context exhibits the same strong safety guarantees as safe code written in Rust. 
 
-The Safe C++ frontend (the user-facing part of the language) is a straight-forward extension of C++. It adds new types like choices and borrows, new control flow like pattern matches, and new language entities like lifetime parameters. But the Safe C++ backend (the hardware-facing part of the language) is all new technology. Safe C++ adopts that Rust's _ownership and borrowing_ approach to memory safety. Type safety is delivered with linear types. Lifetime safety is enforced with borrow checking.[^borrow-checking]. This technology works on mid-level IR,[^mir] the typed control-flow graph that is generated after the phases of translation normally responsible for C++ type safety. 
+The Safe C++ frontend (the user-facing part of the language) is a straight-forward extension of C++. It adds new types like choices and borrows, new control flow like pattern matches, and new language entities like lifetime parameters. But the Safe C++ backend (the hardware-facing part of the language) is all new technology. Safe C++ adopts that Rust's _ownership and borrowing_ approach to memory safety. Type safety is delivered with linear types. Lifetime safety is enforced with borrow checking.[^borrow-checking]. This technology works on mid-level IR,[^mir] the typed control-flow graph that is generated after the phases of translation normally responsible for C++ type safety. Moving C++ to MIR is an important evolution for tooling. It enables the kinds of static analysis needed to keep C++ healthy and viable for the next generation of software.decades.
 
-The argument for Rust: it's a clean new language designed from the ground up for safety.
+Rust owes a lot to C++. Safe C++ owes a lot to Rust. The Rust community has developed _soundness knowledge_ that informs its language and standard library. Safe C++ learns from that soundness knowledge, and provides comparable safety guarantees.
+
+The argument for Rust: it's a clean new language with some enviable ergonomics designed from the start for safety.
 
 The argument for Safe C++: it provides the same rigorous safety guarantees as Rust, but since it extends C++, it has unbeatable interoperability with existing code.
 
@@ -69,7 +71,7 @@ The goal is to write robust, sound software. Rust is a proven tool to achieve th
 
 ```cpp
 #feature on safety
-#include <std2/vector.h>
+#include <std2.h>
 #include <cstdio>
 
 int main() safe {
@@ -117,33 +119,6 @@ This sample is only a few lines, but it introduces several new mechanisms and ty
 [^ranged-for]: [Range-based for loop](https://en.cppreference.com/w/cpp/language/range-for)
 
 [^rust-iterator]: [`Iterator` in `std::iter`](https://doc.rust-lang.org/std/iter/trait.Iterator.html)
-
-### Memory safety as terms and conditions
-
-Memory-safe languages are predicated on a basic observation of human nature: people would rather try something, and only then ask for help if it doesn't work. For programming, this means developers try to use a library, and only then read the docs if they can't get it to work. This has proven very dangerous, since appearing to work is not the same as working.
-
-Many C++ functions have preconditions that are only known after careful of their perusal of their documentation. Preconditions can be anything; users don't come with expectations as to what safe usage should look like. Violating preconditions, which is possible with benign-looking usage, causes undefined behavior and opens your software to attack. **Software safety and security should not be predicated on programmers following documentation.** 
-
-Here's the value proposition: compiler and library vendors make an extra effort to provide a robust environment so that users _don't have to read the docs_. No matter how they use the language and library, their actions will not raise undefined behavior and open the software to safety-related exploits. No system can guard against all misuse, and hastily written code may have plenty of logic bugs. But those logic bugs won't lead to memory safety vulnerabilities.
-
-Consider an old libc function, `std::isprint`,[^isprint] that exhibits unsafe design. This function takes an `int` parameter. _But it's not valid to call `std::isprint` for all int arguments_. The preconditions state the function be called only with arguments between -1 and 255:
-
-> Like all other functions from `<cctype>`, the behavior of `std::isprint` is undefined if the argument's value is neither representable as unsigned char nor equal to EOF. To use these functions safely with plain chars (or signed chars), the argument should first be converted to unsigned char.
-> Similarly, they should not be directly used with standard algorithms when the iterator's value type is char or signed char. Instead, convert the value to unsigned char first.
-
-It seems natural, in the year 2024, to pass UNICODE code points to functions that are typed with `int` and deal with characters. While the mistake is the caller's for not reading the documentation and following the preconditions, this design goes against human nature. Do not rely on the programmer to closely read the docs before using your function. The safe context provided by memory safe languages prevents usage or authoring of functions like `std::isprint` which exhibit undefined behavior when called with invalid arguments.
-
-Rust's approach to safety[^safe-unsafe-meaning] centers on defining responsibility for enforcing preconditions. In a safe context, the user can call safe functions without compromising program soundness. Failure to read the docs may risk correctness, but it won't risk undefined behavior. When the user wants to call an unsafe function from a safe context, they _explicitly take responsibility_ for sound usage of that unsafe function. The user writes the `unsafe` token as a kind of contract: the user has read the terms and conditions of the unsafe function and affirms that it's not being called in a way that violates its preconditions.
-
-Who is to blame when undefined behavior is detected, the caller or the callee? ISO C++ does not have an answer, making it an unreliable language. But Rust's safety model does: whoever typed out the `unsafe` token is at fault. Safe C++ adopts the same principle. Code is divided into unsafe and safe contexts. Unsafe operations may only occur in unsafe contexts. Dropping from a safe context to an unsafe context requires use of the `unsafe` keyword. This leaves an artifact that makes for easy audits: reviewers search for the `unsafe` keyword and focus their attention there first.
-
-Consider the design of an `std2::isprint` function. If it's marked `safe`, it must be sound for all integer arguments. If it's called with an argument that is out of its supported range, it must fail in a deterministic way: it return an error code, it could throw an exception or it could panic and abort. The designer of the function doesn't have to think very hard about soundness, they just have to follow the rules. Inside the `std2::isprint` implementation, there's probably a lookup table with capabilities for each supported character. If the lookup table is accessed with a slice, an out-of-bounds access will implicitly generate a bounds check and panic and abort on failure. If the lookup table is accessed through a pointer, the implementer writes the `unsafe` keyword, drops to the unsafe context and subscripts the pointer. The `unsafe` keyword is the programmer's oath that the subsequent unsafe operations are correct. It's obligatory for the library to test the integer argument against the range of the array and error if it's out-of-bounds before subscripting the pointer.
-
-In ISO C++, soundness holes often occur because caller and callee don't agree on who should enforce preconditions, so neither of them do. In Safe C++, there's a convention policed by the compiler, eliminating this confusion and improving software quality.
-
-[^isprint]: [`std::isprint`](https://en.cppreference.com/w/cpp/string/byte/isprint)
-
-[^safe-unsafe-meaning]: [How Safe and Unsafe Interact](https://doc.rust-lang.org/nomicon/safe-unsafe-meaning.html)
 
 ## Categories of safety
 
@@ -326,7 +301,32 @@ From st louis ISO talk:
 
 
 
+### Memory safety as terms and conditions
 
+Memory-safe languages are predicated on a basic observation of human nature: people would rather try something, and only then ask for help if it doesn't work. For programming, this means developers try to use a library, and only then read the docs if they can't get it to work. This has proven very dangerous, since appearing to work is not the same as working.
+
+Many C++ functions have preconditions that are only known after careful of their perusal of their documentation. Preconditions can be anything; users don't come with expectations as to what safe usage should look like. Violating preconditions, which is possible with benign-looking usage, causes undefined behavior and opens your software to attack. **Software safety and security should not be predicated on programmers following documentation.** 
+
+Here's the value proposition: compiler and library vendors make an extra effort to provide a robust environment so that users _don't have to read the docs_. No matter how they use the language and library, their actions will not raise undefined behavior and open the software to safety-related exploits. No system can guard against all misuse, and hastily written code may have plenty of logic bugs. But those logic bugs won't lead to memory safety vulnerabilities.
+
+Consider an old libc function, `std::isprint`,[^isprint] that exhibits unsafe design. This function takes an `int` parameter. _But it's not valid to call `std::isprint` for all int arguments_. The preconditions state the function be called only with arguments between -1 and 255:
+
+> Like all other functions from `<cctype>`, the behavior of `std::isprint` is undefined if the argument's value is neither representable as unsigned char nor equal to EOF. To use these functions safely with plain chars (or signed chars), the argument should first be converted to unsigned char.
+> Similarly, they should not be directly used with standard algorithms when the iterator's value type is char or signed char. Instead, convert the value to unsigned char first.
+
+It seems natural, in the year 2024, to pass Unicode code points to functions that are typed with `int` and deal with characters. While the mistake is the caller's for not reading the documentation and following the preconditions, this design goes against human nature. Do not rely on the programmer to closely read the docs before using your function. The safe context provided by memory safe languages prevents usage or authoring of functions like `std::isprint` which exhibit undefined behavior when called with invalid arguments.
+
+Rust's approach to safety[^safe-unsafe-meaning] centers on defining responsibility for enforcing preconditions. In a safe context, the user can call safe functions without compromising program soundness. Failure to read the docs may risk correctness, but it won't risk undefined behavior. When the user wants to call an unsafe function from a safe context, they _explicitly take responsibility_ for sound usage of that unsafe function. The user writes the `unsafe` token as a kind of contract: the user has read the terms and conditions of the unsafe function and affirms that it's not being called in a way that violates its preconditions.
+
+Who is to blame when undefined behavior is detected, the caller or the callee? ISO C++ does not have an answer, making it an unreliable language. But Rust's safety model does: whoever typed out the `unsafe` token is at fault. Safe C++ adopts the same principle. Code is divided into unsafe and safe contexts. Unsafe operations may only occur in unsafe contexts. Dropping from a safe context to an unsafe context requires use of the `unsafe` keyword. This leaves an artifact that makes for easy audits: reviewers search for the `unsafe` keyword and focus their attention there first.
+
+Consider the design of an `std2::isprint` function. If it's marked `safe`, it must be sound for all integer arguments. If it's called with an argument that is out of its supported range, it must fail in a deterministic way: it return an error code, it could throw an exception or it could panic and abort. The designer of the function doesn't have to think very hard about soundness, they just have to follow the rules. Inside the `std2::isprint` implementation, there's probably a lookup table with capabilities for each supported character. If the lookup table is accessed with a slice, an out-of-bounds access will implicitly generate a bounds check and panic and abort on failure. If the lookup table is accessed through a pointer, the implementer writes the `unsafe` keyword, drops to the unsafe context and subscripts the pointer. The `unsafe` keyword is the programmer's oath that the subsequent unsafe operations are correct. It's obligatory for the library to test the integer argument against the range of the array and error if it's out-of-bounds before subscripting the pointer.
+
+In ISO C++, soundness holes often occur because caller and callee don't agree on who should enforce preconditions, so neither of them do. In Safe C++, there's a convention policed by the compiler, eliminating this confusion and improving software quality.
+
+[^isprint]: [`std::isprint`](https://en.cppreference.com/w/cpp/string/byte/isprint)
+
+[^safe-unsafe-meaning]: [How Safe and Unsafe Interact](https://doc.rust-lang.org/nomicon/safe-unsafe-meaning.html)
 
 ## The `safe` context
 
@@ -1369,10 +1369,10 @@ Use `circle -print-mir` to dump the MIR of this program.
 ```txt
    15  Assign _4.1 = 84
    16  Commit _4 (((int, double), float), char)
-   17  InstLive _5 double
+   17  InstStart _5 double
    18  Assign _5 = use _4.0.0.1
-   19  InstDead _5
-   20  InstDead _4
+   19  InstEnd _5
+   20  InstEnd _4
 ```
 
 The assignment `t3.0.0.1` lowers to `_4.0.0.1`. This is a place name of a local variable. It's an _owned place_. The compiler would be able to relocate out of this place, because it doesn't involve dereferences, chasing function calls or accessing global state.
@@ -1387,9 +1387,64 @@ TODO
 
 ### Pattern matching
 
-## Thread safety
-
 ## Interior mutability
+
+Recall the law of exclusivity, the program-wide invariant that guarantees a resource isn't mutated while another user access it. How does this square with the use of shared pointers, which enables shared ownership of a mutable resource? How does it support threaded programs, where access to shared mutable state is gated by a mutex?
+
+Shared mutable access exists in this safety model, but the way it's enabled involves some trickery. Rust has a blessed type, `UnsafeCell`[^unsafe-cell], which encapsulates an object and provides mutable access to it, _through a shared reference_. 
+
+```rust
+pub const fn get(&self) -> *mut T 
+```
+
+This is an official way of stripping away const. While the function is safe, it returns a raw pointer, which is unsafe to dereference. Rust includes a number of library types which wrap `UnsafeCell` and implement their own deconfliction strategies to prevent violations of exclusivity. 
+
+* `std::Cell<T>`[^cell] provides get and set methods to read out the current value and store new values into the protected resource. Since `Cell` can't be used across threads, there's no risk of violating exclusivity.
+* `std::RefCell<T>`[^ref-cell] is a single-threaded multiple-read, single-write lock. If the caller requests a mutable reference to the interior object, the implementation checks its counter, and if the object is not locked, it establishes a mutable lock and returns a mutable borrow. If the caller requests a shared reference to the interior object, the implementation checks that there is no live mutable borrow, and if there isn't, increments the counter. When users are done with the borrow, they have to release the lock, which decrements the reference count. If the user's request can't be serviced, the `RefCell` can either gracefully with an error code, or it can panic and abort.
+* `std::Mutex<T>`[^mutex] provides mutable borrows to the interior data across threads. A mutex synchronization object deconflicts access, so there's only one live borrow at a time.
+* `std::RwLock<T>`[^rwlock] is the threaded multiple-read, single-write lock. The interface is similar to RefCell's, but it uses a mutex for deconfliction, so clients can sit on the lock until their request is serviced.
+
+Safe C++ provides `std2::unsafe_cell` in its standard library. It provides the same interior mutability strategy as Rust:
+
+```cpp
+template<class T+>
+class [[unsafe::sync(false)]] unsafe_cell
+{
+  T t_;
+
+public:
+  unsafe_cell() = default;
+  unsafe_cell(T t) noexcept safe
+    : t_(rel t)
+  {
+  }
+
+  T* get(self const^) noexcept safe {
+    return const_cast<T*>(addr self->t_);
+  }
+};
+```
+
+Forming a pointer to the mutable inner state through a shared borrow is _safe_, but dereferencing that pointer is unsafe. Safe C++ implements `std2::cell`, `std2::ref_cell`, `std2::mutex` and `std2::shared_mutex`, which provide safe member functions to access interior state through their deconfliction strategies.
+
+
+
+
+
+EXAMPLE OF CELL ?
+
+
+
+Safe C++ and Rust and equate exclusive access with mutable types and shared access with const types. This is an economical choice, because one type qualifier, const, also determines exclusivity. But this awkward cast-away-const model of interior mutability is the logical consequence. 
+
+[^unsafe-cell]: [UnsafeCell](https://doc.rust-lang.org/std/cell/struct.UnsafeCell.html)
+[^cell]: [Cell](https://doc.rust-lang.org/std/cell/struct.Cell.html)
+[^ref-cell]: [RefCell](https://doc.rust-lang.org/std/cell/struct.RefCell.html)
+[^mutex]: [Mutex](https://doc.rust-lang.org/std/sync/struct.Mutex.html)
+[^rwlock]: [RwLock](https://doc.rust-lang.org/std/sync/struct.RwLock.html)
+[^ante]: [Ante Shared Interior Mutability](https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability)
+
+## Thread safety
 
 ## Implementation guidance
 
