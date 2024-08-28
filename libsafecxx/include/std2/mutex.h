@@ -48,7 +48,7 @@ public:
 
     public:
     ~lock_guard() safe {
-      unsafe { m_->mtx_->get()&->unlock(); }
+      unsafe { mut m_->mtx_->get()->unlock(); }
     }
 
     T const^ borrow(self const^) noexcept safe {
@@ -78,7 +78,7 @@ public:
 
   lock_guard lock(self const^) safe  {
     auto *r = self->mtx_->get();
-    unsafe { self->mtx_->get()&->lock();}
+    unsafe { mut self->mtx_->get()->lock();}
     return lock_guard(self);
   }
 };

@@ -120,7 +120,7 @@ void vector_iterator() safe
 
     check_definition(^it);
 
-    auto m_val = (^it).std2::iterator::next();
+    auto m_val = mut it.std2::iterator::next();
     bool b = match (m_val) -> bool {
       .none => true;
       .some(x) => false;

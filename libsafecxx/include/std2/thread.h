@@ -57,11 +57,11 @@ public:
   }
 
   ~thread() safe {
-    t_&.detach();
+    mut t_.detach();
   }
 
   void join(self) safe {
-    self.t_&.join();
+    mut self.t_.join();
   }
 };
 

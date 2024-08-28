@@ -52,7 +52,7 @@ public:
   {
     std::size_t s = --p_->strong_;
     if (s == 0) {
-      unsafe { p_->data_^.destroy(); }
+      unsafe { mut p_->data_.destroy(); }
 
       std::size_t w = --p_->weak_;
       if (w == 0) {

@@ -80,7 +80,7 @@ public:
     : vector()
   {
     self^.reserve(ilist.size());
-    unsafe { relocate_array(self^.data(), ilist.data(), ilist.size()); }
+    unsafe { relocate_array(mut self.data(), ilist.data(), ilist.size()); }
     self.size_ = ilist.size();
 
     ilist^.advance(ilist.size());
