@@ -1004,36 +1004,33 @@ During the type relation pass that generates lifetime constraints for function c
 
 ## Explicit mutation
 
-Reference binding convention is important in the context of borrow checking. Const and non-const borrows differ by more than just constness. Users are allowed multiple live shared borrows, but only one live mutable borrow. C++'s convention of always preferring non-const references would tie the borrow checker into knots, as mutable borrows don't permit aliasing. We want to bind shared borrows by default, and require a token to opt into binding mutable borrows.
+Reference binding convention is important in the context of borrow checking. Const and non-const borrows differ by more than just constness. By the law of exclusivity, users are allowed multiple live shared borrows, but only one live mutable borrow. C++'s convention of always preferring non-const references would tie the borrow checker into knots, as mutable borrows don't permit aliasing.
 
-To achieve this binding precision, the relocation object model takes a new approach to references. Unlike in ISO C++, expressions can actually have reference types. Naming a reference object yields an lvalue expression with reference type, rather than implicitly dereferencing the reference and giving you an lvalue to the pointed-at thing.
+Rather than binding the mutable overload of functions by default, we prefer binding the const ones. Shared borrows are less likely to bring borrow checker errors. To improve reference binding precision, the relocation object model takes a new approach to references. Unlike in ISO C++, expressions can actually have reference types. Naming a reference object yields an lvalue expression with reference type, rather than implicitly dereferencing the reference and giving you an lvalue to the pointed-at thing. The standard conversion will bind const borrows and const lvalue references to lvalues of the same type. But standard conversions won't bind mutable borrows and mutable lvalue references. Those require an opt-in.
 
 ```cpp
-#include <utility>
+struct Obj {
+  const int& func() const;   // #1
+        int& func();         // #2
+};
 
-void f(int&);   // #1
-void f(int&&);  // #2
+void func(Obj obj) {
+  // In ISO C++, calls overload #2.
+  // In Safe C++, calls overload #1.
+  obj.func();
 
-void iso_mode(int&& r) {
-  // In ISO C++, naming r is an `lvalue int` expression. 
-  // #1 is called, even though r is an rvalue reference. That's weird.
-  f(r);
-
-  // In ISO C++, use std::forward or std::move to bind an rvalue reference.
-  // #2 is called.
-  f(std::move(r));
-}
-
-#feature on safety
-
-void new_mode(int&& r) {
-  // In the new object model, naming r is an `lvalue int&&` expression.
-  // #2 is called, without using std::forward or std::move.
-  f(r);
+  // In Safe C++, these all call overload #2.
+  (&obj).func();
+  obj&.func();
+  mut obj.func();
 }
 ```
 
-In this model, references and borrows have value semantics. There are operators to create values from places. If you want a borrow, lvalue reference or rvalue reference from an object or subobject, there's a prefix _unary-operator_ for that:
+In Safe C++, the standard conversion will not bind a mutable borrow or mutable lvarue reference. During overload resolution for `obj.func()`, candidate #2 fails, because the compiler can't bind the object parameter type `Obj&` to the object expression `lvalue Obj`. But candidate #1 is viable, because the standard conversion can still bind the object parameter type `const Obj&` to the object expression `lvalue Obj`.
+
+The subsequent statements call candidate #1 by explicitly requesting mutation. `&obj` is syntax for creating a `prvalue Obj&` from the `lvalue Obj` operand. We can call the func member function on that reference. `obj&.func()` uses a special postfix syntax that alleviates the need for parentheses. Finally, the `mut` keyword puts the remaining operators of the _cast-expression_ into the [_mutable context_](#the-mutable-context). In the mutable context, standard conversions to mutable borrows and mutable lvalue references are enabled. Overload resolution finds both candidates #1 and #2 viable, and chooses #2 because the mutable lvalue reference ranks higher than the const reference.
+
+Here's a list of _unary-operators_ for taking borrows, lvalue and rvalue references, and pointers to lvalues.
 
 * `^x` - mutable borrow to `x`
 * `^const x` - shared borrow to `x`
@@ -1043,7 +1040,7 @@ In this model, references and borrows have value semantics. There are operators 
 * `addr x` - pointer to `x`
 * `addr const x` - const pointer to `x`
 
-It would get noisy to use these everywhere, and C++ people are already used to implicit operations. There are standard conversions from lvalues to const versions of reference-like types. The effect is that **all mutations are explicit**. You don't have to wonder about side-effects. If you're passing arguments to a function, and you don't see `^`, `&` or `&&` before it, it's going to be modified by that function.
+While the motivation of this design is to pacify the borrow checker, the consequence is that **all mutations are explicit**. You don't have to wonder about side-effects. If you're passing arguments to a function, and you don't see `mut`, `^`, `&` or `&&` before it, you know the argument won't be modified by that function.
 
 ```cpp
 #feature on safety
@@ -1062,6 +1059,7 @@ int main() {
 
   // Explicit ^ for mut borrow required.
   f1(^x);
+  f1(mut x);
 
   // Standard conversion or explicit ^const for shared borrow.
   f2(x);
@@ -1069,6 +1067,7 @@ int main() {
 
   // Explicit & for lvalue ref required.
   f3(&x);
+  f3(mut x);
 
   // Standard conversion or explicit &const for const lvalue ref.
   f4(x);
@@ -1099,7 +1098,7 @@ f(x);         // Pass by const lvalue ref.
 f(&const x);  // Extra verbose -- call attention to it.
 ```
 
-Is there a downside to rely on standard conversions for producing const references? Not really... If the parameter is pass-by-value, and your argument type is trivially copyable, then it'll copy. If the parameter is pass-by-value, and your argument type is non-trivially copyable, then the compiler will prompt for a `rel` or `cpy` token to resolve how to pass the argument. If the parameter is pass-by-const-reference, it'll bind implicitly. You're not going to accidentally hit the slow path by making use of this convenience.
+Is there a downside to rely on standard conversions for producing const references? Not really... If the parameter is pass-by-value, and your argument type is trivially copyable, then it'll copy. If the parameter is pass-by-value, and your argument type is non-trivially copyable, the compiler will prompt for a `rel` or `cpy` token to resolve how to pass the argument. If the parameter is pass-by-const-reference, it'll bind implicitly. You're not going to accidentally hit the slow path by making use of this convenience.
 
 ## Object postfix
 
@@ -1366,10 +1365,10 @@ Use `circle -print-mir` to dump the MIR of this program.
 ```txt
    15  Assign _4.1 = 84
    16  Commit _4 (((int, double), float), char)
-   17  InstLive _5 double
+   17  InstStart _5 double
    18  Assign _5 = use _4.0.0.1
-   19  InstDead _5
-   20  InstDead _4
+   19  InstEnd _5
+   20  InstEnd _4
 ```
 
 The assignment `t3.0.0.1` lowers to `_4.0.0.1`. This is a place name of a local variable. It's an _owned place_. The compiler would be able to relocate out of this place, because it doesn't involve dereferences, chasing function calls or accessing global state.
