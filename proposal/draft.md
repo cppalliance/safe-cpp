@@ -14,7 +14,7 @@ Over the past two years, the United States Government has been issuing warnings 
 
 * May 7, 2024 - **National Cybersecurity Strategy Implementation Plan**[^ncsi-plan]
 
-The government papers are backed by industry research. Microsoft's bug telemetry reveals that 70% of its vulnerabilities would be stopped by memory-safe programming languages.[^ms-vulnerabilities] Google's research has found 68% of 0day exploits are related to memory corruption.[^google-0day] 
+The government papers are backed by industry research. Microsoft's bug telemetry reveals that 70% of its vulnerabilities would be stopped by memory-safe programming languages.[^ms-vulnerabilities] Google's research has found 68% of 0day exploits are related to memory corruption.[^google-0day]
 
 * Mar. 4, 2024 - **Secure by Design: Google's Perspective on Memory Safety**[^secure-by-design]
 
@@ -48,7 +48,7 @@ The foreignness of Rust for career C++ developers along with the inadequacies of
 
 ### Extend C++ for safety
 
-The goal of the authors is to define a superset of C++ with a _rigorously safe subset_. Begin a new project, or take an existing one, and start writing safe code in C++. Code in the safe context exhibits the same strong safety guarantees as safe code written in Rust. 
+The goal of the authors is to define a superset of C++ with a _rigorously safe subset_. Begin a new project, or take an existing one, and start writing safe code in C++. Code in the safe context exhibits the same strong safety guarantees as safe code written in Rust.
 
 Rigorous safety is a carrot-and-stick approach. The stick comes first. The stick is what regulators care about. Developers are prohibited from writing operations that may result in lifetime safety, type safety or thread safety undefined behaviors. Sometimes these operations are prohibited by the compiler frontend, as is the case with pointer arithmetic. Sometimes the operations are prohibited by static analysis in the compiler's middle-end; that stops use of initialized variables and use-after-free bugs, and it's the technology enabling the _ownership and borrowing_ safety model. The remainder of issues, like out-of-bounds array subscripts, are averted with runtime panic and aborts.
 
@@ -120,7 +120,7 @@ This sample is only a few lines, but it introduces several new mechanisms and ty
 
 Memory-safe languages are predicated on a basic observation of human nature: people would rather try something, and only then ask for help if it doesn't work. For programming, this means developers try to use a library, and only then read the docs if they can't get it to work. This has proven very dangerous, since appearing to work is not the same as working.
 
-Many C++ functions have preconditions that are only known after careful of their perusal of their documentation. Preconditions can be anything; users don't come with expectations as to what safe usage should look like. Violating preconditions, which is possible with benign-looking usage, causes undefined behavior and opens your software to attack. **Software safety and security should not be predicated on programmers following documentation.** 
+Many C++ functions have preconditions that are only known after careful of their perusal of their documentation. Preconditions can be anything; users don't come with expectations as to what safe usage should look like. Violating preconditions, which is possible with benign-looking usage, causes undefined behavior and opens your software to attack. **Software safety and security should not be predicated on programmers following documentation.**
 
 Here's the value proposition: compiler and library vendors make an extra effort to provide a robust environment so that users _don't have to read the docs_. No matter how they use the language and library, their actions will not raise undefined behavior and open the software to safety-related exploits. No system can guard against all misuse, and hastily written code may have plenty of logic bugs. But those logic bugs won't lead to memory safety vulnerabilities.
 
@@ -155,7 +155,7 @@ How do we ensure that dangling references are never used? There are two safe tec
 
 Borrow checking is an advanced form of live analysis. It keeps track of the _live references_ (meaning those that have a future use) at every point in the function, and errors when there's a _conflicting action_ on a place associated with a live reference. For example, writing to, moving or dropping an object with a live shared borrow will raise a borrow checkerror. Pushing to a vector with a live iterator will raise an iterator invalidation error. This is a good system for C++, because it's compatible with manual memory management and RAII.
 
-Borrow checking a function only has to consider the body of that function. It avoids whole-program analysis by instituting the _law of exclusivity_. Checked references (borrows) come in two flavors: mutable and shared, noted respectively as `T^` and `const T^`. There can be one live mutable reference to a place, or any number of shared references to a place, but not both at once. Upholding this principle makes it much easier to reason about your program. Since the law of exclusivity prohibits mutable aliasing, if a function is passed a mutable reference and some shared references, you can be certain that the function won't have side effects that, through the mutable reference, cause the invalidation of those shared references. 
+Borrow checking a function only has to consider the body of that function. It avoids whole-program analysis by instituting the _law of exclusivity_. Checked references (borrows) come in two flavors: mutable and shared, noted respectively as `T^` and `const T^`. There can be one live mutable reference to a place, or any number of shared references to a place, but not both at once. Upholding this principle makes it much easier to reason about your program. Since the law of exclusivity prohibits mutable aliasing, if a function is passed a mutable reference and some shared references, you can be certain that the function won't have side effects that, through the mutable reference, cause the invalidation of those shared references.
 
 [^dangling-pointer]: [Dangling pointer](https://en.wikipedia.org/wiki/Dangling_pointer)
 
@@ -297,7 +297,7 @@ Pattern matching and choice types aren't just a qualify-of-life improvement. The
 
 ### 4. Thread safety
 
-A memory-safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread should be allowed access to it. Rust provides thread safety using a really novel extension of the type system. 
+A memory-safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread should be allowed access to it. Rust provides thread safety using a really novel extension of the type system.
 
 TODO
 
@@ -316,7 +316,7 @@ From st louis ISO talk:
 
 1. safe1.cxx - out-of-bounds panic
 1. sv1.cxx - dangling string_view
-1. sv3.cxx - 
+1. sv3.cxx -
 1. iter2.cxx - iterator invalidation
 1. safe3.cxx - deref
 
@@ -362,7 +362,7 @@ using F3 = void(int) noexcept;
 using F4 = void(int) noexcept safe;
 ```
 
-As with `noexcept`, `safe` is part of the function's type, so types with different _safe-specifiers_ always compare differently. 
+As with `noexcept`, `safe` is part of the function's type, so types with different _safe-specifiers_ always compare differently.
 
 
 ```cpp
@@ -461,7 +461,7 @@ Naming an unsafe object yields an lvalue expression of the unsafe type. What are
 
 Calling unsafe member functions on expressions with unsafe types is permitted in the unsafe context. Calling initializers of unsafe types is also permitted. In fact, these operations on unsafe types are "safe" for the purpose of _safe-operator_.
 
-Expressions carry noexcept and safe information which is outside of the type's expression; this information is moved transitively between subexpressions and feeds the _noexcept-_- and _safe-operator_. Why make unsafe a type qualifier, which represents a significant change to the type system, rather than some other kind of property of an object or member declaration, propagate it like the noexcept and safe flags? 
+Expressions carry noexcept and safe information which is outside of the type's expression; this information is moved transitively between subexpressions and feeds the _noexcept-_- and _safe-operator_. Why make unsafe a type qualifier, which represents a significant change to the type system, rather than some other kind of property of an object or member declaration, propagate it like the noexcept and safe flags?
 
 The answer is that template specialization works on types and it doesn't work on these other kinds of properties. A template argument with an unsafe qualifier instantiates a template with an unsafe qualifier on the corresponding template parameter. The unsafe qualifier drills through templates in a way that other language entities don't.
 
@@ -473,26 +473,26 @@ int main() safe {
   // Construct an std::string from a const char* (unsafe)
   // Pass by relocation (unsafe)
   mut vec.push_back("Foo");
-  
+
   // Pass const char*
   // Construct inside emplace_back (unsafe)
   mut vec.push_back("Bar");
 
   // Append Bar to the end of Foo (unsafe)
-  mut vec[0] += vec[1]; 
+  mut vec[0] += vec[1];
 
   std2::println(vec[0]);
 }
 ```
 
-We want to use the new memory-safe vector with the legacy string type. The new vector is borrow checked, eliminating use-after-free and iterator invalidation defects. It presents a safe interface. But the old string is pre-safety. All its member functions are unsafe. If we want to specialize the new vector on the old string, we need to mark it `unsafe`. 
+We want to use the new memory-safe vector with the legacy string type. The new vector is borrow checked, eliminating use-after-free and iterator invalidation defects. It presents a safe interface. But the old string is pre-safety. All its member functions are unsafe. If we want to specialize the new vector on the old string, we need to mark it `unsafe`.
 
 The unsafe type qualifier propagates through the instantiated vector. The expressions returned through the `operator[]` accessor are unsafe qualified, so we can call unsafe member functions on the string, even in main's safe context.
 
 Let's simplify the example above and study it in detail.
 
 ```cpp
-#feature on safety 
+#feature on safety
 
 template<typename T+>
 struct Vec {
@@ -509,7 +509,7 @@ int main() safe {
   Vec<unsafe String> vec { };
 
   // void Vec<unsafe String>::push_back(self^, unsafe String) safe;
-  // Copy initialization of the `unsafe String` function parameter is 
+  // Copy initialization of the `unsafe String` function parameter is
   // permitted.
   mut vec.push_back("A string");
 }
@@ -536,7 +536,7 @@ int main() safe {
 This code is ill-formed. We've established that it's permitted to copy initialize into the push_back call, since its function parameter is `unsafe String`, but direct initialization of `String` is not allowed. The constructor chosen for direct initialization is unsafe, but the type it's initializing is not. The compiler is right to reject this program because the user is plainly calling an unsafe constructor in a safe context, without a mitigating _unsafe-block_ or unsafe qualifier.
 
 ```cpp
-#feature on safety 
+#feature on safety
 
 template<typename T+>
 struct Vec {
@@ -564,13 +564,13 @@ int main() safe {
 }
 ```
 
-This program is well-formed. As with the previous example, there's a direct initialization of a String object using its unsafe constructor. But this time it's allowed, because the type being initialized is `T`, which is substituted with `unsafe String`: unsafe constructors are permitted to initialize unsafe types. 
+This program is well-formed. As with the previous example, there's a direct initialization of a String object using its unsafe constructor. But this time it's allowed, because the type being initialized is `T`, which is substituted with `unsafe String`: unsafe constructors are permitted to initialize unsafe types.
 
 [^atomic-types]: [_Atomic types](https://en.cppreference.com/w/c/language/atomic)
 
 ### Exempted calls
 
-In order to be more accommodating of mixing unsafe with safe code, the unsafe qualifier has very liberal transitive properties. A function invoked with an unsafe-qualified object or argument, or a constructor that initializes an unsafe type, are _exempted calls_. When performing overload resolution for exempted calls, function parameters of candidates become unsafe qualified. This permits copy initialization of 
+In order to be more accommodating of mixing unsafe with safe code, the unsafe qualifier has very liberal transitive properties. A function invoked with an unsafe-qualified object or argument, or a constructor that initializes an unsafe type, are _exempted calls_. When performing overload resolution for exempted calls, function parameters of candidates become unsafe qualified. This permits copy initialization of
 
 TODO
 
@@ -602,7 +602,7 @@ int main() {
 }
 ```
 ```txt
-$ circle string_view.cxx 
+$ circle string_view.cxx
 $ ./string_view
 @.ooo World
 ```
@@ -624,14 +624,14 @@ int main() safe {
 }
 ```
 ```txt
-$ circle str0.cxx 
+$ circle str0.cxx
 safety: str0.cxx:7:11
-  println(sv); 
+  println(sv);
           ^
 use of sv depends on expired loan
 drop of temporary std2::basic_string<char, std2::allocator<char>> between its shared borrow and its use
 loan created at str0.cxx:6:28
-  std2::string_view sv = s + "World\n"; 
+  std2::string_view sv = s + "World\n";
                            ^
 ```
 
@@ -647,7 +647,7 @@ The compiler flags the use of the dangling view, `println(sv)`. It marks the inv
 
 ### Scope and liveness
 
-Key to one's understanding of lifetime safety is the distinction between scope and liveness. Consider lowering your function to instructions which are indexed by points. The set of points at which an object is initialized is its _scope_. In normal C++, this corresponds to its lexical scope. In Safe C++, due to relocation/destructive move, there are points in the lexical scope where the object may not be initialized, making the scope a subset of the lexical scope. 
+Key to one's understanding of lifetime safety is the distinction between scope and liveness. Consider lowering your function to instructions which are indexed by points. The set of points at which an object is initialized is its _scope_. In normal C++, this corresponds to its lexical scope. In Safe C++, due to relocation/destructive move, there are points in the lexical scope where the object may not be initialized, making the scope a subset of the lexical scope.
 
 The compiler lowers AST to MIR control flow graph and runs _initialization analysis_, a form of forward dataflow analysis[^dataflow-analysis] that computes the scope of all local variables. If a local variable has been relocated or dropped, and is then named in an expression, the scope information helps the compiler flag this as an illegal usage.
 
@@ -661,7 +661,7 @@ int main() {
   f(x);       // not live, because 1 isn't loaded out again.
 
   x = 2;      // not live, because 2 isn't loaded out.
-  
+
   x = 3;      // live because 3 is used below.
   f(x);       // still live, because 3 is used below.
   f(x);       // not live, because 3 isn't used again.
@@ -679,7 +679,7 @@ void f(int);
 int main() {
   int^ ref;   // An uninitialized borrow.
   {
-    int x = 1; 
+    int x = 1;
     ref = ^x; // *ref is dereferenced below, so ref is live.
     f(*ref);  // now ref is dead.
 
@@ -702,13 +702,13 @@ It's not enough to compute liveness of references. To determine the invalidating
 
 ### Systems of constraints
 
-NLL borrow checking,[^borrow-checking] is Rust's intentive method for testing invalidating actions against live borrows in the presence of control flow, re-assignments and function calls. The algorithm involves generating a system of lifetime constraints which map borrow variables back to _loans_, growing points until all the constraints are satisfied, and then testing invalidating actions against all loans in scope. 
+NLL borrow checking,[^borrow-checking] is Rust's intentive method for testing invalidating actions against live borrows in the presence of control flow, re-assignments and function calls. The algorithm involves generating a system of lifetime constraints which map borrow variables back to _loans_, growing points until all the constraints are satisfied, and then testing invalidating actions against all loans in scope.
 
 A loan is the action that forms a borrow to a place. In the example above, there are two loans: `^x` and `^y`. Solving the constraint equation extends the liveness of loans `^x` for and `^y` up until the point of the last dereferences to them. When `y` goes out of scope, it doesn't invalidate the loan `^x`, because that's not live. But it does invalidate the loan `^y`, which is lifetime extended by the final `f(*ref)` expression.
 
 Liveness is stored in bit vectors called `regions`. There's a region for loans `^x` and `^y` and there's a region for variables with borrow types, such as `ref`. There are also regions for user-defined types with lifetime parameters, such as `string_view`.
 
-A lifetime constraint `'R0 : 'R1 : P` reads as "region 0 outlives region 1 at point P." The compiler emits constraints when encountering assignment and function calls involving types with regions. 
+A lifetime constraint `'R0 : 'R1 : P` reads as "region 0 outlives region 1 at point P." The compiler emits constraints when encountering assignment and function calls involving types with regions.
 
 ```cpp
     #feature on safety
@@ -717,10 +717,10 @@ A lifetime constraint `'R0 : 'R1 : P` reads as "region 0 outlives region 1 at po
     int main() {
 P0:   int^ ref;          // ref is 'R0
       {
-P1:     int x = 1; 
+P1:     int x = 1;
 P2:     <loan R1> = ^x;  // ^x is loan 'R1
 P3:     ref = <loan R1>; // 'R1 : 'R0 @ P3
-P4:     f(*ref); 
+P4:     f(*ref);
 
 P5:     int y = 2;
 P6:     <loan R2> = ^y;  // ^y is loan 'R2
@@ -730,7 +730,7 @@ P8:     f(*ref);
 P9:     drop y
 P10:    drop x
       }
-    
+
 P11:  f(*ref);
     }
 ```
@@ -747,7 +747,7 @@ The law of exclusivity is enforced at this point. A new mutable loan is an inval
 
 The borrow checker is concerned with invalidating actions on in-scope loans. There are three instructions at play:
 
-* **(B)** The creation of the loan. This is the lvalue-to-borrow operation, equivalent to an addressof (&). 
+* **(B)** The creation of the loan. This is the lvalue-to-borrow operation, equivalent to an addressof (&).
 * **(A)** The action that invalidates the loan. That includes taking a mutable borrow on a place with a shared loan, or taking any borrow or writing to a place with a mutable borrow. These actions could lead to use-after-free bugs.
 * **(U)** A use that extends the liveness of the borrow past the point of the invalidating action.
 
@@ -772,17 +772,17 @@ int main() safe {
 }
 ```
 ```txt
-$ circle use1.cxx 
+$ circle use1.cxx
 safety: use1.cxx:17:11
-  println(*ref); 
+  println(*ref);
           ^
 use of *ref depends on expired loan
 drop of s between its shared borrow and its use
 invalidating operation at use1.cxx:14:3
-  drp s; 
+  drp s;
   ^
 loan created at use1.cxx:11:23
-  const string^ ref = s; 
+  const string^ ref = s;
                       ^
 ```
 
@@ -810,9 +810,9 @@ int main() {
   const int^ ref1;
   const int^ ref2;
   int x = 1;
-  {  
+  {
     int y = 2;
-    ref1 = get_x(x, y); 
+    ref1 = get_x(x, y);
     ref2 = get_y(x, y);
   }
   int val1 = *ref1;  // OK.
@@ -822,19 +822,19 @@ int main() {
 ```txt
 $ circle get.cxx
 safety: get.cxx:20:14
-  int val2 = *ref2; 
+  int val2 = *ref2;
              ^
 use of *ref2 depends on expired loan
 drop of y between its shared borrow and its use
 y declared at get.cxx:15:9
-    int y = 2; 
+    int y = 2;
         ^
 loan created at get.cxx:17:21
-    ref2 = get_y(x, y); 
+    ref2 = get_y(x, y);
                     ^
 ```
 
-Inside function declarations and function types, borrow types must be qualified with lifetime arguments. The arguments name lifetime parameters associated with the function. 
+Inside function declarations and function types, borrow types must be qualified with lifetime arguments. The arguments name lifetime parameters associated with the function.
 
 `get_x` takes two shared borrow parameters and returns a shared borrow. The return type is marked with the lifetime parameter `/a`, which corresponds with the lifetime argument on the returned value `x`. `get_y` is declared to return a shared borrow with a lifetime associated with the parameter `y`. Since we're not specifying an _outlives-constraint_ between the lifetime parameters, the function bodies can't assume anything about how these lifetimes relate to each other. It would be ill-formed for `get_x` to return `y` or `get_y` to return `x`.
 
@@ -847,7 +847,7 @@ Compiling this code raises a borrow checker error when dereferencing `*ref2`, si
 P0:   const int^ ref1;        // ref1 is 'R0
 P1:   const int^ ref2;        // ref2 is 'R1
 P2:   int x = 1;
-      {  
+      {
         int y = 2;
 P3:     <loan R2> = ^const x; // ^const x is 'R2
 P4:     <loan R3> = ^const y; // ^const y is 'R3
@@ -979,7 +979,7 @@ static_assert(F2 == F3);
 // They differ from F1, due to the outlives-constraint.
 static_assert(F1 != F2);
 
-// These are the same. 
+// These are the same.
 using F4 = void/(a, b where a : b, b : a)(int^/a, int^/b) safe;
 using F5 = void/(a)                      (int^/a, int^/a) safe;
 static_assert(F4 == F5);
@@ -994,7 +994,7 @@ The compiler maps all non-dependent types to canonical types. When comparing typ
 
 Think about lifetime parameterizations as a directed graph. Lifetime parameters are the nodes and outlives constraints define the edges. The compiler finds the strongly connected components[^scc] of this graph. That is, it identifies all cycles and reduces them into SCC nodes. In `F4`, the `/a` and `/b` lifetime parameters constrain one another, and there are collapsed into a strongly connected component. The canonical function type is encoded using SCCs as lifetime parameters. Both `F4` and `F5` map to the same canonical type, and therefore compare the same.
 
-During the type relation pass that generates lifetime constraints for function calls in the MIR, arguments and result object regions are constrained to regions of the canonical type's SCCs, rather than the lifetime parameters of the declared type. This reduces the number of regions the borrow checker solves for. But the big reason for this process is to permit writing compatible functions even in the face lifetime normalization.  
+During the type relation pass that generates lifetime constraints for function calls in the MIR, arguments and result object regions are constrained to regions of the canonical type's SCCs, rather than the lifetime parameters of the declared type. This reduces the number of regions the borrow checker solves for. But the big reason for this process is to permit writing compatible functions even in the face lifetime normalization.
 
 [^scc]: [Strongly connected component](https://en.wikipedia.org/wiki/Strongly_connected_component)
 
@@ -1034,7 +1034,7 @@ Here's a list of _unary-operators_ for taking borrows, lvalue and rvalue referen
 
 * `^x` - mutable borrow to `x`
 * `^const x` - shared borrow to `x`
-* `&x` - lvalue reference to `x` (convertible to pointer) 
+* `&x` - lvalue reference to `x` (convertible to pointer)
 * `&const x` - const lvalue reference to `x`
 * `&&x` - rvalue reference to `x`
 * `addr x` - pointer to `x`
@@ -1104,7 +1104,7 @@ Is there a downside to rely on standard conversions for producing const referenc
 
 The _unary-operator_ syntax for mutable borrows, `^x`, will ready function arguments. How do we borrow the object for member function calls? For example, `vec.push_back(1)` is ill-formed under explicit mutation model, because `vec` is mutated, and there's no token signifying that.
 
-Circle introduces an _object postfix_ for effecting borrow and reference binding on the object of member function calls. `vec^.push_back(1)` takes a mutable borrow on `vec` (assuming that lvalue is non-const) and calls the `push_back` member function. 
+Circle introduces an _object postfix_ for effecting borrow and reference binding on the object of member function calls. `vec^.push_back(1)` takes a mutable borrow on `vec` (assuming that lvalue is non-const) and calls the `push_back` member function.
 
 ```cpp
 #feature on safety
@@ -1193,9 +1193,9 @@ int main() safe {
 }
 ```
 ```txt
-$ circle unique1.cxx 
+$ circle unique1.cxx
 safety: unique1.cxx:11:12
-  println(*p); 
+  println(*p);
            ^
 cannot use uninitialized object p
 ```
@@ -1225,9 +1225,9 @@ int main() safe {
 }
 ```
 ```txt
-$ circle unique2.cxx 
+$ circle unique2.cxx
 safety: unique2.cxx:18:12
-  println(*p);  // Ill-formed. 
+  println(*p);  // Ill-formed.
            ^
 cannot use uninitialized object p
 ```
@@ -1243,7 +1243,7 @@ I think implicit relocation is too surprising for C++ users. We're more likely t
 * `rel x` - relocate `x` into a new value. `x` is set as uninitialized.
 * `cpy x` - copy construct `x` into a new value. `x` remains initialized.
 
-If an object is _trivially copyable_, as all scalars are, then you don't need either of these tokens. The compiler will copy your value. Both _rel-_ and _cpy-expressions_ produce prvalues of the operand's type. 
+If an object is _trivially copyable_, as all scalars are, then you don't need either of these tokens. The compiler will copy your value. Both _rel-_ and _cpy-expressions_ produce prvalues of the operand's type.
 
 Why do I make both copy and relocation explicit? I want to make it easy for users to choose the more efficient option. If a type is not trivially copyable, you can opt into an expensive copy with _cpy-expression_. This avoids performance bugs, where an object undergoes an expensive copy just because the user didn't know it was there. Or, if you don't want to copy, use _rel-expression_, which is efficient but destroys the old object, without destructing it.
 
@@ -1295,28 +1295,28 @@ int main() {
 }
 ```
 ```txt
-$ circle rel1.cxx 
+$ circle rel1.cxx
 safety: rel1.cxx:13:15
-  int x = rel *get<0>(&tup); 
+  int x = rel *get<0>(&tup);
               ^
 rel operand does not refer to an owned place
 an owned place is a local variable or subobject of a local variable
 the place involves a dereference of int&
 
 safety: rel1.cxx:18:19
-  int y = rel data[index]; 
+  int y = rel data[index];
                   ^
 rel operand does not refer to an owned place
 an owned place is a local variable or subobject of a local variable
 the place involves a subscript of int[5]
 
 safety: rel1.cxx:21:17
-  int gy = rel g.y; 
+  int gy = rel g.y;
                 ^
 rel operand does not refer to an owned place
 an owned place is a local variable or subobject of a local variable
 g is a non-local variable declared at rel1.cxx:8:6
-Pair g { 10, 20 }; 
+Pair g { 10, 20 };
      ^
 ```
 
@@ -1344,7 +1344,7 @@ int main() {
   // One-length tuple expression.
   auto t1 = (4, );
   static_assert(T1 == decltype(t1));
-     
+
   // Longer tuple expression.
   auto t2 = (5, 3.14);
   static_assert(T2 == decltype(t2));
@@ -1358,7 +1358,7 @@ int main() {
   static_assert(double == decltype(x));
 }
 ```
-Types are noted with comma-separated lists of types inside parentheses. Expressions are noted with comma-separated lists of expressions inside parentheses. You can nest them. You can access elements of tuple expressions by chaining indices together with dots. Tuple fields are accessed with the customary special tuple syntax: just write the element index after a dot, eg `tup.0`. 
+Types are noted with comma-separated lists of types inside parentheses. Expressions are noted with comma-separated lists of expressions inside parentheses. You can nest them. You can access elements of tuple expressions by chaining indices together with dots. Tuple fields are accessed with the customary special tuple syntax: just write the element index after a dot, eg `tup.0`.
 
 Use `circle -print-mir` to dump the MIR of this program.
 
@@ -1396,18 +1396,18 @@ Relocation constructors are always noexcept. It's used to implement the drop-and
 
 ## Interior mutability
 
-Recall the law of exclusivity, the program-wide invariant that guarantees a resource isn't mutated while another user access it. How does this square with the use of shared pointers, which enables shared ownership of a mutable resource? How does it support threaded programs, where access to shared mutable state is gated by a mutex?
+Recall the law of exclusivity, the program-wide invariant that guarantees a resource isn't mutated while another user has access to it. How does this square with the use of shared pointers, which enables shared ownership of a mutable resource? How does it support threaded programs, where access to shared mutable state is gated by a mutex?
 
-Shared mutable access exists in this safety model, but the way it's enabled involves some trickery. Rust has a blessed type, `UnsafeCell`,[^unsafe-cell] which encapsulates an object and provides mutable access to it, _through a shared reference_. 
+Shared mutable access exists in this safety model, but the way it's enabled involves some trickery. Rust has a blessed type, `UnsafeCell`,[^unsafe-cell] which encapsulates an object and provides mutable access to it, _through a shared reference_.
 
 ```rust
-pub const fn get(&self) -> *mut T 
+pub const fn get(&self) -> *mut T
 ```
 
-This is an official way of stripping away const. While the function is safe, it returns a raw pointer, which is unsafe to dereference. Rust includes a number of library types which wrap `UnsafeCell` and implement their own deconfliction strategies to prevent violations of exclusivity. 
+This is an official way of stripping away const. While the function is safe, it returns a raw pointer, which is unsafe to dereference. Rust includes a number of library types which wrap `UnsafeCell` and implement their own deconfliction strategies to prevent violations of exclusivity.
 
 * `std::Cell<T>`[^cell] provides get and set methods to read out the current value and store new values into the protected resource. Since `Cell` can't be used across threads, there's no risk of violating exclusivity.
-* `std::RefCell<T>`[^ref-cell] is a single-threaded multiple-read, single-write lock. If the caller requests a mutable reference to the interior object, the implementation checks its counter, and if the object is not locked, it establishes a mutable lock and returns a mutable borrow. If the caller requests a shared reference to the interior object, the implementation checks that there is no live mutable borrow, and if there isn't, increments the counter. When users are done with the borrow, they have to release the lock, which decrements the reference count. If the user's request can't be serviced, the `RefCell` can either gracefully with an error code, or it can panic and abort.
+* `std::RefCell<T>`[^ref-cell] is a single-threaded multiple-read, single-write lock. If the caller requests a mutable reference to the interior object, the implementation checks its counter, and if the object is not locked, it establishes a mutable lock and returns a mutable borrow. If the caller requests a shared reference to the interior object, the implementation checks that there is no live mutable borrow, and if there isn't, increments the counter. When users are done with the borrow, they have to release the lock, which decrements the reference count. If the user's request can't be serviced, the `RefCell` can either gracefully return with an error code, or it can panic and abort.
 * `std::Mutex<T>`[^mutex] provides mutable borrows to the interior data across threads. A mutex synchronization object deconflicts access, so there's only one live borrow at a time.
 * `std::RwLock<T>`[^rwlock] is the threaded multiple-read, single-write lock. The interface is similar to RefCell's, but it uses a mutex for deconfliction, so clients can sit on the lock until their request is serviced.
 
@@ -1421,6 +1421,8 @@ class [[unsafe::sync(false)]] unsafe_cell
 
 public:
   unsafe_cell() = default;
+
+  explicit
   unsafe_cell(T t) noexcept safe
     : t_(rel t)
   {
@@ -1434,15 +1436,57 @@ public:
 
 Forming a pointer to the mutable inner state through a shared borrow is _safe_, but dereferencing that pointer is unsafe. Safe C++ implements `std2::cell`, `std2::ref_cell`, `std2::mutex` and `std2::shared_mutex`, which provide safe member functions to access interior state through their deconfliction strategies.
 
+Safe C++ and Rust and equate exclusive access with mutable types and shared access with const types. This is an economical choice, because one type qualifier, const, also determines exclusivity. But this awkward cast-away-const model of interior mutability is the logical consequence.
 
+One of the more compelling usages of interior mutability is making data accesses thread-safe. In C++, many production codebases will couple an `std::mutex` alongside the data it's guarding in a wrapper struct. This provides a strong and safe guarantee but is not offered by default and its use is not guaranteed.
 
+In Safe C++, the stdlib offers a safe abstraction for users and eschewing it requires an explicit opt-in via `unsafe` constructs. `std2::mutex` internally uses an `std2::unsafe_cell`.
 
+The idiomatic usage of `std2::mutex` is via `std2::arc` as `static` objects with non-trivial destructors are unsafe. `std2::arc` is safe to copy across thread boundaries which means that at any given point in time, we must assume that multiple threads are attempting to access the data at the same time. Because of this, there's no infallible API that permits access via a direct mutable reference to the data the `arc` is wrapping.
 
-EXAMPLE OF CELL ?
+However, it's always safe to treat a const reference as thread-safe. This means the user must access the inner mutex of `arc<mutex<T>>` via const references. To this end, we can leverage interior mutability to guarantee a lock is acquired before handing out a mutable reference. Consider the following code:
 
+```cpp
+void add(std2::arc<std2::mutex<int>> mtx, int x, int y) safe
+{
+  auto z = x + y;
+  int^ r; // unbound mutable reference
+  {
+    // acquire a RAII handle that's constrained on mtx's lifetime
+    // note that `mtx` access is const here, as there's no mutable context
+    // here we invoke: `T const^ arc::operator->(self const^) noexcept safe;`
+    // which in turn lets us invoke: `lock_guard lock(self const^) safe;` on the
+    // mutex object
+    auto guard = mtx->lock();
 
+    // locally, use a mutable borrow of the `guard` object to invoke the
+    // similarly named `borrow(self^)` member function, which acquires
+    // exclusive access of the mutex via a `.lock()` call on a `std::mutex`.
+    // the local exclusive borrow of the `guard` object prevents potential
+    // misuse like double-locking and other lifetime-related issues
+    r = mut guard.borrow();
 
-Safe C++ and Rust and equate exclusive access with mutable types and shared access with const types. This is an economical choice, because one type qualifier, const, also determines exclusivity. But this awkward cast-away-const model of interior mutability is the logical consequence. 
+    // now assign the result of the operation through the mutable reference
+    *r = z;
+  }
+}
+
+// spawn the thread, copying the `mtx` object
+std2::arc<std2::mutex<int>> mtx{std2::mutex(1234)};
+std2::thread t(add, cpy mtx, 1, 2);
+
+// perform a safe-guarded load, similar to what's done above
+int r = *mtx->lock();
+
+// this condition never fails
+if (r != 1234) assert_eq(r, 1 + 2);
+
+// joining the thread object consumes it, making it unusable in further
+// operations
+t rel.join();
+```
+
+Making sound thread-safe code necessitates interior mutability, which requires a compiler primitive to make the `const_cast` valid. The library is manually upholding invariants around exlusivity via unsafe constructs but what results is a sound interface that is impossible to misuse.
 
 [^unsafe-cell]: [UnsafeCell](https://doc.rust-lang.org/std/cell/struct.UnsafeCell.html)
 [^cell]: [Cell](https://doc.rust-lang.org/std/cell/struct.Cell.html)
@@ -1470,7 +1514,7 @@ box<T> make_box(Ts... args) safe where(T:T(rel args...));
 
 There's a unique tooling aspect to this. To evaluate the implied constraints of the outlives expression, we have lower the expression to MIR, create new region variables for the locals, generate constraints, solve the constraint equation, and propagate region end points up to the function's lifetime parameters.
 
-### Unsafe type qualifier suppression 
+### Unsafe type qualifier suppression
 
 ### Function parameter ownership
 
@@ -1500,16 +1544,15 @@ void swap(T^ a, T^ b) noexcept safe {
 }
 ```
 
-It's equivalent to this function, written in Safe C++'s syntax. This code doesn't compile under Rust or Safe C++ because the operand of the relocation is a dereference, which is not an _owned place_. This defeats the abilities of initialization analysis. 
+It's equivalent to this function, written in Safe C++'s syntax. This code doesn't compile under Rust or Safe C++ because the operand of the relocation is a dereference, which is not an _owned place_. This defeats the abilities of initialization analysis.
 
 In Rust, every function call is potentially throwing, including destructors. In some builds, panics are throwing, so array subscripts can exit a function on the cleanup path. Even worse, in debug builds, integer arithmetic may panic to protect against overflow. There are many non-return paths out functions, and unlike C++, it lacks a _noexcept-specifier_ to disable cleanup. Matsakis suggests that relocating out of references is not implemented, because its use would be limited by the many unwind paths out of a function, making it rather uneconomical to support.
 
-It' already possible to write C++ code that is much less burdened by cleanup paths than Rust. If Safe C++ adopted the `throw()` specifier from the Static Exception Specification,[^static-exception-specifications] we could statically verify that functions don't have internal cleanup paths. Reducing cleanup paths extends the interval between relocating out of a reference and restoring an object there, helping justify the cost of more complex initialization analysis. 
+It' already possible to write C++ code that is much less burdened by cleanup paths than Rust. If Safe C++ adopted the `throw()` specifier from the Static Exception Specification,[^static-exception-specifications] we could statically verify that functions don't have internal cleanup paths. Reducing cleanup paths extends the interval between relocating out of a reference and restoring an object there, helping justify the cost of more complex initialization analysis.
 
-I feel this relocation feature is some of the best low-hanging fruit for improving the safety experience in Safe C++. 
+I feel this relocation feature is some of the best low-hanging fruit for improving the safety experience in Safe C++.
 
 [^unwinding-puts-limits-on-the-borrow-checker]: [Unwinding puts limits on the borrow checker
 ](https://smallcultfollowing.com/babysteps/blog/2024/05/02/unwind-considered-harmful/#unwinding-puts-limits-on-the-borrow-checker)
 
 [^static-exception-specification]: [P3166R0: Static Exception Specifications](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3166r0.html)
-
