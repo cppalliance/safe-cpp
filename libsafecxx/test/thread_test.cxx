@@ -16,7 +16,7 @@ int add(std2::arc<std2::mutex<int>> mtx, int x, int y) safe
   int^ r;
   {
     auto guard = mtx->lock();
-    r = guard^.operator*();
+    r = mut guard.borrow();
     *r = z;
   }
   return z;
@@ -54,7 +54,7 @@ struct [[unsafe::send(false)]] nonsend_callable
 
 void thread_constructor() safe
 {
-  std2::arc<std2::mutex<int>> mtx = std2::mutex<int>(1337);
+  std2::arc<std2::mutex<int>> mtx{std2::mutex(1337)};
 
   static_assert(decltype(add)~is_send);
   static_assert(std2::mutex<int>~is_send);
@@ -65,7 +65,7 @@ void thread_constructor() safe
   {
     std2::thread t(add, cpy mtx, 1, 2);
 
-    unsafe { int r = *mtx->lock(); }
+    int r = *mtx->lock();
     if (r != 1337) assert_eq(r, 1 + 2);
 
     t rel.join();

@@ -76,7 +76,7 @@ public:
 
   mutex(mutex const^) = delete;
 
-  lock_guard lock(self const^) safe  {
+  lock_guard lock(self const^) safe {
     auto *r = self->mtx_->get();
     unsafe { mut self->mtx_->get()->lock();}
     return lock_guard(self);
