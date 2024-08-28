@@ -15,7 +15,7 @@ namespace std2
 template<class T>
 class [[unsafe::sync(true)]] atomic
 {
-  unsafe_cell<T> t_;
+  unsafe_cell<std::atomic<T> unsafe>  t_;
 
 public:
   atomic(T t = T()) safe
@@ -26,27 +26,27 @@ public:
   operator rel(atomic) = delete;
 
   T fetch_add(self const^, T op, std::memory_order memory_order = std::memory_order_seq_cst) noexcept safe {
-    unsafe { return __atomic_fetch_add(self->t_.get(), op, memory_order); }
+    unsafe { return  self->t_.get()&->fetch_add(op, memory_order) + op; }
   }
 
   T fetch_sub(self const^, T op, std::memory_order memory_order = std::memory_order_seq_cst) noexcept safe {
-    unsafe { return __atomic_fetch_sub(self->t_.get(), op, memory_order); }
+    unsafe { return  self->t_.get()&->fetch_sub(op, memory_order); }
   }
 
   T add_fetch(self const^, T op, std::memory_order memory_order = std::memory_order_seq_cst) noexcept safe {
-    unsafe { return __atomic_add_fetch(self->t_.get(), op, memory_order); }
+    unsafe { return  self->t_.get()&->fetch_add(op, memory_order) + op; }
   }
 
   T sub_fetch(self const^, T op, std::memory_order memory_order = std::memory_order_seq_cst) noexcept safe {
-    unsafe { return __atomic_sub_fetch(self->t_.get(), op, memory_order); }
+    unsafe { return  self->t_.get()&->fetch_sub(op, memory_order) - op; }
   }
 
-  void store(self const^, std::memory_order memory_order = std::memory_order_seq_cst) noexcept safe {
-    unsafe { return __atomic_store_n(self->t_.get(), memory_order); }
+  void store(self const^, T op, std::memory_order memory_order = std::memory_order_seq_cst) noexcept safe {
+    unsafe { self->t_.get()&.store(op, memory_order); }
   }
 
   T load(self const^, std::memory_order memory_order = std::memory_order_seq_cst) noexcept safe {
-    unsafe { return __atomic_load_n(self->t_.get(), memory_order); }
+    unsafe { self->t_.get()&.load(memory_order); }
   }
 
   T operator++(self const^) noexcept safe {
