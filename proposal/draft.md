@@ -88,7 +88,7 @@ SHOW OUTPUT
 
 Consider this demonstration of Safe C++ that catches iterator invalidation, a kind of use-after-free bug. Let's break it down line by line:
 
-Line 1: `#feature on safety` - Turn on the new safety-related keywords within this file. Other files in your translation unit are unaffected. This is how Safe C++ avoids breaking existing code--everything is opt-in, including the new keywords and syntax. The safety feature changes the object model for function definitions, enabling object relocation, partial and deferred initialization. It lowers function definitions to mid-level intermediate representation (MIR)[^mir], on which borrow checking is performed to flag potential use-after-free bugs on checked references.
+Line 1: `#feature on safety` - Turn on the new safety-related keywords within this file. Other files in your translation unit are unaffected. This is how Safe C++ avoids breaking existing code--everything is opt-in, including the new keywords and syntax. The safety feature changes the object model for function definitions, enabling object relocation, partial and deferred initialization. It lowers function definitions to mid-level intermediate representation (MIR),[^mir] on which borrow checking is performed to flag potential use-after-free bugs on checked references.
 
 Line 2: `#include <std2/vector.h>` - Include the new safe containers and algorithms. Safety hardening is about reducing your exposure to unsafe APIs. The current Standard Library is full of unsafe APIs. The new Standard Library in namespace `std2` will provide the same basic functionality, but with containers that are lifetime-aware and type safe.
 
@@ -1378,9 +1378,16 @@ The assignment `t3.0.0.1` lowers to `_4.0.0.1`. This is a place name of a local 
 
 ### `operator rel`
 
-Safe C++ introduces a new special member function for all class types. It's the _relocation constructor_, written `operator rel`. Using the _rel-expression_ invokes the relocation constructor. Trivially copyable types are already trivially relocatable. But other types may be trivially relocatable as well, like `box`, `unique_ptr`, `rc`, `arc` and `shared_ptr`. 
+Safe C++ introduces a new special member function, the _relocation constructor_, written `operator rel(T)`, for all class types. Using the _rel-expression_ invokes the relocation constructor. The relocation constructor exists to bridge C++11's move semantics model with Safe C++'s relocation model. Relocation constructors can be:
 
-TODO
+* User defined - manually relocate the operand into the new object. This can be used for fixing internal addresses, like those used to implement sentinels in standard linked lists and maps.
+* `= trivial` - Trivially copyable types are already trivially relocatable. But other types may be trivially relocatable as well, like `box`, `unique_ptr`, `rc`, `arc` and `shared_ptr`.
+* `= default` - A defaulted or implicitly declared relocation constructor is implemented by the compiler with one of three strategies: trivial types are trivially relocated; aggregate types use member-wise relocation; and other types are move-constructed into the new data, and the old operand is destroyed.
+* `= delete` - A deleted relocation constructor _pins_ a type. Objects of that type can't be relocated. A `rel-expression` is a SFINAE failure. Rust uses its `std::Pin`[^pin] pin type as a container for structs with with address-sensitive states. That's an option with Safe C++'s deleted relocation constructors. Or, users can write user-defined relocation constructors to update address-sensitive states.
+
+Relocation constructors are always noexcept. It's used to implement the drop-and-replace semantics of assignment expressions. If a relocation constructor was throwing, it might leave objects involved in drop-and-replace in illegal uninitialized states. An uncaught exception in a user-defined or defaulted relocation constructor will panic and terminate.
+
+[^pin]: [Module `std::pin`](https://doc.rust-lang.org/std/pin/index.html)
 
 ## Choice types
 
@@ -1392,7 +1399,7 @@ TODO
 
 Recall the law of exclusivity, the program-wide invariant that guarantees a resource isn't mutated while another user access it. How does this square with the use of shared pointers, which enables shared ownership of a mutable resource? How does it support threaded programs, where access to shared mutable state is gated by a mutex?
 
-Shared mutable access exists in this safety model, but the way it's enabled involves some trickery. Rust has a blessed type, `UnsafeCell`[^unsafe-cell], which encapsulates an object and provides mutable access to it, _through a shared reference_. 
+Shared mutable access exists in this safety model, but the way it's enabled involves some trickery. Rust has a blessed type, `UnsafeCell`,[^unsafe-cell] which encapsulates an object and provides mutable access to it, _through a shared reference_. 
 
 ```rust
 pub const fn get(&self) -> *mut T 
@@ -1468,7 +1475,7 @@ There's a unique tooling aspect to this. To evaluate the implied constraints of 
 
 ### Function parameter ownership
 
-### Relocation out of dereferences
+### Relocation out of references
 
 Niko Matsakis writes about a significant potential improvement in the ownership model.[^unwinding-puts-limits-on-the-borrow-checker] You can only relocate out of _owned places_, and owned places are subobjects of local variables. Dereferences of borrows are owned places. But there are situations where it would be sound to relocate out of a reference, as long as you relocate back into it before the function returns.
 
