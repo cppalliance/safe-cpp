@@ -62,6 +62,10 @@ public:
 
   void join(self) safe {
     mut self.t_.join();
+
+    // TODO: this line will someday be _required_ once ABI issues are worked out
+    // and dropping through a relocated function parameter works
+    forget(rel self);
   }
 };
 
