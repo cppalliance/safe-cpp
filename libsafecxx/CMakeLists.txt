@@ -5,8 +5,8 @@
 cmake_minimum_required(VERSION 3.25)
 project(circle_stdlib LANGUAGES CXX)
 
-if (NOT (CMAKE_CXX_STANDARD GREATER_EQUAL "17"))
-  message(FATAL_ERROR "Circle only supports C++17 and up.")
+if (NOT (CMAKE_CXX_STANDARD GREATER_EQUAL "20"))
+  message(FATAL_ERROR "Circle only supports C++20 and up.")
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
