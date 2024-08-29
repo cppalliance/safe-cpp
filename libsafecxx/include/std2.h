@@ -9,11 +9,13 @@
 #include <std2/arc.h>
 #include <std2/atomic.h>
 #include <std2/box.h>
+#include <std2/cell.h>
 #include <std2/initializer_list.h>
 #include <std2/iterator.h>
 #include <std2/mutex.h>
 #include <std2/optional.h>
 #include <std2/panic.h>
+#include <std2/ref_cell.h>
 #include <std2/shared_mutex.h>
 #include <std2/slice.h>
 #include <std2/source_location.h>
