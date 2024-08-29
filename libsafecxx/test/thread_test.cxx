@@ -185,7 +185,7 @@ void shared_mutex_test() safe
     mut threads.push_back(std2::thread(fp2, cpy sp));
   }
 
-  for(std2::thread t : rel threads) {
+  for (std2::thread t : rel threads) {
     t rel.join();
   }
 
