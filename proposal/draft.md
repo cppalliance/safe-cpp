@@ -255,7 +255,7 @@ int main() {
 }
 ```
 
-C++'s sum type support is built on top of unions. Unions are extremely unsafe. Naming a union field is like implicitly using `reintepret_cast` to convert the object's bits into the type of the field. The defects in `std::optional` and `std::expected` are of this nature: the libraries don't guard against access using an invalid type. C++ builds abstractions on top of unions, but they're not _safe_ abstractions.
+C++'s sum type support is built on top of unions. Unions are unsafe. Naming a union field is like implicitly using `reintepret_cast` to convert the object's bits into the type of the field. The defects in `std::optional` and `std::expected` are of this nature: the libraries don't guard against access using an invalid type. C++ builds abstractions on top of unions, but they're not _safe_ abstractions.
 
 ```cpp
 #feature on safety
@@ -432,7 +432,7 @@ These kind of constraints are idiomatic in C++ but not supported in Rust, becaus
 
 ### _unsafe-block_
 
-The `unsafe` token is required to escape the safe context and perform operations whose soundness cannot be checked by the toolchain. The most basic unsafe escape is the _unsafe-block_. At the statement level, write `unsafe { }` and put the unsafe operations inside the braces. This does _not_ open a new lexical scope, which is different from Rust's behavior.
+The `unsafe` token is required to escape the safe context and perform operations whose soundness cannot be checked by the toolchain. The most basic unsafe escape is the _unsafe-block_. At the statement level, write `unsafe { }` and put the unsafe operations inside the braces. The _unsafe-block_ does _not_ open a new lexical scope.
 
 ```cpp
 SHOW unsafe { }
@@ -993,6 +993,85 @@ During the type relation pass that generates lifetime constraints for function c
 
 ### Lifetimes and templates
 
+Templates are specially adapted to handle types with lifetime binders. It's important to understand how template lifetime parameters are invented in order to understand how borrow checking fits with C++'s late-checked generics.
+
+Class templates feature a variation on the on the type template parameter: `typename T+` is a lifetime binder parameter. The class template invents an implicit _template lifetime parameter_ for each lifetime binder of the argument's type.
+
+```cpp
+template<typename T0+, typename T1+>
+struct Pair {
+  T0 first;
+  T1 second;
+};
+
+class string_view/(a);
+```
+
+The `Pair` class template doesn't have any named lifetime parameters. `string_view` has one named lifetime parameter, which constrains the pointed-at string to outlive the view. The specialization `Pair<string_view, string_view>` invents a template lifetime parameter for each view's named lifetime parameters. Call them `T0.0.0` and `T1.0.0`. `T0.0` is for the 0th parameter pack element of the template parameter pack. `T0.0.0` is for the 0th lifetime binder in that type. If `string_view` had a second named parameter, the compiler would invent two more template lifetime parameters: `T0.0.1` and `T1.0.1.
+
+Consider the transformation when instantiating the definition of `Pair<string_view/a, string_view/b>`:
+
+```cpp
+template<>
+struct Pair/(T0.0.0, T1.0.0)<string_view/T0.0.0, string_view/T1.0.0> {
+  string_view/T0.0.0 first;
+  string_view/T1.0.0 second;
+};
+```
+
+The compiler ignores the lifetime arguments `/a` and `/b` and replaces them with the template lifetime parameters `T0.0.0` and `T1.0.0`. This transformation deduplicates template instantiations. We don't want to instantiate class templates for every lifetime argument on a template argument type. That would be an incredible waste of compute and result in enormous code bloat. Those lifetime arguments don't carry data in the same way as integer or string types do. Instead, lifetime arguments define constraints on region variables between different function parameters and result objects. Those constraints are an external concern to the class template being specialized.
+
+Since we replaced the named lifetime arguments with template lifetime parameters during specialization of Pair, you have to wonder, what happened to `/a` and `/b`? They get stuck on the outside of the class template specialization: `Pair<string_view, string_view>/a/b`. Since this specialized Pair has two lifetime binders (its two template lifetime parameters), it needs to bind two lifetime arguments. Safe C++ replaces lifetime arguments on template arguments with invented template lifetime parameters and reattaches the lifetime arguments on the specialization.
+
+A class template's instantiation doesn't depend on the lifetimes of its users. `std2::vector<string_view/a>` is transformed to `std2::vector<string_view/T0.0.0>/a`. `T0.0.0` is the implicitly declared lifetime parameter, which becomes the lifetime argument on the template argument, and `/a` is the user's lifetime argument that was hoisted out of the _template-argument-list_ and put in the corresponding position in the specialization's _lifetime-argument-list_.
+
+In the current safety model, this transformation only occurs for bound lifetime template parameters with the `typename T+` syntax. It's not done for all template parameters, because that would interfere with C++'s partial and explicit specialization facilities.
+
+```cpp
+template<typename T0, typename T1>
+struct is_same {
+  static constexpr bool value = false;
+};
+template<typename T>
+struct is_same<T, T> {
+  static constexpr bool value = true;
+};
+```
+
+Should `std::is_same<string_view, string_view>::value` be true or false? Of course it should be true. But what if we invented template lifetime parameters for each lifetime binder in the _template-argument-list_? We'd get something like `std::is_same<string_view/T0.0.0, string_view/T1.0.0>::value`. Those arguments are different types, and they wouldn't match the partial specialization.
+
+When specializing a `typename T` template parameter, lifetimes are stripped from the template argument types. They become unbound types. When specializing a `typename T+` parameter, the compiler creates fully-bound types by implicitly adding placeholder arguments `/_` whenever needed. When a template specialization is matched, the lifetime arguments are replaced with the specialization's invented template lifetime parameters and he original lifetime arguments are hoisted onto the specialization. 
+
+You might want to think of this process as extending an electrical circuit. The lifetime parameters outside of the class template are the source, and the usage on the template arguments are the return. When we specialize, the invented template lifetime parameters become a new source, and their use as lifetime arguments in the data members of the specialization are a new return. The old circuit is connected to the new one, where the outer lifetime arguments lead into the new template lifetime parameters.
+
+```
+Foo<string_view/a>
+  Source: /a
+  Return: string_view
+
+transforms to:
+
+Foo<string_view:string_view/Foo>
+  Source: /a
+  Return: Foo (user-facing)
+  Source: Foo (definition-facing)
+  Return: string_view
+```
+
+Because Rust doesn't support partial or explicit specialization of its generics, it has no corresponding distinction between type parameters that bind lifetimes and type parameters don't. There's nothing like `is_same` that would be confused by lifetime arguments in its operands. 
+
+Deciding when to use the `typename T+` parameter kind on class templates will hopefully be straight-forward. If the class template is a container and the parameter represents a thing being contained, use the new syntax. If the class template exists for metaprogramming, like the classes found in `<type_traits>`, it's probably uninterested in bound lifetimes. Use the traditional `typename T` parameter kind.
+
+The Safe C++ design isn't complete yet. We're still deliberating on how to treat template parameters of other kinds of templates:
+
+* Function templates
+* Variable templates
+* Alias templates
+* Concepts
+* Interface templates
+
+See the [Unresolved or unimplemented design issues section](#unresolved-or-unimplemented-design-issues) for additional topics needing attention.
+
 ### Lifetime normalization
 
 ## Explicit mutation
@@ -1366,8 +1445,6 @@ Relocation constructors are always noexcept. It's used to implement the drop-and
 
 ### Pattern matching
 
-## Thread safety
-
 ## Interior mutability
 
 Recall the law of exclusivity, the program-wide invariant that guarantees a resource isn't mutated while another user has access to it. How does this square with the use of shared pointers, which enables shared ownership of a mutable resource? How does it support threaded programs, where access to shared mutable state is gated by a mutex?
@@ -1410,7 +1487,18 @@ public:
 
 Forming a pointer to the mutable inner state through a shared borrow is _safe_, but dereferencing that pointer is unsafe. Safe C++ implements `std2::cell`, `std2::ref_cell`, `std2::mutex` and `std2::shared_mutex`, which provide safe member functions to access interior state through their deconfliction strategies.
 
-Safe C++ and Rust and equate exclusive access with mutable types and shared access with const types. This is an economical choice, because one type qualifier, const, also determines exclusivity. But this awkward cast-away-const model of interior mutability is the logical consequence.
+Safe C++ and Rust and equate exclusive access with mutable types and shared access with const types. This is an economical choice, because one type qualifier, const, also determines exclusivity. This awkward cast-away-const model of interior mutability is the logical consequence. But it's not the only way. 
+
+The Ante language[^ante] experiments with separate mutable (exclusive) and mutable (shared) type qualifiers. The 
+
+[^unsafe-cell]: [UnsafeCell](https://doc.rust-lang.org/std/cell/struct.UnsafeCell.html)
+[^cell]: [Cell](https://doc.rust-lang.org/std/cell/struct.Cell.html)
+[^ref-cell]: [RefCell](https://doc.rust-lang.org/std/cell/struct.RefCell.html)
+[^mutex]: [Mutex](https://doc.rust-lang.org/std/sync/struct.Mutex.html)
+[^rwlock]: [RwLock](https://doc.rust-lang.org/std/sync/struct.RwLock.html)
+[^ante]: [Ante Shared Interior Mutability](https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability)
+
+## Thread safety
 
 One of the more compelling usages of interior mutability is making data accesses thread-safe. In C++, many production codebases will couple an `std::mutex` alongside the data it's guarding in a wrapper struct. This provides a strong and safe guarantee but is not offered by default and its use is not guaranteed.
 
@@ -1462,15 +1550,6 @@ t rel.join();
 
 Making sound thread-safe code necessitates interior mutability, which requires a compiler primitive to make the `const_cast` valid. The library is manually upholding invariants around exlusivity via unsafe constructs but what results is a sound interface that is impossible to misuse.
 
-[^unsafe-cell]: [UnsafeCell](https://doc.rust-lang.org/std/cell/struct.UnsafeCell.html)
-[^cell]: [Cell](https://doc.rust-lang.org/std/cell/struct.Cell.html)
-[^ref-cell]: [RefCell](https://doc.rust-lang.org/std/cell/struct.RefCell.html)
-[^mutex]: [Mutex](https://doc.rust-lang.org/std/sync/struct.Mutex.html)
-[^rwlock]: [RwLock](https://doc.rust-lang.org/std/sync/struct.RwLock.html)
-[^ante]: [Ante Shared Interior Mutability](https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability)
-
-## Implementation guidance
-
 ## Unresolved or unimplemented design issues
 
 ### _expression-outlives-constraint_
@@ -1520,13 +1599,18 @@ void swap(T^ a, T^ b) noexcept safe {
 
 It's equivalent to this function, written in Safe C++'s syntax. This code doesn't compile under Rust or Safe C++ because the operand of the relocation is a dereference, which is not an _owned place_. This defeats the abilities of initialization analysis.
 
-In Rust, every function call is potentially throwing, including destructors. In some builds, panics are throwing, so array subscripts can exit a function on the cleanup path. Even worse, in debug builds, integer arithmetic may panic to protect against overflow. There are many non-return paths out functions, and unlike C++, it lacks a _noexcept-specifier_ to disable cleanup. Matsakis suggests that relocating out of references is not implemented, because its use would be limited by the many unwind paths out of a function, making it rather uneconomical to support.
+In Rust, every function call is potentially throwing, including destructors. In some builds, panics are throwing, so array subscripts can exit a function on the cleanup path. In debug builds, integer arithmetic may panic to protect against overflow. There are many non-return paths out functions, and unlike C++, it lacks a _noexcept-specifier_ to disable cleanup. Matsakis suggests that relocating out of references is not implemented because its use would be limited by the many unwind paths out of a function, making it rather uneconomical to support.
 
-It' already possible to write C++ code that is much less burdened by cleanup paths than Rust. If Safe C++ adopted the `throw()` specifier from the Static Exception Specification,[^static-exception-specifications] we could statically verify that functions don't have internal cleanup paths. Reducing cleanup paths extends the interval between relocating out of a reference and restoring an object there, helping justify the cost of more complex initialization analysis.
+It's already possible to write C++ code that is less burdened by cleanup paths than Rust. If Safe C++ adopted the `throw()` specifier from the Static Exception Specification,[^static-exception-specifications] we could statically verify that functions don't have internal cleanup paths. Reducing cleanup paths extends the interval between relocating out of a reference and restoring an object there, helping justify the cost of more complex initialization analysis.
 
-I feel this relocation feature is some of the best low-hanging fruit for improving the safety experience in Safe C++.
+I feel this relocation feature is some of the best low-hanging fruit for improving the safety experience in Safe C++. 
 
 [^unwinding-puts-limits-on-the-borrow-checker]: [Unwinding puts limits on the borrow checker
 ](https://smallcultfollowing.com/babysteps/blog/2024/05/02/unwind-considered-harmful/#unwinding-puts-limits-on-the-borrow-checker)
 
 [^static-exception-specification]: [P3166R0: Static Exception Specifications](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3166r0.html)
+
+## Implementation guidance
+
+This section is intended for developers who are toolchain curious. It explains how a vendor may approaching integrating the Safe C++ extension into their compiler.
+
