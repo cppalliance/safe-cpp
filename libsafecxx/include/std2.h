@@ -11,6 +11,7 @@
 #include <std2/box.h>
 #include <std2/cell.h>
 #include <std2/initializer_list.h>
+#include <std2/io.h>
 #include <std2/iterator.h>
 #include <std2/mutex.h>
 #include <std2/optional.h>
