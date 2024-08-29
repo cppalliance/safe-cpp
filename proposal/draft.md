@@ -20,9 +20,9 @@ The government papers are backed by industry research. Microsoft's bug telemetry
 
 Security professionals urge projects to migrate away from C++ and adopt memory safe languages. But the scale of the problem is daunting. C++ powers software that has generated trillions of dollars of value. There are a lot of C++ programmers and a lot of C++ code. Given how wide-spread C and C++ code is, what can industry really do to improve software quality and reduce vulnerabilities? What are the options for introducing new memory safe code into existing projects and hardening software that already exists?
 
-There's only one popular systems-level/non-garbage collected language that provides rigorous memory safety. That's the Rust language.[^rust-language] But while they play in the same space, C++ and Rust are idiomatically very different with limited interop capability, making incremental migration from C++ to Rust a slow, painstaking process.
+There's only one popular systems-level/non-garbage collected language that provides rigorous memory safety. That's the Rust language.[^rust-language] But while they play in the same space, C++ and Rust are idiomatically very different with limited interop capability, making incremental migration from C++ to Rust a painstaking process.
 
-Rust lacks function overloading, templates and inheritance. C++ lacks traits, relocation and lifetime parameters. These discrepancies are responsible for an impedence mismatch when interfacing the two languages. Most code generators for inter-language bindings do not even attempt to represent the features of one language in terms of the features of another. They typically identify a number of special vocabulary types,[^vocabulary-types] which have first-class ergonomics, and limit functionality of other constructs.
+Rust lacks function overloading, templates and inheritance. C++ lacks traits, relocation and lifetime parameters. These discrepancies are responsible for an impedence mismatch when interfacing the two languages. Most code generators for inter-language bindings aren't able to represent features of one language in terms of the features of another. They typically identify a number of special vocabulary types,[^vocabulary-types] which have first-class ergonomics, and limit functionality of other constructs.
 
 The foreignness of Rust for career C++ developers along with the inadequacies of interop tools makes hardening C++ applications by rewriting critical sections in Rust very difficult. Why is there no in-language solution to memory safety? _Why not a Safe C++?_
 
@@ -50,7 +50,7 @@ The foreignness of Rust for career C++ developers along with the inadequacies of
 
 The goal of the authors is to define a superset of C++ with a _rigorously safe subset_. Begin a new project, or take an existing one, and start writing safe code in C++. Code in the safe context exhibits the same strong safety guarantees as safe code written in Rust.
 
-Rigorous safety is a carrot-and-stick approach. The stick comes first. The stick is what regulators care about. Developers are prohibited from writing operations that may result in lifetime safety, type safety or thread safety undefined behaviors. Sometimes these operations are prohibited by the compiler frontend, as is the case with pointer arithmetic. Sometimes the operations are prohibited by static analysis in the compiler's middle-end; that stops use of initialized variables and use-after-free bugs, and it's the technology enabling the _ownership and borrowing_ safety model. The remainder of issues, like out-of-bounds array subscripts, are averted with runtime panic and aborts.
+Rigorous safety is a carrot-and-stick approach. The stick comes first. The stick is what security researchers and regulators care about. Safe C++ developers are prohibited from writing operations that may result in lifetime safety, type safety or thread safety undefined behaviors. Sometimes these operations are prohibited by the compiler frontend, as is the case with pointer arithmetic. Sometimes the operations are prohibited by static analysis in the compiler's middle-end; that stops use of initialized variables and use-after-free bugs, and it's the technology enabling the _ownership and borrowing_ safety model. The remainder of issues, like out-of-bounds array subscripts, are averted with runtime panic and aborts.
 
 The carrot is a suite of new capabilities which improve on the unsafe ones denied to users. The affine type system (aka linear types, aka relocation, aka destructive move) makes it easier to relocate objects without breaking type safety. Pattern matching is safe and expressive, and interfaces with the system's new choice types. Borrow checking[^borrow-checking] is the most sophisticated part of the extension, providing a new reference type that flags use-after-free and iterator invalidation defects at compile time.
 
@@ -104,7 +104,7 @@ Line 12: `unsafe { printf("%d\n", x); }` - Call `printf`. It's a very unsafe fun
 
 If `main` checks out syntatically, its AST is lowered to MIR, where it is borrow checked. The hidden iterator that powers the ranged-for loop stays initialized during execution of the loop. The `push_back` _invalidates_ that iterator, by mutating a place (the vector) that the iterator has a constraint on. When the value `x` is next loaded out of the iterator, the borrow checker raises an error: `mutable borrow of vec between its shared borrow and its use`. The borrow checker prevents Safe C++ from compiling a program that may have exhibited undefined behavior. This is all done at compile time, with no impact on your program's size or speed.
 
-This sample is only a few lines, but it introduces several new mechanisms and types. Security experts keep reminding us that **C++ is very unsafe**. It takes a systematic effort to supply a superset of the language with a safe subset that has enough flexibility to remain expressive.
+This sample is only a few lines, but it introduces several new mechanisms and types. A comprehensive effort is needed to supply a superset of the language with a safe subset that has enough flexibility to remain expressive.
 
 [^borrow-checking]: [The Rust RFC Book - Non-lexical lifetimes](https://rust-lang.github.io/rfcs/2094-nll.html)
 
@@ -309,19 +309,12 @@ TODO
 
 ## Tour of Safe C++
 
-Put at least 10 examples and describe their opreations. It's best to focus on the code early.
+Get 4-6 small samples to illustrate strenghts of this language. Ideas from the chat:
 
-
-From st louis ISO talk:
-
-1. safe1.cxx - out-of-bounds panic
-1. sv1.cxx - dangling string_view
-1. sv3.cxx -
-1. iter2.cxx - iterator invalidation
-1. safe3.cxx - deref
-
-
-
+* box never being in a null state is approachable from a conceptual understanding
+* borrow checking essentially fixes everything wrong with std::string_view
+* relocatable semantics dramatically simplifies implementations of containers like std::vector
+* borrow checking can also trivialize API design where you hand out a RAII-like handles 
 
 
 
@@ -1004,9 +997,9 @@ During the type relation pass that generates lifetime constraints for function c
 
 ## Explicit mutation
 
-Reference binding convention is important in the context of borrow checking. Const and non-const borrows differ by more than just constness. By the law of exclusivity, users are allowed multiple live shared borrows, but only one live mutable borrow. C++'s convention of always preferring non-const references would tie the borrow checker into knots, as mutable borrows don't permit aliasing.
+Reference binding convention is important in the context of borrow checking. Const and non-const borrows differ by more than just constness. By the law of exclusivity, users are allowed multiple live shared borrows, but only one live mutable borrow. C++'s convention of always preferring non-const references would tie the borrow checker into knots, as mutable borrows don't permit aliasing. This is one reason why there's no way to borrow check existing C++ code: the standard conversion contirbutes to mutable aliasing.
 
-Rather than binding the mutable overload of functions by default, we prefer binding the const ones. Shared borrows are less likely to bring borrow checker errors. To improve reference binding precision, the relocation object model takes a new approach to references. Unlike in ISO C++, expressions can actually have reference types. Naming a reference object yields an lvalue expression with reference type, rather than implicitly dereferencing the reference and giving you an lvalue to the pointed-at thing. The standard conversion will bind const borrows and const lvalue references to lvalues of the same type. But standard conversions won't bind mutable borrows and mutable lvalue references. Those require an opt-in.
+Rather than binding the mutable overload of functions by default, we prefer binding the const overloads. Shared borrows are less likely to bring borrow checker errors. To improve reference binding precision, the relocation object model takes a new approach to references. Unlike in ISO C++, expressions can actually have reference types. Naming a reference object yields an lvalue expression with reference type, rather than implicitly dereferencing the reference and giving you an lvalue to the pointed-at thing. The standard conversion will bind const borrows and const lvalue references to lvalues of the same type. But standard conversions won't bind mutable borrows and mutable lvalue references. Those require an opt-in.
 
 ```cpp
 struct Obj {
@@ -1081,7 +1074,7 @@ int main() {
 }
 ```
 
-Most people concede that Rust has the better defaults: in Rust, things are const by default; in C++, they're mutable by default. But by supporting standard conversions to const references, reference binding in Safe C++ is less noisy than the Rust equivalent, while being no less precise.
+In Rust, types and declarations are const by default. In C++, they're mutable by default. But by supporting standard conversions to const references, reference binding in Safe C++ is less noisy than the Rust equivalent, while being no less precise.
 
 ```cpp
 // Rust:
@@ -1098,80 +1091,63 @@ f(x);         // Pass by const lvalue ref.
 f(&const x);  // Extra verbose -- call attention to it.
 ```
 
-Is there a downside to rely on standard conversions for producing const references? Not really... If the parameter is pass-by-value, and your argument type is trivially copyable, then it'll copy. If the parameter is pass-by-value, and your argument type is non-trivially copyable, the compiler will prompt for a `rel` or `cpy` token to resolve how to pass the argument. If the parameter is pass-by-const-reference, it'll bind implicitly. You're not going to accidentally hit the slow path by making use of this convenience.
-
-## Object postfix
-
-The _unary-operator_ syntax for mutable borrows, `^x`, will ready function arguments. How do we borrow the object for member function calls? For example, `vec.push_back(1)` is ill-formed under explicit mutation model, because `vec` is mutated, and there's no token signifying that.
-
-Circle introduces an _object postfix_ for effecting borrow and reference binding on the object of member function calls. `vec^.push_back(1)` takes a mutable borrow on `vec` (assuming that lvalue is non-const) and calls the `push_back` member function.
-
-```cpp
-#feature on safety
-
-template<typename T>
-struct Vec {
-  size_t size(const self^) noexcept safe;
-  void push_back(self^, T value) safe;
-};
-
-int main() safe {
-  Vec<size_t> vec { };
-  vec^.push_back(vec.size());
-}
-```
-
-The inner call to `size` performs an implicit shared borrow to bind the `const self^` receiver parameter to the `vec` object. The outer call uses the object postfix `^` to mutably borrow `vec` and bind it to `self^`. Thanks to two-phase borrows,[^two-phase] the push_back argument is completely read out into a new temporary value before the mutable reference is _activated_. Without this extension to the borrow checker, the compiler would flag the implicit shared borrow on `vec` (in `vec.size()`) as invalidating the mutable borrow that was taken for the push_back.
-
-Rust doesn't support function overloading. It considers at most one function candidate in each trait that the receiver implements, and it performs implicit relocation or shared or mutable borrows on the object argument, as required by the candidate's receiver type. Since C++ supports function overloading, users need a way to explicitly choose between candidates that may only differ in their receiver type.
-
-* `obj^.foo()` - Mutable borrow of obj in call.
-* `obj&.foo()` - Mutable lvalue reference of obj in call.
-* `obj&&.foo()` - Mutable rvalue reference of obj in call.
-* `obj rel.foo()` - Relocation of obj in call.
-* `obj cpy.foo()` - Copy of obj in call.
-
-```cpp
-#feature on safety
-
-struct Foo {
-  // #1 Pass by shared borrow.
-  void f(const self^, int) safe;
-
-  // #2 Pass by mutable borrow.
-  void f(self^, int) safe;
-
-  // #3 Pass by value.
-  void f(self, int) safe;
-};
-
-int main() safe {
-  Foo obj { };
-
-  // Pass by shared borrow - Calls #1.
-  obj.f(1);
-
-  // Pass by mutable borrow - Calls #2.
-  obj^.f(2);
-
-  // Pass by copy - Calls #3.
-  obj cpy.f(3);
-
-  // Pass by relocation - Calls #3.
-  // obj is uninitialized after call.
-  obj rel.f(3);
-};
-```
-
-Note that Safe C++ provides _consuming member functions_, which pass their receiver types by value. To invoking consuming functions, use the `cpy` or `rel` tokens. To bind a mutable borrow or reference, use the `^`, `&` or `&&` postfix tokens. And if you want to pass by shared borrow or constant reference, you can rely on the standard conversions to cover your needs.
-
-_Object postfix_ tokens, along with the various reference-binding operators, provide necessary precision for choosing the right overload. Shared and mutable borrows are treated unequally, and accidentally binding a mutable borrow when all you need is a shared borrow could lead to a conflict with the borrow checker.
-
-[^two-phase]: [Two-phase borrows](https://rustc-dev-guide.rust-lang.org/borrow_check/two_phase_borrows.html#two-phase-borrows)
+The availability of relocation forces another choice on users: to load an lvalue into a prvalue, do you want to copy, or do you want to relocate? If the expression's type is trivially copyable and trivially destructible, it'll copy. Otherwise, the compiler will prompt for a `rel` or `cpy` token to resolve how to resolve the copy initialization. You're not going to accidentally hit the slow path or the mutable path. Opt into mutation. Opt into no-trivial copies.
 
 ### The mutable context
 
+The mutable context is the preferred way to express mutation. In a sense it returns Safe C++ to legacy C++'s default binding behavior. Use it at the start of a _cast-expression_, and the mutable context lasts for all subsequent higher-precedence operations. In the mutable context, standard conversion may bind mutable borrows and mutable lvalue references to lvalue operands.
 
+```cpp
+#feature on safety
+#include <std2.h>
+
+int main() safe {
+  std2::vector<size_t> A { }, B { };
+
+  // Get a shared borrow to an element in B.
+  // The borrow is live until it is loaded from below.
+  const size_t^ b = B[0];
+
+  // A[0] is in the mutable context, so A[0] is the mutable operator[].
+  // B[0] is outside the mutable context, so B[0] is the const operator[].
+  // No borrow checking error.
+  mut A[0] += B[0];
+
+  // Mutable context allows standard conversion binding of mut references.
+  size_t^ a = mut A[0];
+
+  // Keep b live.
+  size_t x = *b;
+}
+```
+
+Write the `mut` token before the _cast-expression_ you want to mutate. _cast-expressions_ are high-precedence unary expressions. Lower-precedence binary expressions aren't in the scope of the mutable context. In this example, the mutable context applies only to the left-hand side of the assignment. `A[0]` chooses the mutable overload of `vector::operator[]`, and `B[0]` chooses the const overload of `vector::operator[]`. This confirmed by the lack of borrow checker error: if the `B[0]` expression chose the mutable overload, that would create a mutable borrow when the shared borrow `b` is still in scope, which violates exclusivity. In the following statement, `int^ a = mut A[0]` calls the mutable overload of the subscript operator, returning an `lvalue int` expression. We're still in the mutable context, because we haven't run into any operators of lower precedence. That means copy initialization into `int^` succeeds, because the standard conversion can bind mutable borrows to lvalues.
+
+```cpp
+#feature on safety
+
+#include <std2.h>
+
+int main() safe {
+  std2::vector<size_t> A { }, B { };
+
+  // Get a shared borrow to an element in B.
+  // The borrow is live until it is loaded from below.
+  const size_t^ b = B[0];
+
+  // A is in the mutable context for its operator[] call.
+  // B is not in the mutable conetxt for its operator[] call.
+  // No borrow checker error.
+  mut A[B[0]] += 1;
+
+  // Keep b live.
+  size_t x = *b;
+}
+```
+
+The mutable context is entered at the start of a _cast-expression_ with the `mut` token. It exists for subsequent high-precedence _unary-expression_, _postfix-expression_ and _primary-expression_ operations. But it's transitive into subexpressions of these. The index operand of the subscript operator matches the _expression-list_ production, which is lower precedence than _cast-expression_, so it's not entered with the mutable context.
+
+The mutable context marks points of mutation while letting standand conversion worry about the details. Its intent is to reduce cognitive load on developers compared with using the reference  operators.
 
 ## Relocation object model
 
@@ -1385,8 +1361,6 @@ Safe C++ introduces a new special member function, the _relocation constructor_,
 * `= delete` - A deleted relocation constructor _pins_ a type. Objects of that type can't be relocated. A `rel-expression` is a SFINAE failure. Rust uses its `std::Pin`[^pin] pin type as a container for structs with with address-sensitive states. That's an option with Safe C++'s deleted relocation constructors. Or, users can write user-defined relocation constructors to update address-sensitive states.
 
 Relocation constructors are always noexcept. It's used to implement the drop-and-replace semantics of assignment expressions. If a relocation constructor was throwing, it might leave objects involved in drop-and-replace in illegal uninitialized states. An uncaught exception in a user-defined or defaulted relocation constructor will panic and terminate.
-
-[^pin]: [Module `std::pin`](https://doc.rust-lang.org/std/pin/index.html)
 
 ## Choice types
 
