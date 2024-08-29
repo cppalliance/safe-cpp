@@ -13,11 +13,12 @@ void box_constructor() safe
 {
   {
     std2::box<int> p(1337);
-    // TODO: refactor this once Sean adds syntax support
-    assert_eq((^p).operator*(), 1337);
+
+    assert_eq(mut *p, 1337);
     assert_eq(*p, 1337);
 
-    int^ x = (^p).operator*();
+    // Bind a mutable borrow.
+    int^ x = mut *p;
     *x = 7331;
 
     assert_eq(*p, 7331);
