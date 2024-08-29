@@ -19,6 +19,7 @@ int add(std2::arc<std2::mutex<int>> mtx, int x, int y) safe
     r = mut guard.borrow();
     *r = z;
   }
+  drp mtx;
   return z;
 }
 
@@ -104,6 +105,7 @@ void adder(std2::arc<std2::mutex<int>> m) safe
     int^ x = mut guard.borrow();
     *x += 1;
   }
+  drp m;
 };
 
 void mutex_test() safe
@@ -153,6 +155,8 @@ void shared_mutex_test() safe
       value_type^ v = mut guard.borrow();
       mut *v.borrow() += 1;
     }
+
+    drp sp;
   };
 
   auto reader = [](std2::arc<mutex_type> sp) safe {
@@ -166,6 +170,8 @@ void shared_mutex_test() safe
       value_type const^ v2 = *guard;
       v = **v2;
     } while(v < value);
+
+    drp sp;
   };
 
   unsafe { fn_type fp1 = +writer; }
