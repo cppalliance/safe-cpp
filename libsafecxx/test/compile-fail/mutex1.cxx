@@ -12,7 +12,7 @@ int main() safe
   int^ x;
   {
     auto guard = mtx.lock();
-    x = guard^.operator*();
+    x = mut *guard;
   }
   *x = 7331;
 }

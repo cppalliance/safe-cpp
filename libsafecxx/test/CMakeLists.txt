@@ -113,7 +113,7 @@ safe_cxx_compile_fail_test(manually_drop1 "cannot convert prvalue std2::box<int>
 
 safe_cxx_compile_fail_test(vector1 "use of strs depends on expired loan")
 safe_cxx_compile_fail_test(vector2 "use of it depends on expired loan")
-safe_cxx_compile_fail_test(mutex1 "use of \\*x depends on expired loan")
+safe_cxx_compile_fail_test(mutex1 "use of x depends on expired loan")
 safe_cxx_compile_fail_test(mutex2 "cannot convert prvalue const int\\^ to int\\^")
 
 # TODO: for this test, determine if we can ever bring it back into the main suite
