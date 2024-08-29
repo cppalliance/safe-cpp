@@ -104,6 +104,8 @@ function(safe_cxx_compile_fail_test testname fail_regex)
   set_property(TEST "safecxx-compile-fail-${testname}" PROPERTY PASS_REGULAR_EXPRESSION "${fail_regex}")
 endfunction()
 
+add_test(NAME "safecxx-verify-headers" COMMAND "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target "safe_cxx_verify_interface_header_sets" --config $<CONFIG)
+
 safe_cxx_compile_fail_test(string_view1 "use of sv depends on expired loan")
 safe_cxx_compile_fail_test(box_incomplete "class incomplete is incomplete")
 safe_cxx_compile_fail_test(box1 "cannot convert prvalue int to std2::box<int>")
