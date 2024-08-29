@@ -7,6 +7,7 @@
 #feature on safety
 
 #include <std2/string_view.h>
+#include <string>
 
 #include <cstdio>
 
@@ -16,6 +17,10 @@ namespace std2
 inline void println(string_view sv) safe
 {
   unsafe { printf("%s\n", sv.data()); }
+}
+
+inline void println(const std::string^ s) safe {
+  unsafe { printf("%s\n", s->c_str()); }
 }
 
 inline void println(signed char x) safe
