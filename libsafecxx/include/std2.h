@@ -21,6 +21,7 @@
 #include <std2/source_location.h>
 #include <std2/string_constant.h>
 #include <std2/string_view.h>
+#include <std2/string.h>
 #include <std2/thread.h>
 #include <std2/tuple.h>
 #include <std2/unique_ptr.h>

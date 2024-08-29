@@ -282,6 +282,8 @@ private:
   }
 
 public:
+  struct no_utf_check {};
+
   basic_string_view() = delete;
 
   basic_string_view(string_constant<value_type> sc) noexcept safe
@@ -296,12 +298,21 @@ public:
     if (pos != (*str)~length) panic_impl("invalid utf detected");
   }
 
+  basic_string_view(const [value_type; dyn]^/a str, no_utf_check) noexcept
+    : p_(str)
+  {
+  }
+
   value_type const* data(self) noexcept safe {
     return (*self.p_)~as_pointer;
   }
 
   size_type size(self) noexcept safe {
       return (*self.p_)~length;
+  }
+
+  bool empty(self) noexcept safe {
+    return (self.size() == 0);
   }
 
   bool operator==(self, basic_string_view rhs) noexcept safe {
