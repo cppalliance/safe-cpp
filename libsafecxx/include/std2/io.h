@@ -16,7 +16,7 @@ namespace std2
 
 inline void println(string_view sv) safe
 {
-  unsafe { printf("%s\n", sv.data()); }
+  unsafe { printf("%.*s\n", sv.size(), sv.data()); }
 }
 
 inline void println(const std::string^ s) safe {
