@@ -12,8 +12,14 @@
 namespace std2
 {
 
+// Interior mutability is only well-defined through `&UnsafeCell<T>`
+// so leaking a `&T` from anywhere in the `Cell` here is an inherent
+// soundness hole, which includes calling user-defined copy constructors
+// The library can only interact with the underlying T via compiler-generated
+// means such as trivial relocation.
+
 template<class T+>
-class cell
+class [[unsafe::sync(false)]] cell
 {
   unsafe_cell<T> t_;
 
@@ -25,12 +31,20 @@ class cell
   {
   }
 
-  T get(self^) safe {
+  T get(self const^) safe {
+    // rely on implicit copy operator erroring out for types with non-trivial
+    // destructors or types that have user-defined copy constructors
     unsafe { return *self->t_.get(); }
   }
 
-  void set(self^, T t) safe {
-    unsafe { ^*self->t_.get() = rel t; }
+  void set(self const^, T t) safe {
+    unsafe { *self->t_.get() = rel t; }
+  }
+
+  T replace(self const^, T t) safe {
+    unsafe { auto old = __rel_read(self->t_.get()); }
+    unsafe { __rel_write(self->t_.get(), rel t); }
+    return old;
   }
 };
 
