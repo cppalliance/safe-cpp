@@ -109,7 +109,7 @@ void ref_cell_constructor() safe
     };
   }
 
-  auto^ p = mut rc.borrow();
+  auto^ p = mut rc.get_mut();
   assert_eq(*p, 1337);
 }
 

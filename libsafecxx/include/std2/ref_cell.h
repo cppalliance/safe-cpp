@@ -8,6 +8,7 @@
 
 #include <std2/cell.h>
 #include <std2/optional.h>
+#include <std2/panic.h>
 #include <std2/utility.h>
 
 #include <cstdint>
@@ -102,7 +103,7 @@ class ref_cell
     return .some(ref_mut{self->t_.get(), self->borrow_count_});
   }
 
-  T^ borrow(self^) noexcept safe {
+  T^ get_mut(self^) noexcept safe {
     unsafe { return ^*self->t_.get(); }
   }
 };
