@@ -19,6 +19,11 @@ inline void println(string_view sv) safe
   unsafe { printf("%.*s\n", sv.size(), sv.data()); }
 }
 
+inline void println(string_constant<char> sc) safe
+{
+  println(sc.text());
+}
+
 inline void println(const std::string^ s) safe {
   unsafe { printf("%s\n", s->c_str()); }
 }
