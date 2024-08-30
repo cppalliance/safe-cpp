@@ -97,7 +97,13 @@ using u16str = basic_string_view<char16_t>;
 using u32str = basic_string_view<char32_t>;
 
 template<class CharT>
-class basic_string_view/(a)
+class 
+  __attribute__((preferred_name(string_view)))
+  __attribute__((preferred_name(wstring_view)))
+  __attribute__((preferred_name(u8string_view)))
+  __attribute__((preferred_name(u16string_view)))
+  __attribute__((preferred_name(u32string_view)))
+basic_string_view/(a)
 {
 public:
   using value_type             = CharT;
