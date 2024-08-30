@@ -25,6 +25,7 @@
 #include <std2/string.h>
 #include <std2/thread.h>
 #include <std2/tuple.h>
+#include <std2/type_traits.h>
 #include <std2/unique_ptr.h>
 #include <std2/utility.h>
 #include <std2/vector.h>
