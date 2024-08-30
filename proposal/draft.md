@@ -274,10 +274,10 @@ void print(Value val) safe {
   match(val) {
     // Type safety bugs are impossible inside the pattern match.
     // The alternatives listed must be exhaustive.
-    .i32(i32) => unsafe { mut std::cout<< i32<< "\n" };
-    .f32(f32) => unsafe { mut std::cout<< f32<< "\n" };
-    .f64(f64) => unsafe { mut std::cout<< f64<< "\n" };
-    .str(str) => unsafe { mut std::cout<< str<< "\n" };
+    .i32(i32) => println(i32);
+    .f32(f32) => println(f32);
+    .f64(f64) => println(f64);
+    .str(str) => println(str);
   };
 }
 
@@ -581,7 +581,7 @@ Garbage collection requires storing objects on the _heap_. But C++ is about _man
 
 ### Use-after-free
 
-`std::string_view`[^string_view] was added to C++ as a safer alternatives to passing character pointers around. Unfortunately, it's so safe unsafe that its reported to _encourage_ use-after-free bugs.[^string-view-use-after-free]
+`std::string_view`[^string_view] was added to C++ as a safer alternatives to passing character pointers around. Unfortunately, it's rvalue reference constructorn is so dangerously designed that its reported to _encourage_ use-after-free bugs.[^string-view-use-after-free]
 
 ```cpp
 #include <iostream>
@@ -628,7 +628,7 @@ loan created at str0.cxx:6:28
                            ^
 ```
 
-The compiler flags the use of the dangling view, `println(sv)`. It marks the invalidating action, the drop of the temporary string. And it indicates where the loan was created, which is the conversion to `string_view` right after the string concatenation. See the [error reporting](lifetime.md#error-reporting) section for details on lifetime diagnostics.
+The compiler flags the use of the dangling view, `println(sv)`. It marks the invalidating action, the drop of the temporary string. And it indicates where the loan was created, which is the conversion to `string_view` right after the string concatenation. See the [error reporting](#lifetime-error-reporting) section for details on lifetime diagnostics.
 
 [^string_view]: [std::basic_string_view](https://en.cppreference.com/w/cpp/string/basic_string_view)
 
@@ -637,6 +637,8 @@ The compiler flags the use of the dangling view, `println(sv)`. It marks the inv
 [^string_conversion]: [std::string::operator string_view](https://en.cppreference.com/w/cpp/string/basic_string/operator_basic_string_view)
 
 ### Iterator invalidation
+
+Modern C++ design is sometimes more prone to memory safety bugs than the C-with-classes style of programming it is intended to replace. 
 
 ### Scope and liveness
 
@@ -695,7 +697,7 @@ It's not enough to compute liveness of references. To determine the invalidating
 
 ### Systems of constraints
 
-NLL borrow checking,[^borrow-checking] is Rust's intentive method for testing invalidating actions against live borrows in the presence of control flow, re-assignments and function calls. The algorithm involves generating a system of lifetime constraints which map borrow variables back to _loans_, growing points until all the constraints are satisfied, and then testing invalidating actions against all loans in scope.
+NLL borrow checking[^borrow-checking] is Rust's innovative method for testing invalidating actions against live borrows in the presence of control flow. The algorithm involves generating a system of lifetime constraints which map borrow variables back to _loans_, growing points until all the constraints are satisfied, and then testing invalidating actions against all loans in scope.
 
 A loan is the action that forms a borrow to a place. In the example above, there are two loans: `^x` and `^y`. Solving the constraint equation extends the liveness of loans `^x` for and `^y` up until the point of the last dereferences to them. When `y` goes out of scope, it doesn't invalidate the loan `^x`, because that's not live. But it does invalidate the loan `^y`, which is lifetime extended by the final `f(*ref)` expression.
 
@@ -1074,11 +1076,15 @@ See the [Unresolved or unimplemented design issues section](#unresolved-or-unimp
 
 ### Lifetime normalization
 
+
+
 ## Explicit mutation
 
 Reference binding convention is important in the context of borrow checking. Const and non-const borrows differ by more than just constness. By the law of exclusivity, users are allowed multiple live shared borrows, but only one live mutable borrow. C++'s convention of always preferring non-const references would tie the borrow checker into knots, as mutable borrows don't permit aliasing. This is one reason why there's no way to borrow check existing C++ code: the standard conversion contirbutes to mutable aliasing.
 
-Rather than binding the mutable overload of functions by default, we prefer binding the const overloads. Shared borrows are less likely to bring borrow checker errors. To improve reference binding precision, the relocation object model takes a new approach to references. Unlike in ISO C++, expressions can actually have reference types. Naming a reference object yields an lvalue expression with reference type, rather than implicitly dereferencing the reference and giving you an lvalue to the pointed-at thing. The standard conversion will bind const borrows and const lvalue references to lvalues of the same type. But standard conversions won't bind mutable borrows and mutable lvalue references. Those require an opt-in.
+Unlike in ISO C++, expressions can have reference types. Naming a reference object yields an lvalue expression with reference type, rather than implicitly dereferencing the reference and giving you an lvalue to the pointed-at thing.
+
+Rather than binding the mutable overload of functions by default, Safe C++ prefers binding  const overloads. Shared borrows are less likely to bring borrow checker errors. To improve reference binding precision, the relocation object model takes a new approach to references. The standard conversion will bind const borrows and const lvalue references to lvalues of the same type. But standard conversions won't bind mutable borrows and mutable lvalue references. Those require an opt-in.
 
 ```cpp
 struct Obj {
@@ -1430,13 +1436,15 @@ The assignment `t3.0.0.1` lowers to `_4.0.0.1`. This is a place name of a local 
 
 ### Arrays and slices
 
+New array type [T; N] won't decay to T* during argument deduction.
+
 ### `operator rel`
 
 Safe C++ introduces a new special member function, the _relocation constructor_, written `operator rel(T)`, for all class types. Using the _rel-expression_ invokes the relocation constructor. The relocation constructor exists to bridge C++11's move semantics model with Safe C++'s relocation model. Relocation constructors can be:
 
 * User defined - manually relocate the operand into the new object. This can be used for fixing internal addresses, like those used to implement sentinels in standard linked lists and maps.
 * `= trivial` - Trivially copyable types are already trivially relocatable. But other types may be trivially relocatable as well, like `box`, `unique_ptr`, `rc`, `arc` and `shared_ptr`.
-* `= default` - A defaulted or implicitly declared relocation constructor is implemented by the compiler with one of three strategies: trivial types are trivially relocated; aggregate types use member-wise relocation; and other types are move-constructed into the new data, and the old operand is destroyed.
+* `= default` - A defaulted or implicitly declared relocation constructor is implemented by the compiler with one of three strategies: types with safe destructors are trivially relocated; aggregate types use member-wise relocation; and other types are move-constructed into the new data, and the old operand is destroyed.
 * `= delete` - A deleted relocation constructor _pins_ a type. Objects of that type can't be relocated. A `rel-expression` is a SFINAE failure. Rust uses its `std::Pin`[^pin] pin type as a container for structs with with address-sensitive states. That's an option with Safe C++'s deleted relocation constructors. Or, users can write user-defined relocation constructors to update address-sensitive states.
 
 Relocation constructors are always noexcept. It's used to implement the drop-and-replace semantics of assignment expressions. If a relocation constructor was throwing, it might leave objects involved in drop-and-replace in illegal uninitialized states. An uncaught exception in a user-defined or defaulted relocation constructor will panic and terminate.
@@ -1498,7 +1506,7 @@ The Ante language[^ante] experiments with separate mutable (exclusive) and mutab
 [^rwlock]: [RwLock](https://doc.rust-lang.org/std/sync/struct.RwLock.html)
 [^ante]: [Ante Shared Interior Mutability](https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability)
 
-## Thread safety
+### Thread safety
 
 One of the more compelling usages of interior mutability is making data accesses thread-safe. In C++, many production codebases will couple an `std::mutex` alongside the data it's guarding in a wrapper struct. This provides a strong and safe guarantee but is not offered by default and its use is not guaranteed.
 
@@ -1550,6 +1558,12 @@ t rel.join();
 
 Making sound thread-safe code necessitates interior mutability, which requires a compiler primitive to make the `const_cast` valid. The library is manually upholding invariants around exlusivity via unsafe constructs but what results is a sound interface that is impossible to misuse.
 
+
+## Types with compiler magic
+
+std2::initializer_list
+std2::string_constant
+
 ## Unresolved or unimplemented design issues
 
 ### _expression-outlives-constraint_
@@ -1571,9 +1585,13 @@ There's a unique tooling aspect to this. To evaluate the implied constraints of 
 
 ### Function parameter ownership
 
+* If the type has a non-trivial destructor, the caller calls that destructor after control returns to it (including when the caller throws an exception).[^itanium-abi]
+
+[^itanium-abi]: [Itanium C++ ABI: Non-Trivial Parameters](https://itanium-cxx-abi.github.io/cxx-abi/abi.html#non-trivial-parameters)
+
 ### Relocation out of references
 
-Niko Matsakis writes about a significant potential improvement in the ownership model.[^unwinding-puts-limits-on-the-borrow-checker] You can only relocate out of _owned places_, and owned places are subobjects of local variables. Dereferences of borrows are owned places. But there are situations where it would be sound to relocate out of a reference, as long as you relocate back into it before the function returns.
+You can only relocate out of _owned places_, and owned places are subobjects of local variables. Dereferences of borrows are not owned places, so you can't relocate out of them. Niko Matsakis writes about a significant potential improvement in the ownership model, [^unwinding-puts-limits-on-the-borrow-checker] citing situations where it would be sound to relocate out of a reference, as long as you relocate back into it before the function returns.
 
 ```rust
 fn swap<T>(
@@ -1586,7 +1604,7 @@ fn swap<T>(
 }
 ```
 
-The blog post considers this swap function, which is currently unsupported by Rust.
+The blog post considers the above swap function, which transliterates to the Safe C++ code below.
 
 ```cpp
 template<typename T>
@@ -1597,20 +1615,23 @@ void swap(T^ a, T^ b) noexcept safe {
 }
 ```
 
-It's equivalent to this function, written in Safe C++'s syntax. This code doesn't compile under Rust or Safe C++ because the operand of the relocation is a dereference, which is not an _owned place_. This defeats the abilities of initialization analysis.
+This code doesn't compile under Rust or Safe C++ because the operand of the relocation is a projection involving a reference, which is not an _owned place_. This defeats the abilities of initialization analysis.
 
 In Rust, every function call is potentially throwing, including destructors. In some builds, panics are throwing, so array subscripts can exit a function on the cleanup path. In debug builds, integer arithmetic may panic to protect against overflow. There are many non-return paths out functions, and unlike C++, it lacks a _noexcept-specifier_ to disable cleanup. Matsakis suggests that relocating out of references is not implemented because its use would be limited by the many unwind paths out of a function, making it rather uneconomical to support.
 
-It's already possible to write C++ code that is less burdened by cleanup paths than Rust. If Safe C++ adopted the `throw()` specifier from the Static Exception Specification,[^static-exception-specifications] we could statically verify that functions don't have internal cleanup paths. Reducing cleanup paths extends the interval between relocating out of a reference and restoring an object there, helping justify the cost of more complex initialization analysis.
+It's already possible to write C++ code that is less burdened by cleanup paths than Rust. If Safe C++ adopted the `throw()` specifier from the Static Exception Specification,[^static-exception-specifications] we could statically verify that functions don't have internal cleanup paths. Reducing cleanup paths extends the supported interval between relocating out of a reference and restoring an object there, helping justify the cost of more complex initialization analysis.
 
-I feel this relocation feature is some of the best low-hanging fruit for improving the safety experience in Safe C++. 
+I feel this relocation feature is some of the best low-hanging fruit for improving the safety experience in Safe C++.
 
 [^unwinding-puts-limits-on-the-borrow-checker]: [Unwinding puts limits on the borrow checker
 ](https://smallcultfollowing.com/babysteps/blog/2024/05/02/unwind-considered-harmful/#unwinding-puts-limits-on-the-borrow-checker)
 
 [^static-exception-specification]: [P3166R0: Static Exception Specifications](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3166r0.html)
 
+
+
 ## Implementation guidance
 
 This section is intended for developers who are toolchain curious. It explains how a vendor may approaching integrating the Safe C++ extension into their compiler.
 
+## Roadmap
