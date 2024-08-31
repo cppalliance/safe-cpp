@@ -23,7 +23,7 @@ class thread
 
   template<class F, class ...Args>
   static
-  void call((F, (Args...,))* p_tup) safe
+  void call/(where F:static, Args...:static)((F, (Args...,))* p_tup) safe
   {
     unsafe { box<(F, (Args...,))> p = p_tup; }
 

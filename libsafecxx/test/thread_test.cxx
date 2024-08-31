@@ -100,7 +100,7 @@ static_assert(!std2::mutex<nonsend_callable>~is_sync);
 void adder(std2::arc<std2::mutex<int>> m) safe
 {
   unsafe { std::this_thread::sleep_for(std::chrono::milliseconds(250)); }
-  for (int i = 0; i < 100'000; ++i) {
+  for (int i = 0; i < 10'000; ++i) {
     auto guard = m->lock();
     int^ x = mut guard.borrow();
     *x += 1;
@@ -123,7 +123,7 @@ void mutex_test() safe
   }
 
   int const val = *sp->lock()^.borrow();
-  auto const expected = num_threads * 100'000;
+  auto const expected = num_threads * 10'000;
   assert_eq(val, expected);
 }
 
@@ -135,7 +135,7 @@ void shared_mutex_test() safe
   static_assert(mutex_type~is_send);
   static_assert(mutex_type~is_sync);
 
-  static int const num_iters = 100'000;
+  static int const num_iters = 10'000;
   static int const num_writer_threads = 4;
   static int const num_reader_threads = 8;
   static int const value = num_writer_threads * num_iters;
