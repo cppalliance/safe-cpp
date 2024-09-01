@@ -1066,8 +1066,8 @@ Deciding when to use the `typename T+` parameter kind on class templates will ho
 
 The Safe C++ design isn't complete yet. We're still deliberating on how to treat template parameters of other kinds of templates:
 
+* Variable templates - Support partial and explicit specialization, so this will need to follow the class template convention.
 * Function templates
-* Variable templates
 * Alias templates
 * Concepts
 * Interface templates
@@ -1076,7 +1076,24 @@ See the [Unresolved or unimplemented design issues section](#unresolved-or-unimp
 
 ### Lifetime normalization
 
+Lifetime normalization conditions the lifetime parameters and lifetime arguments on function declarations and function types. After normalization, function parameters and return types have fully bound lifetimes. Their lifetime arguments always refer to lifetime parameters on the function, and not to those on any other scope, such as the containing class. 
 
+_Lifetime elision_ assigns lifetime arguments to function parameters and return types with unbound lifetimes.
+* If the type with unbound lifetimes is the enclosing class of a member function, the lifetime parameters of the enclosing class are used for elision.
+* If a function parameter has unbound lifetimes, _elision lifetime parameters_ are invented to fully bind the function parameter.
+* If a return type has unbound lifetimes and there is a `self` parameter, it is assigned the lifetime argument on the `self` parameter, if there is just one, or elision is ill-formed.
+* If a return type has unbound lifetimes and there is one lifetime parameter for the whole function, the return type is assigned that, or elision is ill-formed.
+
+In addition to elision, lifetime normalization substitutes type parameters in _outlives-constraints_ with all corresponding lifetime arguments of the template arguments.  
+
+```cpp
+template<typename T1, typename T2, typename T3>
+void func/(where T1:static, T2:T3)(T1 x, T2 y, T3 Z);
+
+&func<int^, const string_view^, double>;
+```
+
+During normalization of this function specialization, the _outlives-constraint_ is rebuilt with the substituted lifetime arguments on its type parameters. The template lifetime parameter on `int^` outlives `/static`. All lifetime parameters bound on `const string_view^` (one for the outer borrow, one on the string_view) outlive all lifetime parameters bound on the `double`. But `double` isn't a lifetime binder. As it contributes no lifetime parameters, so the `T2:T3` type constraint is dropped.
 
 ## Explicit mutation
 
