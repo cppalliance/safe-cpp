@@ -958,6 +958,54 @@ Lifetime parameters and _where-clauses_ are a facility for instructing the borro
 
 ### Free regions
 
+### Destructors and phantom data
+
+Safe C++ includes an operator to call the destructor on local objects.
+
+* `drp x` - call the destructor on an object and set as uninitialized.
+
+Local objects start off uninitialized. They're initialized when first assigned to. Then they're uninitialized again when relocated from. If you want to _destruct_ an object prior to it going out of scope, use _drp-expression_. Unlike Rust's `drop` API,[^drop] this works even on objects that are pinned or are only potentially initialized (was uninitialized on some control flow paths) or partially initialized (has some uninitialized subobjects).
+
+```rs
+fn main() {
+  let mut v = Vec::<&i32>::new();
+  {
+    let x = 101;
+    v.push(&x);
+  }
+
+  // Error: `x` does not live long enough
+  drop(v);
+}
+```
+
+Rust's `drop` API also performs a non-drop-use of all lifetimes on the operand. A vector with dangling lifetimes would pass the normal drop check, but when passed to an explicit `drop` call leaves the program ill-formed. 
+
+```cpp
+#feature on safety
+#include <std2.h>
+
+int main() safe {
+  std2::vector<const int^> vec { };
+  {
+    int x = 101;
+    mut vec.push_back(x);
+  }
+
+  // Okay. vec has dangling borrows, but passes the drop check.
+  drp vec;
+}
+```
+
+The _drp-expression_ in Safe C++ only perfoms a drop use of the operand's lifetimes. 
+
+TODO: Describe drop check
+
+
+
+
+[^phantom-data]: [PhantomData](https://doc.rust-lang.org/nomicon/phantom-data.html)
+
 ### Lifetime canonicalization
 
 ```cpp
@@ -1324,10 +1372,6 @@ I think implicit relocation is too surprising for C++ users. We're more likely t
 If an object is _trivially copyable_, as all scalars are, then you don't need either of these tokens. The compiler will copy your value. Both _rel-_ and _cpy-expressions_ produce prvalues of the operand's type.
 
 Why do I make both copy and relocation explicit? I want to make it easy for users to choose the more efficient option. If a type is not trivially copyable, you can opt into an expensive copy with _cpy-expression_. This avoids performance bugs, where an object undergoes an expensive copy just because the user didn't know it was there. Or, if you don't want to copy, use _rel-expression_, which is efficient but destroys the old object, without destructing it.
-
-* `drp x` - call the destructor on an object and set as uninitialized.
-
-Local objects start off uninitialized. They're initialized when first assigned to. Then they're uninitialized again when relocated from. If you want to _destruct_ an object prior to it going out of scope, use _drp-expression_. Unlike Rust's `drop` API,[^drop] this works even on objects that are pinned or are only potentially initialized (was uninitialized on some control flow paths) or partially initialized (has some uninitialized subobjects).
 
 Consider a function like `std::unique_ptr::reset`.[^unique_ptr-reset] It destructs the existing object, if one is engaged, and sets the unique_ptr to its null state. But in our safe version, box doesn't have a default state. It doesn't supply the `reset` member function. Instead, users just drop it, running its destructor and leaving it uninitialized.
 
