@@ -997,9 +997,27 @@ int main() safe {
 }
 ```
 
-The _drp-expression_ in Safe C++ only perfoms a drop use of the operand's lifetimes. 
+The _drp-expression_ in Safe C++ only performs a drop use of the operand's lifetimes. The logic for establishing lifetime used on object destruction is part of the _drop check_.
 
-TODO: Describe drop check
+A user-defined destructor uses the lifetimes associated with all class data members. However, container types that store data on heap memory, such as box and vector, don't store their data as data members, but instead keep pointers into keep memory. In order to expose data for the drop check, container types must have phantom data[^phantom-data] to declare a sort of phantom data.
+
+```cpp
+template<typename T+>
+struct Vec {
+  ~Vec() safe;
+
+  // Pointer to the data. Since T* has a trivial destructor, template
+  // lifetime parameters of T are not used by Vec's dtor.
+  T* _data;
+
+  // For the purpose of drop check, declare a member of type T.
+  // This is a phantom data member that does not effect data
+  // layout or initialization. 
+  T __phantom_data;
+};
+```  
+
+Declaring a `__phantom_data` member informs the compiler that the class may destroy objects of type `T` inside the user-defined destructor. The drop check expects user-defined destructors to be maximally permissive with its data members, and that it can use any of the class's lifetime parameters. In order to permit _dangling references_ in containers, destructors should opt into the `[[unsafe::drop_only(T)]]` attribute. This is available in Rust as the `#[may_dangle]` attribute.[^may-dangle]
 
 ```cpp
 #feature on safety
@@ -1008,7 +1026,7 @@ template<typename T+, bool DropOnly>
 struct Vec {
   Vec() safe { }
 
-  [[safety::drop_only(T)]] ~Vec() safe requires(DropOnly);
+  [[unsafe::drop_only(T)]] ~Vec() safe requires(DropOnly);
                            ~Vec() safe requires(!DropOnly);
 
   void push(self^, T rhs) safe;
@@ -1056,11 +1074,21 @@ safety: during safety checking of void test<int, false>() safe
                    ^
 ```
 
+This example shows a basic Vec implementation. A `T __phantom_data` member indicates that `T` will be destroyed as part of the user-defined destructor. The user-defined destructor is conditionally declared with the `[[unsafe::drop_only(T)]]` attribute, which means that the destructor body will only use T's lifetime parameters as part of a drop, and not any other use.
 
+The point of this mechanism is to make drop order less important by permitting the drop of containers that hold dangling references. Declare a Vec specialized on a shared borrow to int. Push a shared borrow to a local integer declaration, then make the local integer go out of scope. The Vec now holds a dangling borrow. This should compile, as long as we don't use the template lifetime parameter associated with the borrow. That would produce a use-after-free borrow checker error.
+
+When `DropOnly` is true, the destructor overload with the `[[unsafe::drop_only]]` attribute is instantiated. Calling the destructor from `test` doesn't necessarily use the template lifetime parameters for the `const int^` template argument. Instead, the drop check considers the destructor for the `const int^` type. In that case it's trivial destruction and the lifetime parameter is not used. This means the _drp-expression_ can destroy the Vec without a borrow checker violation. The programmer is making an unsafe promise not to do anything with T's template lifetime parameters other than use it to drop T.
+
+When `DropOnly` is false, the destructor overload without the attribute is instantiated. In this case, the user-defined destructor is assumed to use all of the class's lifetime parameters outside of the drop check. If the Vec held a borrow to out-of-scope data, as it does in this example, loading that data through the borrow would be a use-after-free defect. To prevent this unsound behavior, the compiler uses all the class's lifetime parameters when its user-defined destructor is called. This raises the borrow checker error, indicating that the _drp-expression_ depends on an expired loan on `x`.
+
+The `drop_only` attribute is currently unsafe because it's incumbent on the user to implement a destructor that doesn't use associated lifetime parameters outside of invoking their destructors. It is planned to make this attribute safe. The compiler should be able to monitor the user-defined destructor for use of lifetimes associated with T outside of drops and raise borrow checker errors.
 
 [^drop]: [`drop` in `std::ops`](https://doc.rust-lang.org/std/ops/trait.Drop.html)
 
 [^phantom-data]: [PhantomData](https://doc.rust-lang.org/nomicon/phantom-data.html)
+
+[^may-dangle]: [dropck_eyepatch](https://rust-lang.github.io/rfcs/1327-dropck-param-eyepatch.html)
 
 ### Lifetime canonicalization
 
