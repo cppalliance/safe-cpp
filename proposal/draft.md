@@ -966,7 +966,7 @@ Safe C++ includes an operator to call the destructor on local objects.
 
 Local objects start off uninitialized. They're initialized when first assigned to. Then they're uninitialized again when relocated from. If you want to _destruct_ an object prior to it going out of scope, use _drp-expression_. Unlike Rust's `drop` API,[^drop] this works even on objects that are pinned or are only potentially initialized (was uninitialized on some control flow paths) or partially initialized (has some uninitialized subobjects).
 
-```rs
+```rust
 fn main() {
   let mut v = Vec::<&i32>::new();
   {
@@ -1001,8 +1001,64 @@ The _drp-expression_ in Safe C++ only perfoms a drop use of the operand's lifeti
 
 TODO: Describe drop check
 
+```cpp
+#feature on safety
+
+template<typename T+, bool DropOnly>
+struct Vec {
+  Vec() safe { }
+
+  [[safety::drop_only(T)]] ~Vec() safe requires(DropOnly);
+                           ~Vec() safe requires(!DropOnly);
+
+  void push(self^, T rhs) safe;
+
+  // T is a phantom data member of Vec. The non-trivial dtor will
+  // use the lifetimes of T, raising a borrow checker error if 
+  // T is not drop_only.
+  T __phantom_data;
+};
+
+template<typename T, bool DropOnly>
+void test() safe {
+  Vec<const T^, DropOnly> vec { };
+  {
+    T x = 101;
+    mut vec.push(^x);
+  }
+
+  // Use of vec is ill-formed due to drop of x above.
+  // int y = 102;
+  // mut vec.push(^y);
+
+  // Should be ill-formed due to drop check.
+  drp vec;
+}
+
+int main() safe {
+  test<int, true>();
+  test<int, false>();
+}
+```
+```
+$ circle drop.cxx
+safety: during safety checking of void test<int, false>() safe
+  borrow checking: drop.cxx:31:3
+    drp vec; 
+    ^
+  use of vec depends on expired loan
+  drop of x between its mutable borrow and its use
+  x declared at drop.cxx:22:7
+      T x = 101; 
+        ^
+  loan created at drop.cxx:23:18
+      mut vec.push(^x); 
+                   ^
+```
 
 
+
+[^drop]: [`drop` in `std::ops`](https://doc.rust-lang.org/std/ops/trait.Drop.html)
 
 [^phantom-data]: [PhantomData](https://doc.rust-lang.org/nomicon/phantom-data.html)
 
@@ -1305,14 +1361,11 @@ A core enabling feature of Safe C++ is the new object model. It supports relocat
 
 ```cpp
 #feature on safety
-#include <std2/box.h>
-#include <std2/string.h>
-
-using namespace std2;
+#include <std2.h>
 
 int main() safe {
   // No default construct. p is uninitialized.
-  box<string> p;
+  std2::box<string> p;
 
   // Ill-formed: p is uninitialized.
   println(*p);
@@ -1330,8 +1383,7 @@ The `std2::box` has no default state. It's safe against [null pointer type safet
 
 ```cpp
 #feature on safety
-#include <std2/box.h>
-#include <std2/string.h>
+#include <std2.h>
 
 using namespace std2;
 
@@ -1340,7 +1392,7 @@ void f(box<string> p) safe { }
 int main() safe {
   // No default construct. p is uninitialized.
   box<string> p;
-  p = box<string>::make("Hello");
+  p = box<string>("Hello");
   println(*p);
 
   // Relocate to another function.
@@ -1373,9 +1425,11 @@ If an object is _trivially copyable_, as all scalars are, then you don't need ei
 
 Why do I make both copy and relocation explicit? I want to make it easy for users to choose the more efficient option. If a type is not trivially copyable, you can opt into an expensive copy with _cpy-expression_. This avoids performance bugs, where an object undergoes an expensive copy just because the user didn't know it was there. Or, if you don't want to copy, use _rel-expression_, which is efficient but destroys the old object, without destructing it.
 
+The relocation object model also supports _drp-expression_, noted by the `drp` token, which calls the destructor on an object and leaves it uninitialized. See the [Destructors and phantom data](#destructors-and-phantom-data) for details.
+
 Consider a function like `std::unique_ptr::reset`.[^unique_ptr-reset] It destructs the existing object, if one is engaged, and sets the unique_ptr to its null state. But in our safe version, box doesn't have a default state. It doesn't supply the `reset` member function. Instead, users just drop it, running its destructor and leaving it uninitialized.
 
-You've noticed the nonsense spellings for these keywords. Why not call them `move`, `copy` and `drop`? I wanted to avoid shadowing those common identifiers and improve results when searching code or the web.
+You've noticed the nonsense spellings for these keywords. Why not call them `move`, `copy` and `drop`? Alternative token spellings avoids shadowing these common identifiers and improves results when searching code or the web.
 
 [^copy-trait]: [`Copy` in `std::marker`](https://doc.rust-lang.org/std/marker/trait.Copy.html)
 
@@ -1383,10 +1437,7 @@ You've noticed the nonsense spellings for these keywords. Why not call them `mov
 
 [^pin]: [Module `std::pin`](https://doc.rust-lang.org/std/pin/index.html)
 
-[^drop]: [`drop` in `std::ops`](https://doc.rust-lang.org/std/ops/trait.Drop.html)
-
 [^unique_ptr-reset]: [`std::unique_ptr::reset`](https://en.cppreference.com/w/cpp/memory/unique_ptr/reset)
-
 
 ### Tuples
 
@@ -1689,10 +1740,6 @@ I feel this relocation feature is some of the best low-hanging fruit for improvi
 
 [^static-exception-specification]: [P3166R0: Static Exception Specifications](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3166r0.html)
 
-
-
 ## Implementation guidance
 
-This section is intended for developers who are toolchain curious. It explains how a vendor may approaching integrating the Safe C++ extension into their compiler.
-
-## Roadmap
+Compiler engineers 
