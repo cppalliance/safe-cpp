@@ -67,8 +67,7 @@ What are the properties we're trying to deliver with Safe C++?
 
 ```cpp
 #feature on safety
-#include <std2/vector.h>
-#include <cstdio>
+#include <std2.h>
 
 int main() safe {
   std2::vector<int> vec { 11, 15, 20 };
@@ -90,7 +89,7 @@ Consider this demonstration of Safe C++ that catches iterator invalidation, a ki
 
 Line 1: `#feature on safety` - Turn on the new safety-related keywords within this file. Other files in your translation unit are unaffected. This is how Safe C++ avoids breaking existing code--everything is opt-in, including the new keywords and syntax. The safety feature changes the object model for function definitions, enabling object relocation, partial and deferred initialization. It lowers function definitions to mid-level intermediate representation (MIR),[^mir] on which borrow checking is performed to flag potential use-after-free bugs on checked references.
 
-Line 2: `#include <std2/vector.h>` - Include the new safe containers and algorithms. Safety hardening is about reducing your exposure to unsafe APIs. The current Standard Library is full of unsafe APIs. The new Standard Library in namespace `std2` will provide the same basic functionality, but with containers that are lifetime-aware and type safe.
+Line 2: `#include <std2.h>` - Include the new safe containers and algorithms. Safety hardening is about reducing your exposure to unsafe APIs. The current Standard Library is full of unsafe APIs. The new Standard Library in namespace `std2` will provide the same basic functionality, but with containers that are lifetime-aware and type safe.
 
 Line 4: `int main() safe` - The new _safe-specifier_ is part of a function's type, just like _noexcept-specifier_. To callers, the function is marked as safe, so that it can be called from a safe context. `main`'s definition starts in a safe context, so unsafe operations like pointer dereferences, and calling unsafe functions, is not allowed. Rust's functions are safe by default. C++'s are unsafe by default. But that's now just a syntax difference. Once you enter a safe context in C++ by using the _safe-specifier_, you're backed by the same rigorous safety guarantees that Rust provides.
 
@@ -108,7 +107,7 @@ This sample is only a few lines, but it introduces several new mechanisms and ty
 
 [^borrow-checking]: [The Rust RFC Book - Non-lexical lifetimes](https://rust-lang.github.io/rfcs/2094-nll.html)
 
-[^mir]: [The Rust RFC Book - Mid-level IR](https://rust-lang.github.io/rfcs/1211-mir.html)
+[^mir]: [The MIR (Mid-level IR)](https://rustc-dev-guide.rust-lang.org/mir/index.html)
 
 [^init-list]: [std::initializer_list](https://en.cppreference.com/w/cpp/utility/initializer_list)
 
@@ -174,7 +173,7 @@ As Hoare observes, the problem was conflating two different things, a pointer to
 
 How do you move objects around in C++? Use `std::move` to select the move constructor. That moves data out of the old object, leaving it in a default state. For smart pointers, that's the null state. If `unique_ptr` didn't have a null state, it couldn't be moved in C++.
 
-Addressing the null type safety problem means entails overhauling the object model. Safe C++ features a new kind of move: [_relocation_](type.md#relocation-object-model), also called _destructive move_. Unless explicitly initialized, objects start out _uninitialized_. They can't be used in this state. When you assign to an object, it becomes initialized. When you relocate from an object, it's back to being uninitialized. If you relocate from an object inside control flow, it becomes _potentially uninitialized_, and its destructor is conditionally executed after reading an automatically-generated drop flag.
+Addressing the null type safety problem means entails overhauling the object model. Safe C++ features a new kind of move: [_relocation_](type.md#relocation-object-model), also called _destructive move_. Unless explicitly initialized, objects start out _uninitialized_. They can't be used in this state. When you assign to an object, it becomes initialized. When you relocate from an object, it's value is moved and it's reset to uninitialized. If you relocate from an object inside control flow, it becomes _potentially uninitialized_, and its destructor is conditionally executed after reading a compiler-generated drop flag.
 
 ```cpp
 int main() {
@@ -185,7 +184,7 @@ int main() {
   int x = *p;
 
   // p is definitely initialized.
-  p = std2::box<int>::make(5);
+  p = std2::box<int>(5);
 
   // Ok.
   int y = *p;
@@ -259,8 +258,7 @@ C++'s sum type support is built on top of unions. Unions are unsafe. Naming a un
 
 ```cpp
 #feature on safety
-#include <iostream>
-#include <std2/string>
+#include <std2.h>
 
 // A discriminated union that's impossible to misuse.
 choice Value {
@@ -608,7 +606,7 @@ Safe C++ allows us to author lifetime-aware `string_view` types that provide mem
 
 ```cpp
 #feature on safety
-#include <std2/string.h>
+#include <std2.h>
 
 int main() safe {
   std2::string s = "Hellooooooooooooooo ";
@@ -1129,7 +1127,7 @@ During the type relation pass that generates lifetime constraints for function c
 
 Templates are specially adapted to handle types with lifetime binders. It's important to understand how template lifetime parameters are invented in order to understand how borrow checking fits with C++'s late-checked generics.
 
-Class templates feature a variation on the on the type template parameter: `typename T+` is a lifetime binder parameter. The class template invents an implicit _template lifetime parameter_ for each lifetime binder of the argument's type.
+Class templates feature a variation on the type template parameter: `typename T+` is a lifetime binder parameter. The class template invents an implicit _template lifetime parameter_ for each lifetime binder of the argument's type.
 
 ```cpp
 template<typename T0+, typename T1+>
@@ -1449,9 +1447,9 @@ I think implicit relocation is too surprising for C++ users. We're more likely t
 * `rel x` - relocate `x` into a new value. `x` is set as uninitialized.
 * `cpy x` - copy construct `x` into a new value. `x` remains initialized.
 
-If an object is _trivially copyable_, as all scalars are, then you don't need either of these tokens. The compiler will copy your value. Both _rel-_ and _cpy-expressions_ produce prvalues of the operand's type.
+Why make copy and relocation explicit? In line with C++'s goals of _zero-cost abstractions_, we want to make it easy for users to choose the more efficient option. If a type is not trivially copyable, you can opt into an expensive copy with _cpy-expression_. This avoids performance bugs, where an object undergoes an expensive copy just because the user didn't know it was there. Or, if you don't want to copy, use _rel-expression_, which is efficient but destroys the old object, without destructing it.
 
-Why do I make both copy and relocation explicit? I want to make it easy for users to choose the more efficient option. If a type is not trivially copyable, you can opt into an expensive copy with _cpy-expression_. This avoids performance bugs, where an object undergoes an expensive copy just because the user didn't know it was there. Or, if you don't want to copy, use _rel-expression_, which is efficient but destroys the old object, without destructing it.
+If an object is _trivially copyable_, as all scalar types are, then you don't need either of these tokens. The compiler will copy your value without prompting. 
 
 The relocation object model also supports _drp-expression_, noted by the `drp` token, which calls the destructor on an object and leaves it uninitialized. See the [Destructors and phantom data](#destructors-and-phantom-data) for details.
 
@@ -1770,4 +1768,42 @@ I feel this relocation feature is some of the best low-hanging fruit for improvi
 
 ## Implementation guidance
 
-Compiler engineers 
+The intelligence behind the _ownership and borrowing_ safety model resides in the compiler's middle-end. Lower AST to mid-level IR (MIR), a typed control flow graph which abstracts your program from the complex details of the frontend. I count seven rounds of operations on the MIR in the compiler's middle-end:
+
+1. **Initialization analysis** - Perform forward dataflow analysis on the control flow graph, finding all program points where a place is initialized or uninitialized. This can be computed efficiently with gen-kill analysis,[^gen-kill] in which the gen and kill states within a basic block or computed once and memoized into a pair of bit vectors. An iterative fixed-point solver follows the control flow graph and applies the gen-kill vectors to each basic block. After establishing the initialization for each place, raise errors if any uninitialized, partially initialized or potentially initialized place is used. 
+2. **Live analysis** - Invent new region variables for each lifetime binder on each local variable in the function. Perform reverse dataflow analysis on the control flow graph to find all program points where a region is live or dead. A region is live when the borrow it is bound to may be dereferenced at a subsequent point in the program.
+3. **Variance analysis** - Inter-procedural live analysis solves the _constraint equation_. The constraints go one way: `'R1 : 'R2 @ P3` reads "R1 outlives R2 starting from the point P3." Variance[^variance] relates the lifetime parameterizations of function parameters and return types to these one-way constraints. It's necessary to examine the definitions of classes with lifetime binders, and to recursively examine their data member types, in order to solve for the variance[^taming-the-wildcards] for each function call. Failure to appropriately solve for variance can result in soundness holes, as illustrated by cve-rs[^cve-rs], a practical joke which draws attention to this advanced part of the soundness model by exploiting a bug in rustc's variance analysis to effect undefined behavior.[^cve-rs]
+4. **Type relation** - Emit lifetime constraints to relate assignments from one object with a region variable to another object with a region variable. The variance of lifetime parameters determines the directionality of lifetime constraints. 
+5. **Solve the constraint equation** - Iteratively grow region variables until all lifetime constraints emitted during type relation are satisfied. We now have _inter-procedural live analysis_: we know the full set of live borrows, _even through function calls_. 
+6. **Borrow checking** - Visit all instructions in the control flow graph. For all _loans in scope_ (i.e. the set of loans live at each program point) test for invalidating actions.[^how-the-borrow-check-works] If there's a read or write on an object with a mutable borrow in scope, or a write to an object with a shared borrow in scope, that violates exclusivity, and a borrowck errors is raised. The borrow checker also detects invalid end points in free region variables. 
+7. **Drop elaboration** - The relocation object model may leave objects uninitialized, partially initialized or potentially initialized at the point where they go out of scope. Drop elaboration erases drops on uninitialized places, replaces drops on partially initialized places with drops only on the initialized subobjects, and gates drops on potentially initialized places behind drop flags. Drop elaboration changes your program, and is the reason why MIR isn't just an analysis representation, but a transformation between the AST and the code generator.
+
+Because of the importance of MIR analysis in enforcing type and lifetime safety, the first thing compiler engineers should focus on when pursuing Safe C++ is to lower their frontend's AST to MIR. Several compiled languages already pass through a mid-level IR: Swift passes through SIL,[^sil] Rust passes through MIR,[^mir] and Circle passes through it's mid-level IR when targeting the relocation object model. There is an effort called ClangIR[^clangir] to lower Clang to an MLIR dialect called CIR, but the project is in an early phase and doesn't have enough coverage to support the language or library features described in this document.
+
+Once there is a MIR representation with adequete coverage, most of the work involves piping information from the frontend down to the MIR. Most conspicuously are lifetime parameters on functions and classes and lifetime arguments on _lifetime binders_. This necessitates a comprehensive change to the compiler's type system. Whereever you had a type, you may now have a _lifetime-qualified type_. The compiler will have to strip the binders off to access the type inside, which would indicate a pointer, reference, struct, primitive, etc. 
+
+Template specialization involves additional deduplication work, where lifetime arguments on template argument types are replaced by proxy lifetime arguments. This helps canonicalize specializations while preserving the relationship established by its lifetime parameterization. Lifetime normalization and canonicalization is also very challenging to implement, partly because there is no precedent for lifetime language entities in C++. This aspect of the frontend work is by far the most difficult programming that will be faced when implementing memory safety for C++. The dataflow analysis by contrast is very easy, mostly because the MIR is such an elegant language for expressing programs at that phase.
+
+Implementing the _safe-specifier_ and _safe-operator_ is easily achieved by duplicating the _noexcept_ code paths. These features are implemented in the frontend with similar means, and their noexceptness/safeness are both conveyed through flags on expressions.
+
+Supporting the `unsafe` type qualifier is more challenging, because the `const` and `volatile` qualifiers offer less guidance. Unlike the cv-qualifiers, the unsafe qualifier is ignored when examining pairs of types for ref-relation, but is attached to prvalues that are the result of lvalue-to-rvalue conversions, pointer adjustments, subobject access and the like.
+
+There are some new syntax requirements. Circle chose the `#feature` directive to accommodate deep changes to the grammar and semantics of the language with a per-file scope, rather than per-translation scope. The directive is implemented by notionally including a mask of active features for each token in the translation unit. During tokenization, identifier tokens check their feature masks for the \[safety\] feature, which enables the promotion of the `safe`, `unsafe`, `cpy`, `rel`, `match`, `mut` and etc tokens as keywords. For the most part the frontend can simply match against these new keywords when parsing the input and building the AST. Certain aspects of the relocation object model, such as drop-and-replace instead of invoking assignment operators, don't involve new keywords and are implemented by testing the object model mode of the current function (which indicates the state of the \[safety\] flag at the start of the function's definition). 
+
+In addition to the core safety features, there are many new types that put a demand on engineering resources: borrows, choice types (and pattern matching to use them), first-class tuples, arrays and slices. Interfaces and interface templates are a new language mechanism that provides customization points to C++, making it much easier to author libraries that are called directly by the language. Examples in Safe C++ are the iterator support for ranged-for statements, send/sync for thread safety and fmt interfaces for f-strings.
+
+All this took about 18 months to design and implement in Circle. I spent six months in advance learning Rust and reading the NLL RFC and Rustnomicon, which are critical resources for understanding the safety model. While Safe C++ is a large extension to the language, the cost of building the new tooling is not steep. If C++ continues to go forward without a memory safety strategy, it's because institutional users don't want one, not because memory-safe tooling is too expensive or difficult to build. 
+
+[^gen-kill]: [Data-flow analysis](https://en.wikipedia.org/wiki/Data-flow_analysis#Bit_vector_problems)
+
+[^variance]: [RFC 0738 - variance](https://rust-lang.github.io/rfcs/0738-variance.html)
+
+[^taming-the-wildcards]: [Taming the Wildcards: Combining Definition- and Use-Site Variance](https://yanniss.github.io/variance-pldi11.pdf)
+
+[^cve-rs]: [cve-rs]: (https://github.com/Speykious/cve-rs)
+
+[^how-the-borrow-check-works]: [How the borrow check works](https://rust-lang.github.io/rfcs/2094-nll.html#layer-5-how-the-borrow-check-works)
+
+[^sil]: [Swift Intermediate Language (SIL)](https://github.com/swiftlang/swift/blob/main/docs/SIL.rst)
+
+[^clangir]: [Upstreaming ClangIR](https://discourse.llvm.org/t/rfc-upstreaming-clangir/76587)
