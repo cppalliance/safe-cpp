@@ -78,4 +78,16 @@ inline void println(long long unsigned int x) safe
   unsafe { printf("%llu\n", x); }
 }
 
+inline void println(float x) safe {
+  unsafe { printf("%f\n", x); }
+}
+
+inline void println(double x) safe {
+  unsafe { printf("%f\n", x); }
+}
+
+inline void println(long double x) safe {
+  unsafe { printf("%Lf\n", x); }
+}
+
 } // namespace std2

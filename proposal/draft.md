@@ -65,6 +65,7 @@ What are the properties we're trying to deliver with Safe C++?
 
 ### A safe program
 
+[**iterator.cxx**](iterator.cxx)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -77,12 +78,20 @@ int main() safe {
     if(x % 2)
       mut vec.push_back(x);
 
-    println(x);
+    std2::println(x);
   }
 }
 ```
 ```txt
-SHOW OUTPUT
+$ circle iterator.cxx -I ../libsafecxx/include/
+safety: during safety checking of int main() safe
+  borrow checking: iterator.cxx:10:11
+        mut vec.push_back(x); 
+            ^
+  mutable borrow of vec between its shared borrow and its use
+  loan created at iterator.cxx:7:15
+    for(int x : vec) { 
+                ^
 ```
 
 Consider this demonstration of Safe C++ that catches iterator invalidation, a kind of use-after-free bug. Let's break it down line by line:
@@ -98,8 +107,6 @@ Line 5: `std2::vector<int> vec { 11, 15, 20 };` - List initialization of a memor
 Line 7: `for(int x : vec)` - Ranged-for on the vector. The standard mechanism[^ranged-for] returns a pair of iterators, which are pointers wrapped in classes. C++ iterators are unsafe. They come in begin and end pairs, and don't share common lifetime parameters, making borrow checking them impractical. The Safe C++ version uses slice iterators, which resemble Rust's `Iterator`.[^rust-iterator] These safe types use lifetime parameters making them robust against iterator invalidation.
 
 Line 10: `mut vec.push_back(x);` - Push a value onto the vector. What's the `mut` doing there? That token establishes a _mutable context_, which permits enables standard conversions from lvalues to mutable borrows and references. When `#feature on safety` is enabled, _all mutations are explicit_. Explicit mutation lends precision when choosing between shared borrows and mutable borrows of an object. Rust doesn't feature function overloading, so it will implicitly borrow (mutably or shared) from the member function's object. C++ of course has function overloading, so we'll need to be explicit in order to get the overload we want.
-
-Line 12: `unsafe { printf("%d\n", x); }` - Call `printf`. It's a very unsafe function. Since we're in a safe context, we have to escape with the `unsafe` keyword. Safe C++ doesn't lock off any parts of the C++ language. You're free to shoot yourself in the foot, provided you sign the waiver in the form of the `unsafe` keyword. `unsafe` means that you swear to follow the preconditions of the function, rather than relying on the compiler to ensure those preconditions for you.
 
 If `main` checks out syntatically, its AST is lowered to MIR, where it is borrow checked. The hidden iterator that powers the ranged-for loop stays initialized during execution of the loop. The `push_back` _invalidates_ that iterator, by mutating a place (the vector) that the iterator has a constraint on. When the value `x` is next loaded out of the iterator, the borrow checker raises an error: `mutable borrow of vec between its shared borrow and its use`. The borrow checker prevents Safe C++ from compiling a program that may have exhibited undefined behavior. This is all done at compile time, with no impact on your program's size or speed.
 
@@ -169,35 +176,52 @@ The "billion-dollar mistake" is a type safety problem. Consider `std::unique_ptr
 
 As Hoare observes, the problem was conflating two different things, a pointer to an object and an empty state, into the same type and giving them the same interface. Smart pointers should only hold valid pointers. If you want to represent an empty state, use some other mechanism that has its own interface. Denying the null state eliminates undefined behavior.
 
-`std2::unique_ptr` has no null state. There's no default constructor. If the object is in scope, you can dereference it without risk of undefined behavior. Why doesn't C++ simply introduce its own fixed `unique_ptr` without a null state? Blame C++11 move semantics.
+`std2::box` has no null state. There's no default constructor. If the object is in scope, you can dereference it without risk of undefined behavior. Why doesn't C++ simply introduce its own fixed `unique_ptr` without a null state? Blame C++11 move semantics.
 
 How do you move objects around in C++? Use `std::move` to select the move constructor. That moves data out of the old object, leaving it in a default state. For smart pointers, that's the null state. If `unique_ptr` didn't have a null state, it couldn't be moved in C++.
 
 Addressing the null type safety problem means entails overhauling the object model. Safe C++ features a new kind of move: [_relocation_](type.md#relocation-object-model), also called _destructive move_. Unless explicitly initialized, objects start out _uninitialized_. They can't be used in this state. When you assign to an object, it becomes initialized. When you relocate from an object, it's value is moved and it's reset to uninitialized. If you relocate from an object inside control flow, it becomes _potentially uninitialized_, and its destructor is conditionally executed after reading a compiler-generated drop flag.
 
+[**box.cxx**](box.cxx)
 ```cpp
-int main() {
+#feature on safety
+#include <std2.h>
+
+int main() safe {
   // p is uninitialized.
-  std2::box<int> p;
+  std2::box<std2::string_view> p;
 
   // Error: p is uninitialized.
-  int x = *p;
+  println(*p);
 
   // p is definitely initialized.
-  p = std2::box<int>(5);
+  p = std2::box<std2::string_view>("Hello Safety");
 
   // Ok.
-  int y = *p;
+  println(*p);
 
   // p is moved into q. Now p is uninitialized again.
   auto q = rel p;
 
   // Error: p is uninitialized.
-  int z = *p;
+  println(*p);
 }
 ```
+```
+$ circle box.cxx -I ../libsafecxx/include/
+safety: during safety checking of int main() safe
+  initialization analysis: box.cxx:9:12
+    println(*p); 
+             ^
+  cannot use uninitialized object p with type std2::box<std2::string_view>
 
-The _rel-expression_ names a local variable object or subobject and relocates that into a new value. The old object becomes uninitialized. Any uses of uninitialized objects generates a compiler error. Using a null `unique_ptr` was undefined behavior. Using an uninitialized one is a compile-time error.
+  initialization analysis: box.cxx:21:12
+    println(*p); 
+             ^
+  cannot use uninitialized object p with type std2::box<std2::string_view>
+```
+
+The _rel-expression_ names a local variable object or subobject and relocates that into a new value. The old object becomes uninitialized. Any uses of uninitialized objects generates a compiler error. Using a null `std::unique_ptr` was undefined behavior. Using an uninitialized `std2::box` is a compile-time error.
 
 We have to reimagine our standard library in the presence of relocation. Most kinds of resource handles include null states. These should all be replaced by safe versions to reduce exposure to unsafe APIs.
 
@@ -230,6 +254,7 @@ If we were to wrap the safe `std2::unique_ptr` in an `std::optional`, it would b
 
 The new `std2::optional` is a _choice type_, a first-class discriminated union, that can only be accessed with _pattern matching_. Pattern matching makes the union variety of type safety violations impossible: we can't access the wrong state of the sum type.
 
+[**union.cxx**](union.cxx)
 ```cpp
 #include <string>
 #include <iostream>
@@ -253,9 +278,15 @@ int main() {
   print(value);
 }
 ```
+```
+$ circle union.cxx
+$ ./union
+Segmentation fault (core dumped)
+```
 
 C++'s sum type support is built on top of unions. Unions are unsafe. Naming a union field is like implicitly using `reintepret_cast` to convert the object's bits into the type of the field. The defects in `std::optional` and `std::expected` are of this nature: the libraries don't guard against access using an invalid type. C++ builds abstractions on top of unions, but they're not _safe_ abstractions.
 
+[**match.cxx**](match.cxx)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -395,6 +426,7 @@ struct foo_t {
 
 You can query the safeness of an expression in an unevaluated context with the _safe-operator_. It's analagous to the existing _noexcept-operator_.[^noexcept-operator] This is very useful when paired with _requires-clause_,[^requires-clause] as it lets you constrain inputs based on the safeness of a callable.
 
+[**safe.cxx**](safe.cxx)
 ```cpp
 #feature on safety
 
@@ -414,6 +446,26 @@ int main() safe {
   spawn(obj, 1);   // OK
   spawn(obj, 1.1); // Ill-formed. Fails requires-clause.
 }
+```
+```
+$ circle safe.cxx
+error: safe.cxx:17:8
+  spawn(obj, 1.1); // Ill-formed. Fails requires-clause. 
+       ^
+error during overload resolution for spawn
+  instantiation: safe.cxx:4:6
+  void spawn(F f, Args... args) safe requires(safe(f(args...))); 
+       ^
+  
+  template arguments: [
+    F = Foo
+      class Foo declared at safe.cxx:6:1
+    Args#0 = double
+  ]
+    constraint: safe.cxx:4:45
+    void spawn(F f, Args... args) safe requires(safe(f(args...))); 
+                                                ^
+    spawn fails requires-clause (safe(f(args...)))
 ```
 
 Consider a `spawn` function that takes a callable `f` and a set of arguments `args`. The function is marked `safe`. Transitively, the callable, when invoked with the provided arguments, must also be a safe operation. But we can't stipulate `safe` on the type `F`, because it may not be a function type. In this example it's a class with two overloaded call operators.
@@ -456,18 +508,23 @@ Expressions carry noexcept and safe information which is outside of the type's e
 
 The answer is that template specialization works on types and it doesn't work on these other kinds of properties. A template argument with an unsafe qualifier instantiates a template with an unsafe qualifier on the corresponding template parameter. The unsafe qualifier drills through templates in a way that other language entities don't.
 
+[**unsafe2.cxx**](unsafe2.cxx)
 ```cpp
+#feature on safety
+#include <std2.h>
+#include <string>
+
 int main() safe {
   // Requires unsafe type specifier because std::string's dtor is unsafe.
-  std2::vector<unsafe std::string> vec;
+  std2::vector<unsafe std::string> vec { };
 
   // Construct an std::string from a const char* (unsafe)
   // Pass by relocation (unsafe)
-  mut vec.push_back("Foo");
+  mut vec.push_back("Hello unsafe type qualifier!");
 
   // Pass const char*
   // Construct inside emplace_back (unsafe)
-  mut vec.push_back("Bar");
+  mut vec.push_back("I integrate with legacy types");
 
   // Append Bar to the end of Foo (unsafe)
   mut vec[0] += vec[1];
@@ -482,6 +539,7 @@ The unsafe type qualifier propagates through the instantiated vector. The expres
 
 Let's simplify the example above and study it in detail.
 
+[**unsafe3.cxx**](unsafe3.cxx)
 ```cpp
 #feature on safety
 
@@ -512,16 +570,37 @@ Permitting unsafe operations with unsafe specialization is far preferable to usi
 
 Placing the unsafe token on the _template-argument-list_, where the class template gets used, is also far safer than enclosing operations on the template parameter type in _unsafe-blocks_ inside the template. In the former case, the user of the container can read its preconditions and swear that the precondidions are met. In the latter case, the template isn't able to make any statements about properly using the template type, because it doesn't know what that type is. The `unsafe` token should go with the caller, not the callee.
 
+[**unsafe4.cxx**](unsafe4.cxx)
 ```cpp
+#feature on safety
+
+template<typename T+>
+struct Vec {
+  Vec() safe;
+  void push_back(self^, T obj) safe;
+};
+
+struct String {
+  String(const char*); // Unsafe ctor.
+};
+
 int main() safe {
   // Vec has a safe constructor.
   Vec<unsafe String> vec { };
 
   // void Vec<unsafe String>::push_back(self^, unsafe String) safe;
-  // This is ill-formed. We can't invoke the unsafe String constructor
-  // to initialize an unsafe type.
-  mut vec.push_back(String("A string"));
+  // Copy initialization of the `unsafe String` function parameter is
+  // permitted.
+  mut vec.push_back("A string");
 }
+```
+```
+$ circle unsafe4.cxx
+error: unsafe4.cxx:20:27
+  mut vec.push_back(String("A string")); 
+                          ^
+cannot call unsafe constructor String::String(const char*) in safe context
+see declaration at unsafe4.cxx:10:3
 ```
 
 This code is ill-formed. We've established that it's permitted to copy initialize into the push_back call, since its function parameter is `unsafe String`, but direct initialization of `String` is not allowed. The constructor chosen for direct initialization is unsafe, but the type it's initializing is not. The compiler is right to reject this program because the user is plainly calling an unsafe constructor in a safe context, without a mitigating _unsafe-block_ or unsafe qualifier.
@@ -1770,7 +1849,7 @@ The intelligence behind the _ownership and borrowing_ safety model resides in th
 
 1. **Initialization analysis** - Perform forward dataflow analysis on the control flow graph, finding all program points where a place is initialized or uninitialized. This can be computed efficiently with gen-kill analysis,[^gen-kill] in which the gen and kill states within a basic block or computed once and memoized into a pair of bit vectors. An iterative fixed-point solver follows the control flow graph and applies the gen-kill vectors to each basic block. After establishing the initialization for each place, raise errors if any uninitialized, partially initialized or potentially initialized place is used. 
 2. **Live analysis** - Invent new region variables for each lifetime binder on each local variable in the function. Perform reverse dataflow analysis on the control flow graph to find all program points where a region is live or dead. A region is live when the borrow it is bound to may be dereferenced at a subsequent point in the program.
-3. **Variance analysis** - Inter-procedural live analysis solves the _constraint equation_. The constraints go one way: `'R1 : 'R2 @ P3` reads "R1 outlives R2 starting from the point P3." Variance[^variance] relates the lifetime parameterizations of function parameters and return types to these one-way constraints. It's necessary to examine the definitions of classes with lifetime binders, and to recursively examine their data member types, in order to solve for the variance[^taming-the-wildcards] for each function call. Failure to appropriately solve for variance can result in soundness holes, as illustrated by cve-rs[^cve-rs], a practical joke which draws attention to this advanced part of the soundness model by exploiting a bug in rustc's variance analysis to effect undefined behavior.[^cve-rs]
+3. **Variance analysis** - Inter-procedural live analysis solves the _constraint equation_. The constraints go one way: `'R1 : 'R2 @ P3` reads "R1 outlives R2 starting from the point P3." Variance[^variance] relates the lifetime parameterizations of function parameters and return types to these one-way constraints. It's necessary to examine the definitions of classes with lifetime binders, and to recursively examine their data member types, in order to solve for the variance[^taming-the-wildcards] for each function call. Failure to appropriately solve for variance can result in soundness holes, as illustrated by cve-rs[^cve-rs], which drew attention to this advanced aspect of the safety model.
 4. **Type relation** - Emit lifetime constraints to relate assignments from one object with a region variable to another object with a region variable. The variance of lifetime parameters determines the directionality of lifetime constraints. 
 5. **Solve the constraint equation** - Iteratively grow region variables until all lifetime constraints emitted during type relation are satisfied. We now have _inter-procedural live analysis_: we know the full set of live borrows, _even through function calls_. 
 6. **Borrow checking** - Visit all instructions in the control flow graph. For all _loans in scope_ (i.e. the set of loans live at each program point) test for invalidating actions.[^how-the-borrow-check-works] If there's a read or write on an object with a mutable borrow in scope, or a write to an object with a shared borrow in scope, that violates exclusivity, and a borrowck errors is raised. The borrow checker also detects invalid end points in free region variables. 
