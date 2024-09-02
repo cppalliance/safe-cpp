@@ -746,37 +746,35 @@ The borrow checker is concerned with invalidating actions on in-scope loans. The
 
 ```cpp
 #feature on safety
-#include "std2.h"
-
-using namespace std2;
+#include <std2.h>
 
 int main() safe {
-  // Make a unique pointer.
-  string s = "Hello safety";
+  std2::string s = "Hello safety";
 
   // (B) - borrow occurs here.
-  const string^ ref = s;
+  std2::string_view view = s;
 
   // (A) - invalidating action
-  drp s;
+  s = "A different string";
 
   // (U) - use that extends borrow
-  println(*ref);
+  println(view);
 }
 ```
 ```txt
-$ circle use1.cxx
-safety: use1.cxx:17:11
-  println(*ref);
-          ^
-use of *ref depends on expired loan
-drop of s between its shared borrow and its use
-invalidating operation at use1.cxx:14:3
-  drp s;
-  ^
-loan created at use1.cxx:11:23
-  const string^ ref = s;
-                      ^
+$ circle view.cxx
+safety: during safety checking of int main() safe
+  borrow checking: view.cxx:14:11
+    println(view); 
+            ^
+  use of view depends on expired loan
+  drop of s between its shared borrow and its use
+  invalidating operation at view.cxx:11:5
+    s = "A different string"; 
+      ^
+  loan created at view.cxx:8:28
+    std2::string_view view = s; 
+                             ^
 ```
 
 When helpful, Circle tries to identify all three of these points when forming borrow checker errors. Usually they're printed in bottom-to-top order. That is, the first source location printed is the location of the use of the invalidated loan. Next, the invalidating action is categorized and located. Lastly, the creation of the loan is indicated.
@@ -1746,7 +1744,7 @@ The blog post considers the above swap function, which transliterates to the Saf
 
 ```cpp
 template<typename T>
-void swap(T^ a, T^ b) noexcept safe {
+void swap(T^ a, T^ b) safe {
   T tmp = rel *a;
   *a = rel *b;
   *b = rel tmp;
@@ -1755,7 +1753,7 @@ void swap(T^ a, T^ b) noexcept safe {
 
 This code doesn't compile under Rust or Safe C++ because the operand of the relocation is a projection involving a reference, which is not an _owned place_. This defeats the abilities of initialization analysis.
 
-In Rust, every function call is potentially throwing, including destructors. In some builds, panics are throwing, so array subscripts can exit a function on the cleanup path. In debug builds, integer arithmetic may panic to protect against overflow. There are many non-return paths out functions, and unlike C++, it lacks a _noexcept-specifier_ to disable cleanup. Matsakis suggests that relocating out of references is not implemented because its use would be limited by the many unwind paths out of a function, making it rather uneconomical to support.
+In Rust, every function call is potentially throwing, including destructors. In some builds, panics are throwing, allowing array subscripts to exit a function on the cleanup path. In debug builds, integer arithmetic may panic to protect against overflow. There are many non-return paths out functions, and unlike C++, Rust lacks a _noexcept-specifier_ to disable cleanup. Matsakis suggests that relocating out of references is not implemented because its use would be limited by the many unwind paths out of a function, making it rather uneconomical to support.
 
 It's already possible to write C++ code that is less burdened by cleanup paths than Rust. If Safe C++ adopted the `throw()` specifier from the Static Exception Specification,[^static-exception-specifications] we could statically verify that functions don't have internal cleanup paths. Reducing cleanup paths extends the supported interval between relocating out of a reference and restoring an object there, helping justify the cost of more complex initialization analysis.
 
@@ -1800,7 +1798,7 @@ All this took about 18 months to design and implement in Circle. I spent six mon
 
 [^taming-the-wildcards]: [Taming the Wildcards: Combining Definition- and Use-Site Variance](https://yanniss.github.io/variance-pldi11.pdf)
 
-[^cve-rs]: [cve-rs]: (https://github.com/Speykious/cve-rs)
+[^cve-rs]: [cve-rs](https://github.com/Speykious/cve-rs)
 
 [^how-the-borrow-check-works]: [How the borrow check works](https://rust-lang.github.io/rfcs/2094-nll.html#layer-5-how-the-borrow-check-works)
 
