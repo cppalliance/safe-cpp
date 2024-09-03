@@ -1,4 +1,17 @@
-# Safe C++
+---
+title: "Safe C++"
+document: PXXXXR0
+date: 2024-09-15
+audience: SG23
+toc: true
+toc-depth: 3
+---
+
+\pagebreak
+
+# Introduction
+
+An earlier version of this work was presented to SG23 at the St Louis 2024 ISO meeting, with the closing poll "We should promise more committee time on borrow checking?" --- SF: 20, WF: 7, N: 1, WA: 0, SA: 0.
 
 ## The call for memory safety
 
@@ -18,13 +31,13 @@ The government papers are backed by industry research. Microsoft's bug telemetry
 
 * Mar. 4, 2024 - **Secure by Design: Google's Perspective on Memory Safety**[^secure-by-design]
 
-Security professionals urge projects to migrate away from C++ and adopt memory safe languages. But the scale of the problem is daunting. C++ powers software that has generated trillions of dollars of value. There are a lot of C++ programmers and a lot of C++ code. Given how wide-spread C and C++ code is, what can industry really do to improve software quality and reduce vulnerabilities? What are the options for introducing new memory safe code into existing projects and hardening software that already exists?
+Security professionals urge projects to migrate away from C++ and adopt memory safe languages. But the scale of the problem is daunting. C++ powers software that has generated trillions of dollars of value. There are many veteran C++ programmers and lots of C++ code. Given how wide-spread C++ is, what can industry really do to improve software quality and reduce vulnerabilities? What are the options for introducing new memory safe code into existing projects and hardening software that already exists?
 
 There's only one popular systems-level/non-garbage collected language that provides rigorous memory safety. That's the Rust language.[^rust-language] But while they play in the same space, C++ and Rust are idiomatically very different with limited interop capability, making incremental migration from C++ to Rust a painstaking process.
 
-Rust lacks function overloading, templates and inheritance. C++ lacks traits, relocation and lifetime parameters. These discrepancies are responsible for an impedence mismatch when interfacing the two languages. Most code generators for inter-language bindings aren't able to represent features of one language in terms of the features of another. They typically identify a number of special vocabulary types,[^vocabulary-types] which have first-class ergonomics, and limit functionality of other constructs.
+Rust lacks function overloading, templates, inheritance and exceptions. C++ lacks traits, relocation and borrow checking. These discrepancies are responsible for an impedence mismatch when interfacing the two languages. Most code generators for inter-language bindings aren't able to represent features of one language in terms of the features of another. They typically identify a number of special vocabulary types,[^vocabulary-types] which have first-class ergonomics, and limit functionality of other constructs.
 
-The foreignness of Rust for career C++ developers along with the inadequacies of interop tools makes hardening C++ applications by rewriting critical sections in Rust very difficult. Why is there no in-language solution to memory safety? _Why not a Safe C++?_
+The foreignness of Rust for career C++ developers combined with the the friction of interop tools makes hardening C++ applications by rewriting critical sections in Rust difficult. Why is there no in-language solution to memory safety? _Why not a Safe C++?_
 
 [^nsa-guidance]: [NSA Releases Guidance on How to Protect Against Software Memory Safety Issues](https://www.nsa.gov/Press-Room/News-Highlights/Article/Article/3215760/nsa-releases-guidance-on-how-to-protect-against-software-memory-safety-issues/)
 
@@ -46,7 +59,7 @@ The foreignness of Rust for career C++ developers along with the inadequacies of
 
 [^vocabulary-types]: [CXX — safe interop between Rust and C++](https://cxx.rs/bindings.html)
 
-### Extend C++ for safety
+## Extend C++ for safety
 
 The goal of the authors is to define a superset of C++ with a _rigorously safe subset_. Begin a new project, or take an existing one, and start writing safe code in C++. Code in the safe context exhibits the same strong safety guarantees as safe code written in Rust.
 
@@ -63,9 +76,9 @@ What are the properties we're trying to deliver with Safe C++?
 
 [^borrow-checking]: [The Rust RFC Book - Non-lexical lifetimes](https://rust-lang.github.io/rfcs/2094-nll.html)
 
-### A safe program
+## A safe program
 
-[**iterator.cxx**](iterator.cxx)
+[**iterator.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/iterator.cxx)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -122,7 +135,7 @@ This sample is only a few lines, but it introduces several new mechanisms and ty
 
 [^rust-iterator]: [`Iterator` in `std::iter`](https://doc.rust-lang.org/std/iter/trait.Iterator.html)
 
-### Memory safety as terms and conditions
+## Memory safety as terms and conditions
 
 Memory-safe languages are predicated on a basic observation of human nature: people would rather try something, and only then ask for help if it doesn't work. For programming, this means developers try to use a library, and only then read the docs if they can't get it to work. This has proven very dangerous, since appearing to work is not the same as working.
 
@@ -151,11 +164,11 @@ In ISO C++, soundness holes often occur because caller and callee don't agree on
 
 [^safety-comments]: [Safety comments policy](https://std-dev-guide.rust-lang.org/policy/safety-comments.html)
 
-## Categories of safety
+# Categories of safety
 
 It's instructive to break the memory safety problem down into five categories. Each of these is addressed with a different strategy.
 
-### 1. Lifetime safety
+## Lifetime safety
 
 How do we ensure that dangling references are never used? There are two safe technologies: garbage collection and borrow checking. Garbage collection is simple to implement and use, but moves object allocations to the heap, making it incompatible with manual memory manegement. It extends object lifetimes as long as there are live references to them, making it incompatible with C++'s RAII[^raii] object model.
 
@@ -167,7 +180,7 @@ Borrow checking a function only has to consider the body of that function. It av
 
 [^raii]: [Resource acquisition is initialization](https://en.wikipedia.org/wiki/Resource_acquisition_is_initialization)
 
-### 2. Type safety - null pointer variety
+## Type safety - null pointer variety
 
 > I call it my billion-dollar mistake. It was the invention of the null reference in 1965. At that time, I was designing the first comprehensive type system for references in an object oriented language (ALGOL W). My goal was to ensure that all use of references should be absolutely safe, with checking performed automatically by the compiler. But I couldn't resist the temptation to put in a null reference, simply because it was so easy to implement. This has led to innumerable errors, vulnerabilities, and system crashes, which have probably caused a billion dollars of pain and damage in the last forty years.
 > -- <cite>Tony Hoare</cite>[^hoare]
@@ -182,7 +195,7 @@ How do you move objects around in C++? Use `std::move` to select the move constr
 
 Addressing the null type safety problem means entails overhauling the object model. Safe C++ features a new kind of move: [_relocation_](type.md#relocation-object-model), also called _destructive move_. Unless explicitly initialized, objects start out _uninitialized_. They can't be used in this state. When you assign to an object, it becomes initialized. When you relocate from an object, it's value is moved and it's reset to uninitialized. If you relocate from an object inside control flow, it becomes _potentially uninitialized_, and its destructor is conditionally executed after reading a compiler-generated drop flag.
 
-[**box.cxx**](box.cxx)
+[**box.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/box.cxx)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -227,7 +240,7 @@ We have to reimagine our standard library in the presence of relocation. Most ki
 
 [^hoare]: [Null References: The Billion Dollar Mistake](https://www.infoq.com/presentations/Null-References-The-Billion-Dollar-Mistake-Tony-Hoare/)
 
-### 3. Type safety - union variety
+## Type safety - union variety
 
 The compiler can only relocate local variables. How do we move objects that live on the heap, or for which we only have a pointer or reference? We need to use optional types.
 
@@ -254,7 +267,7 @@ If we were to wrap the safe `std2::unique_ptr` in an `std::optional`, it would b
 
 The new `std2::optional` is a _choice type_, a first-class discriminated union, that can only be accessed with _pattern matching_. Pattern matching makes the union variety of type safety violations impossible: we can't access the wrong state of the sum type.
 
-[**union.cxx**](union.cxx)
+[**union.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/union.cxx)
 ```cpp
 #include <string>
 #include <iostream>
@@ -286,7 +299,7 @@ Segmentation fault (core dumped)
 
 C++'s sum type support is built on top of unions. Unions are unsafe. Naming a union field is like implicitly using `reintepret_cast` to convert the object's bits into the type of the field. The defects in `std::optional` and `std::expected` are of this nature: the libraries don't guard against access using an invalid type. C++ builds abstractions on top of unions, but they're not _safe_ abstractions.
 
-[**match.cxx**](match.cxx)
+[**match.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/match.cxx)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -324,17 +337,19 @@ The compiler also performs exhaustiveness testing. Users must name all the alter
 
 Pattern matching and choice types aren't just a qualify-of-life improvement. They're a critical part of the memory safety puzzle and all modern languages provide them.
 
-### 4. Thread safety
+## Thread safety
 
 A memory-safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread should be allowed access to it. Rust provides thread safety using a really novel extension of the type system.
 
 TODO
 
-### 5. Runtime checks
+## Runtime checks
 
 TODO
 
 
+
+# Design overview
 
 ## Tour of Safe C++
 
@@ -344,8 +359,6 @@ Get 4-6 small samples to illustrate strenghts of this language. Ideas from the c
 * borrow checking essentially fixes everything wrong with std::string_view
 * relocatable semantics dramatically simplifies implementations of containers like std::vector
 * borrow checking can also trivialize API design where you hand out a RAII-like handles 
-
-
 
 ## The `safe` context
 
@@ -426,7 +439,7 @@ struct foo_t {
 
 You can query the safeness of an expression in an unevaluated context with the _safe-operator_. It's analagous to the existing _noexcept-operator_.[^noexcept-operator] This is very useful when paired with _requires-clause_,[^requires-clause] as it lets you constrain inputs based on the safeness of a callable.
 
-[**safe.cxx**](safe.cxx)
+[**safe.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/safe.cxx)
 ```cpp
 #feature on safety
 
@@ -488,7 +501,7 @@ The `unsafe` token is required to escape the safe context and perform operations
 SHOW unsafe { }
 ```
 
-## The `unsafe` type qualifier
+### The `unsafe` type qualifier
 
 The Rust ecosystem was built from the bottom-up prioritizing safe code. Consequently, there's so little unsafe code that the _unsafe-block_ is generally sufficient for interfacing with it. By contrast, there are many billions of lines of unsafe C++ in the wild. The _unsafe-block_ isn't powerful enough to interface our safe and unsafe assets, as we'd be writing _unsafe-blocks_ everywhere, making a noisy mess. Worse, we'd be unable to use unsafe types from safe function templates, since the template definition wouldn't know it was dealing with unsafe template parameters. Because of the ecosystem difference, Rust does not provide guidance for this problem, and we're left to our own devices.
 
@@ -508,7 +521,7 @@ Expressions carry noexcept and safe information which is outside of the type's e
 
 The answer is that template specialization works on types and it doesn't work on these other kinds of properties. A template argument with an unsafe qualifier instantiates a template with an unsafe qualifier on the corresponding template parameter. The unsafe qualifier drills through templates in a way that other language entities don't.
 
-[**unsafe2.cxx**](unsafe2.cxx)
+[**unsafe2.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe2.cxx)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -539,7 +552,7 @@ The unsafe type qualifier propagates through the instantiated vector. The expres
 
 Let's simplify the example above and study it in detail.
 
-[**unsafe3.cxx**](unsafe3.cxx)
+[**unsafe3.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe3.cxx)
 ```cpp
 #feature on safety
 
@@ -570,7 +583,7 @@ Permitting unsafe operations with unsafe specialization is far preferable to usi
 
 Placing the unsafe token on the _template-argument-list_, where the class template gets used, is also far safer than enclosing operations on the template parameter type in _unsafe-blocks_ inside the template. In the former case, the user of the container can read its preconditions and swear that the precondidions are met. In the latter case, the template isn't able to make any statements about properly using the template type, because it doesn't know what that type is. The `unsafe` token should go with the caller, not the callee.
 
-[**unsafe4.cxx**](unsafe4.cxx)
+[**unsafe4.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe4.cxx)
 ```cpp
 #feature on safety
 
@@ -605,6 +618,7 @@ see declaration at unsafe4.cxx:10:3
 
 This code is ill-formed. We've established that it's permitted to copy initialize into the push_back call, since its function parameter is `unsafe String`, but direct initialization of `String` is not allowed. The constructor chosen for direct initialization is unsafe, but the type it's initializing is not. The compiler is right to reject this program because the user is plainly calling an unsafe constructor in a safe context, without a mitigating _unsafe-block_ or unsafe qualifier.
 
+[**unsafe5.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe5.cxx)
 ```cpp
 #feature on safety
 
@@ -1721,7 +1735,7 @@ The Ante language[^ante] experiments with separate mutable (exclusive) and mutab
 [^rwlock]: [RwLock](https://doc.rust-lang.org/std/sync/struct.RwLock.html)
 [^ante]: [Ante Shared Interior Mutability](https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability)
 
-### Thread safety
+## Thread safety
 
 One of the more compelling usages of interior mutability is making data accesses thread-safe. In C++, many production codebases will couple an `std::mutex` alongside the data it's guarding in a wrapper struct. This provides a strong and safe guarantee but is not offered by default and its use is not guaranteed.
 
@@ -1779,9 +1793,9 @@ Making sound thread-safe code necessitates interior mutability, which requires a
 std2::initializer_list
 std2::string_constant
 
-## Unresolved or unimplemented design issues
+# Unresolved or unimplemented design issues
 
-### _expression-outlives-constraint_
+## _expression-outlives-constraint_
 
 C++ variadics don't convey lifetime constraints from the function's return type to its parameters. Calls like `make_unique` and `emplace_back` take parameters `Ts... args` and return an unrelated type `T`. This may trigger the borrow checker, because the implementation of the function will produce free regions with unrelated endpoints. It's not a soundness issue, but it is a serious usability issue.
 
@@ -1796,15 +1810,15 @@ box<T> make_box(Ts... args) safe where(T:T(rel args...));
 
 There's a unique tooling aspect to this. To evaluate the implied constraints of the outlives expression, we have lower the expression to MIR, create new region variables for the locals, generate constraints, solve the constraint equation, and propagate region end points up to the function's lifetime parameters.
 
-### Unsafe type qualifier suppression
+## Unsafe type qualifier suppression
 
-### Function parameter ownership
+## Function parameter ownership
 
 * If the type has a non-trivial destructor, the caller calls that destructor after control returns to it (including when the caller throws an exception).[^itanium-abi]
 
 [^itanium-abi]: [Itanium C++ ABI: Non-Trivial Parameters](https://itanium-cxx-abi.github.io/cxx-abi/abi.html#non-trivial-parameters)
 
-### Relocation out of references
+## Relocation out of references
 
 You can only relocate out of _owned places_, and owned places are subobjects of local variables. Dereferences of borrows are not owned places, so you can't relocate out of them. Niko Matsakis writes about a significant potential improvement in the ownership model, [^unwinding-puts-limits-on-the-borrow-checker] citing situations where it would be sound to relocate out of a reference, as long as you relocate back into it before the function returns.
 
@@ -1843,7 +1857,7 @@ I feel this relocation feature is some of the best low-hanging fruit for improvi
 
 [^static-exception-specification]: [P3166R0: Static Exception Specifications](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3166r0.html)
 
-## Implementation guidance
+# Implementation guidance
 
 The intelligence behind the _ownership and borrowing_ safety model resides in the compiler's middle-end. Lower AST to mid-level IR (MIR), a typed control flow graph which abstracts your program from the complex details of the frontend. I count seven rounds of operations on the MIR in the compiler's middle-end:
 

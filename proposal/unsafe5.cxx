@@ -22,5 +22,5 @@ int main() safe {
   Vec<unsafe String> vec { };
 
   // void Vec<unsafe String>::emplace_back(self^, const char*) safe;
-  mut vec.push_back("A string");
+  mut vec.emplace_back("A string");
 }
