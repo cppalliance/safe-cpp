@@ -1864,10 +1864,10 @@ void (*PF1)(std::string) = func1;
 void (*PF2)(std::string) = func2;
 
 // Only bind legacy ABI functions.
-void (default *PF2)(std::string) = func;
+void (default *PF2)(std::string) = func1;
 
 // Only bind relocate ABI functions.
-void (rel     *PF2)(std::string) = func;
+void (rel     *PF2)(std::string) = func2;
 ```
 
 [^itanium-abi]: [Itanium C++ ABI: Non-Trivial Parameters](https://itanium-cxx-abi.github.io/cxx-abi/abi.html#non-trivial-parameters)
