@@ -1850,6 +1850,8 @@ Consider these three new ABIs:
 
 There's a standard conversion from both `__legacy` and `__relocate` function pointers to the `__unified` function pointer type. The latter is a trivial bit-cast. The former merely demands setting the most significant bit.
 
+Surprisingly, we can also support standard conversions from a `__unified` function pointer to the `__legacy` and `__relocate` function poiner types. If it's a mismatch, the null pointer is returned. This is still memory safe, because dereferencing a pointer is the unsafe operation. However, standard conversions from `__unified` function references to `__legacy` and `__relocate` references are not supported, because references may not hold nullptr.
+
 ## Non-static member functions with lifetimes
 
 At this point in development, lifetime parameters are not supported for non-static member functions where the enclosing class has lifetime parameters, including including template lifetime parameters. Use the `self` parameter to declare an explicit object parameter. Non-static member functions don't have full object parameter types, which makes it confusing to know where to attach lifetime arguments. As the project matures it's likely that this capability will be included.
