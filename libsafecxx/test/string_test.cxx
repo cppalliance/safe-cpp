@@ -20,16 +20,16 @@ void string_constructor() safe
     std2::string s = "hello, world!";
     assert_eq(s.size(), 13u);
     assert_eq(s.capacity(), 13u);
-    assert(s == std2::string_view("hello, world!"));
-    assert(s != std2::string_view(""));
+    assert_true(s == std2::string_view("hello, world!"));
+    assert_true(s != std2::string_view(""));
   }
 
   {
     std2::string s{"hello, world!"};
     assert_eq(s.size(), 13u);
     assert_eq(s.capacity(), 13u);
-    assert(s == std2::string_view("hello, world!"));
-    assert(s != std2::string_view(""));
+    assert_true(s == std2::string_view("hello, world!"));
+    assert_true(s != std2::string_view(""));
   }
 
   {
@@ -37,8 +37,8 @@ void string_constructor() safe
     std2::string s{buf};
     assert_eq(s.size(), 14u); // null terminator
     assert_eq(s.capacity(), 14u);
-    assert(s == std2::string_view(buf));
-    assert(s != std2::string_view(""));
+    assert_true(s == std2::string_view(buf));
+    assert_true(s != std2::string_view(""));
   }
 
   {
@@ -47,8 +47,8 @@ void string_constructor() safe
     std2::string s{p_buf};
     assert_eq(s.size(), 14u); // null terminator
     assert_eq(s.capacity(), 14u);
-    assert(s == std2::string_view(p_buf));
-    assert(s != std2::string_view(""));
+    assert_true(s == std2::string_view(p_buf));
+    assert_true(s != std2::string_view(""));
   }
 
   {
@@ -56,8 +56,8 @@ void string_constructor() safe
     std2::string s = sv;
     assert_eq(s.size(), 13u);
     assert_eq(s.capacity(), 13u);
-    assert(s == sv);
-    assert(s != std2::string_view(""));
+    assert_true(s == sv);
+    assert_true(s != std2::string_view(""));
   }
 }
 
@@ -73,7 +73,7 @@ void string_append() safe
     assert_eq(s.size(), sv1.size() + sv2.size());
     assert_eq(s.capacity(), s.size());
     assert_eq(s, std2::string_view("if I only had the heart to find out exactly who you are"));
-    assert(s != std2::string_view(""));
+    assert_true(s != std2::string_view(""));
   }
 
   {
@@ -88,7 +88,7 @@ void string_append() safe
     assert_eq(s.size(), sv1.size() + sv2.size());
     assert_eq(s.capacity(), s.size());
     assert_eq(s, std2::string_view("if I only had the heart to find out exactly who you are"));
-    assert(s != std2::string_view(""));
+    assert_true(s != std2::string_view(""));
   }
 }
 

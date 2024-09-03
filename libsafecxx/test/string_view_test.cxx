@@ -15,8 +15,8 @@ void string_view_constructor() safe
   std2::string_view sv = sc;
   assert_eq(sv.size(), (*sc.text())~length);
   assert_eq(sv.data(), (*sc.text())~as_pointer);
-  assert(sv == sc);
-  assert(!(sv != sc));
+  assert_true(sv == sc);
+  assert_true(!(sv != sc));
 }
 
 // Encodes ucs into the UTF-8 buffer at s. Returns the number of characters
@@ -263,10 +263,10 @@ void string_view_slice_ordinary_utf8_constructor() safe
     for (char32_t i = 0; i <= 0x10ffff; ++i) {
       [char; 4] buf = {};
       auto str = to_utf8(^buf, i);
-      assert((*str)~length > 0);
+      assert_true((*str)~length > 0);
 
       std2::string_view sv = str;
-      assert(sv.size() > 0u);
+      assert_true(sv.size() > 0u);
       assert_eq(sv.data(), (*str)~as_pointer);
     }
   }
@@ -387,10 +387,10 @@ void string_view_slice_utf16_constructor() safe
 
       [char16_t; 2] buf = {};
       auto str = to_utf16(^buf, i);
-      assert((*str)~length > 0);
+      assert_true((*str)~length > 0);
 
       std2::u16string_view sv = str;
-      assert(sv.size() > 0u);
+      assert_true(sv.size() > 0u);
       assert_eq(sv.data(), (*str)~as_pointer);
     }
   }
@@ -430,7 +430,7 @@ void string_view_slice_utf32_constructor() safe
       const char32_t str[] = { i };
 
       std2::u32string_view sv = str;
-      assert(sv.size() > 0u);
+      assert_true(sv.size() > 0u);
       assert_eq(sv.data(), str);
     }
   }
@@ -465,7 +465,7 @@ void string_view_slice_wstring_constructor() safe
   {
     const [wchar_t; dyn]^ str = L"한";
     std2::wstring_view sv = str;
-    assert(sv.size() > 0);
+    assert_true(sv.size() > 0);
     assert_eq(sv.data(), (*str)~as_pointer);
   }
 }
@@ -478,8 +478,8 @@ void string_view_compare() safe
     std2::string_view sv1 = str;
     std2::string_view sv2 = str;
 
-    assert(sv1 == sv2);
-    assert(!(sv1 != sv2));
+    assert_true(sv1 == sv2);
+    assert_true(!(sv1 != sv2));
   }
 
   {
@@ -489,8 +489,8 @@ void string_view_compare() safe
     std2::string_view sv1 = str1;
     std2::string_view sv2 = str2;
 
-    assert(sv1 != sv2);
-    assert(!(sv1 == sv2));
+    assert_true(sv1 != sv2);
+    assert_true(!(sv1 == sv2));
   }
 }
 

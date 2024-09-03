@@ -62,20 +62,20 @@ void ref_cell_constructor() safe
     auto m_x = rc.try_borrow();
     match (m_x) {
       .some(x) => assert_eq(*x, -1);
-      .none => assert(false);
+      .none => assert_true(false);
     };
 
     auto rc1 = ^const rc;
     auto m_x1 = rc1.try_borrow();
     match (m_x1) {
       .some(x) => assert_eq(*x, -1);
-      .none => assert(false);
+      .none => assert_true(false);
     };
 
     auto rc2 = ^const rc;
     auto m_x2 = rc2.try_borrow_mut();
     match (m_x2) {
-      .some(x) => assert(false);
+      .some(x) => assert_true(false);
       .none => void();
     };
 
@@ -83,7 +83,7 @@ void ref_cell_constructor() safe
     auto m_x3 = rc3.try_borrow();
     match (m_x3) {
       .some(x) => verify_ref(rel x);
-      .none => assert(false);
+      .none => assert_true(false);
     };
   }
 
@@ -91,20 +91,20 @@ void ref_cell_constructor() safe
     auto m_x = rc.try_borrow_mut();
     match (m_x) {
       .some(x) => void(mut *x = 1337);
-      .none => assert(false);
+      .none => assert_true(false);
     };
 
     auto rc1 = ^const rc;
     auto m_x1 = rc1.try_borrow();
     match (m_x1) {
-      .some(x) => assert(false);
+      .some(x) => assert_true(false);
       .none => void();
     };
 
     auto rc2 = ^const rc;
     auto m_x2 = rc2.try_borrow_mut();
     match (m_x2) {
-      .some(x) => assert(false);
+      .some(x) => assert_true(false);
       .none => void();
     };
   }

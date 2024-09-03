@@ -125,8 +125,8 @@ void vector_iterator() safe
       .none => true;
       .some(x) => false;
     };
-    assert(v.empty());
-    assert(b);
+    assert_true(v.empty());
+    assert_true(b);
 
     v^.push_back(1);
     v^.push_back(2);
