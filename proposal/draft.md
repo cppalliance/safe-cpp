@@ -97,7 +97,7 @@ Line 5: `std2::vector<int> vec { 11, 15, 20 };` - List initialization of a memor
 
 Line 7: `for(int x : vec)` - Ranged-for on the vector. The standard mechanism[^ranged-for] returns a pair of iterators, which are pointers wrapped in classes. C++ iterators are unsafe. They come in begin and end pairs, and don't share common lifetime parameters, making borrow checking them impractical. The Safe C++ version uses slice iterators, which resemble Rust's `Iterator`.[^rust-iterator] These safe types use lifetime parameters making them robust against iterator invalidation.
 
-Line 10: `mut vec.push_back(x);` - Push a value onto the vector. What's the `mut` doing there? That token establishes a _mutable context_, which permits enables standard conversions from lvalues to mutable borrows and references. When `#feature on safety` is enabled, _all mutations are explicit_. Explicit mutation lends precision when choosing between shared borrows and mutable borrows of an object. Rust doesn't feature function overloading, so it will implicitly borrow (mutably or shared) from the member function's object. C++ of course has function overloading, so we'll need to be explicit in order to get the overload we want.
+Line 10: `mut vec.push_back(x);` - Push a value onto the vector. What's the `mut` doing there? That token establishes a _mutable context_, which permits enables standard conversions from lvalues to mutable borrows and references. When [safety] is enabled, _all mutations are explicit_. Explicit mutation lends precision when choosing between shared borrows and mutable borrows of an object. Rust doesn't feature function overloading, so it will implicitly borrow (mutably or shared) from the member function's object. C++ of course has function overloading, so we'll need to be explicit in order to get the overload we want.
 
 If `main` checks out syntatically, its AST is lowered to MIR, where it is borrow checked. The hidden iterator that powers the ranged-for loop stays initialized during execution of the loop. The `push_back` _invalidates_ that iterator, by mutating a place (the vector) that the iterator has a constraint on. When the value `x` is next loaded out of the iterator, the borrow checker raises an error: `mutable borrow of vec between its shared borrow and its use`. The borrow checker prevents Safe C++ from compiling a program that may have exhibited undefined behavior. This is all done at compile time, with no impact on your program's size or speed.
 
@@ -142,6 +142,7 @@ Borrow checking a function only has to consider the body of that function. It av
 ## Type safety - null pointer variety
 
 > I call it my billion-dollar mistake. It was the invention of the null reference in 1965. At that time, I was designing the first comprehensive type system for references in an object oriented language (ALGOL W). My goal was to ensure that all use of references should be absolutely safe, with checking performed automatically by the compiler. But I couldn't resist the temptation to put in a null reference, simply because it was so easy to implement. This has led to innumerable errors, vulnerabilities, and system crashes, which have probably caused a billion dollars of pain and damage in the last forty years.
+>
 > -- <cite>Tony Hoare</cite>[^hoare]
 
 The "billion-dollar mistake" is a type safety problem. Consider `std::unique_ptr`. It has two states: engaged and disengaged. The class presents member functions like `operator*` and `operator->` that are valid when the object is in the engaged state and _undefined_ when the object is disengaged. `->` is the most important API for smart pointers. Calling it when the pointer is null? That's your billion-dollar mistake.
@@ -1833,44 +1834,21 @@ There's a unique tooling aspect to this. To evaluate the implied constraints of 
 The C++ Standard does not specify parameter passing conventions. That's left to implementers. Unfortunately, different implementers settled on different conventions.
 
 > If the type has a non-trivial destructor, the caller calls that destructor after control returns to it (including when the caller throws an exception).[^itanium-abi]
+>
 > -- Itanium C++ ABI: Non-Trivial Parameters[^itanium-abi]
 
 In the Itanium C++ ABI, callers destruct function arguments after the callee has returned. This isn't compatible with Safe C++'s relocation object model. If you relocate from a function parameter into a local object, then the object would be destructed _twice_: once by the callee when the local object goes out of scope and once by the caller on the function parameter's address when the callee returns. Safe C++ specifies this aspect of parameter passing: the callee is responsible for destroying its own function parameters. If a function parameter is relocated out of, that parameter becomes uninitialized and drop elaboration elides its destructor call.
 
-Let's say all functions declared in the [safety] feature implement the _relocate calling convention_. Direct calls to them should be no problem. This includes virtual calls. Direct calls to the legacy ABI from the relocate ABI should be no problem. And calls going the other way--where the caller is in the legacy ABI and the callee implemetns the relocate ABI is not an issue either. 
+Let's say all functions declared in the [safety] feature implement the _relocate calling convention_. Direct calls to them should be no problem. This includes virtual calls. Direct calls to the legacy ABI from the relocate ABI should be no problem. And calls going the other way--where the caller is in the legacy ABI and the callee implements the relocate ABI is not an issue either. 
 
-The friction comes when forming function pointers or pointers-to-member functions for indirect calls. The pointer has to contain ABI information in its type, and a pointer to a relocate ABI function must have a different type than a pointer to the equivalent legacy ABI function. Ideally we'd have an undecorated function pointer type that can point to either legacy or relocate ABI functions.
+The friction comes when forming function pointers or pointers-to-member functions for indirect calls. The pointer has to contain ABI information in its type, and a pointer to a relocate ABI function must have a different type than a pointer to the equivalent legacy ABI function. Ideally we'd have an undecorated function pointer type that can point to either legacy or relocate ABI functions, creating a unified type for indirect function calls.
 
-This ambidextrous undecorated function pointer type has to use the relocate ABI internally. It can support a call to a relocate ABI function. It can support a call a _proxy function_ that wraps a legacy ABI function. The proxy calls the legacy ABI function, and when the call returns it destroys the function arguments. The reverse choice is not available: we can't choose the legacy ABI to implement undecorated function pointers and generate a shim about relocate ABI functions. An Itanium ABI function will always destruct its function parameters, and no shim can undo that.
+Consider these three new ABIs:
+* `__relocate` - Relocate CC. Callee destroys parameters. This is opt-in for both legacy and [safety] modes.
+* `__legacy` - Legacy CC. The system's default calling convention. For Itanium ABI, the caller destroys arguments.
+* `__unified` - A unified CC that holds function pointers of either the above types. The implementer can use the most significant bit to store a discriminator between CCs: set=`__relocate`, cleared=`__legacy`. This is the default for the [safety] mode.
 
-```cxx
-#include <string>
-
-// Outside the [safety] feature. This function uses the legacy ABI.
-void func1(std::string) { }
-
-#feature on safety
-
-// Inside the [safety] feature. This function uses the relocate ABI.
-void func2(std::string) { }
-
-// The undecorated pointer type will bind either legacy or relocate ABI
-// functions.
-// Binding to a legacy ABI function creates a shim that makes a legacy ABI
-// call.
-void (*PF1)(std::string) = func1;
-
-// Binding to a relocate ABI function creates a pointer to the real function.
-void (*PF2)(std::string) = func2;
-
-// Only bind legacy ABI functions.
-void (default *PF2)(std::string) = func1;
-
-// Only bind relocate ABI functions.
-void (rel     *PF2)(std::string) = func2;
-```
-
-[^itanium-abi]: [Itanium C++ ABI: Non-Trivial Parameters](https://itanium-cxx-abi.github.io/cxx-abi/abi.html#non-trivial-parameters)
+There's a standard conversion from both `__legacy` and `__relocate` function pointers to the `__unified` function pointer type. The latter is a trivial bit-cast. The former merely demands setting the most significant bit.
 
 ## Non-static member functions with lifetimes
 
@@ -2057,6 +2035,8 @@ All this took about 18 months to design and implement in Circle. I spent six mon
 [^rwlock]: [RwLock](https://doc.rust-lang.org/std/sync/struct.RwLock.html)
 
 [^ante]: [Ante Shared Interior Mutability](https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability)
+
+[^itanium-abi]: [Itanium C++ ABI: Non-Trivial Parameters](https://itanium-cxx-abi.github.io/cxx-abi/abi.html#non-trivial-parameters)
 
 [^unwinding-puts-limits-on-the-borrow-checker]: [Unwinding puts limits on the borrow checker
 ](https://smallcultfollowing.com/babysteps/blog/2024/05/02/unwind-considered-harmful/#unwinding-puts-limits-on-the-borrow-checker)
