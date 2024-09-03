@@ -8,6 +8,7 @@
 
 #include <std2/source_location.h>
 #include <std2/string_view.h>
+#include <std2/__config/config.h>
 #include <std2/__panic/codes.h>
 #include <string>
 
@@ -20,8 +21,9 @@ namespace std2
 // per-file basis.
 [[noreturn, safety::panic(panic_code::generic)]]
 inline void panic(
-  str msg, source_location loc = source_location::current()) noexcept safe
+  str msg, source_location loc = source_location::current()) SAFECXX_NOEXCEPT safe
 {
+#if !defined(LIBSAFECXX_PANIC_THROWS)
   unsafe {
     __assert_fail(
       std::string(msg.data(), msg.size()).c_str(),
@@ -29,6 +31,9 @@ inline void panic(
       loc.line(),
       loc.function_name());
   }
+#else
+  unsafe { throw std::string(msg.data(), msg.size()); }
+#endif
 }
 
 [[noreturn, safety::panic(panic_code::bounds)]]

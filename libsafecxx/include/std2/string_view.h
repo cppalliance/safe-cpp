@@ -68,8 +68,8 @@ public:
 
 #include <std2/string_constant.h>
 #include <std2/source_location.h>
-#include <std2/slice.h>
 #include <std2/__panic/codes.h>
+#include <std2/__slice/slice.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -97,7 +97,7 @@ using u16str = basic_string_view<char16_t>;
 using u32str = basic_string_view<char32_t>;
 
 template<class CharT>
-class 
+class
   __attribute__((preferred_name(string_view)))
   __attribute__((preferred_name(wstring_view)))
   __attribute__((preferred_name(u8string_view)))
