@@ -91,7 +91,7 @@ Line 1: `#feature on safety` - Turn on the new safety-related keywords within th
 
 Line 2: `#include <std2.h>` - Include the new safe containers and algorithms. Safety hardening is about reducing your exposure to unsafe APIs. The current Standard Library is full of unsafe APIs. The new Standard Library in namespace `std2` will provide the same basic functionality, but with containers that are lifetime-aware and type safe.
 
-Line 4: `int main() safe` - The new _safe-specifier_ is part of a function's type, just like _noexcept-specifier_. To callers, the function is marked as safe, so that it can be called from a safe context. `main`'s definition starts in a safe context, so unsafe operations like pointer dereferences, and calling unsafe functions, is not allowed. Rust's functions are safe by default. C++'s are unsafe by default. But that's now just a syntax difference. Once you enter a safe context in C++ by using the _safe-specifier_, you're backed by the same rigorous safety guarantees that Rust provides.
+Line 4: `int main() safe` - The new _safe-specifier_ is part of a function's type, just like _noexcept-specifier_. To callers, the function is marked as safe, so that it can be called from a safe context. `main`'s definition starts in a safe context, so unsafe operations such as pointer dereferences, which may raise undefined behavior, is disallowed. Rust's functions are safe by default. C++'s are unsafe by default. But that's now just a syntax difference. Once you enter a safe context in C++ by using the _safe-specifier_, you're backed by the same rigorous safety guarantees that Rust provides.
 
 Line 5: `std2::vector<int> vec { 11, 15, 20 };` - List initialization of a memory-safe vector. This vector is aware of lifetime parameters, so borrow checking would extend to element types that have lifetimes. The vector's constructor doesn't use `std::initializer_list<int>`[^init-list]. That type is problematic for two reasons: first, users are given pointers into the argument data, and reading from pointers is unsafe; second, the `std::initializer_list` _doesn't own_ its data, making relocation impossible. For these reasons, Safe C++ introduces a `std2::initializer_list<T>`, which can be used in a safe context and supports our ownership object model.
 
@@ -127,11 +127,11 @@ Consider the design of a future `std2::isprint` function. If it's marked `safe`,
 In ISO C++, soundness holes often occur because caller and callee don't agree on who should enforce preconditions, so neither of them do. In Safe C++, there's a convention backed up by the compiler, eliminating this confusion and improving software quality.
 
 
-# Categories of safety
+## Categories of safety
 
 It's instructive to break the memory safety problem down into five categories. Each of these is addressed with a different strategy.
 
-## Lifetime safety
+### Lifetime safety
 
 How do we ensure that dangling references are never used? There are two safe technologies: garbage collection and borrow checking. Garbage collection is simple to implement and use, but moves object allocations to the heap, making it incompatible with manual memory manegement. It extends object lifetimes as long as there are live references to them, making it incompatible with C++'s RAII[^raii] object model.
 
@@ -139,7 +139,7 @@ Borrow checking is an advanced form of live analysis. It keeps track of the _liv
 
 Borrow checking a function only has to consider the body of that function. It avoids whole-program analysis by instituting the _law of exclusivity_. Checked references (borrows) come in two flavors: mutable and shared, noted respectively as `T^` and `const T^`. There can be one live mutable reference to a place, or any number of shared references to a place, but not both at once. Upholding this principle makes it much easier to reason about your program. Since the law of exclusivity prohibits mutable aliasing, if a function is passed a mutable reference and some shared references, you can be certain that the function won't have side effects that, through the mutable reference, cause the invalidation of those shared references.
 
-## Type safety - null pointer variety
+### Type safety - null pointer variety
 
 > I call it my billion-dollar mistake. It was the invention of the null reference in 1965. At that time, I was designing the first comprehensive type system for references in an object oriented language (ALGOL W). My goal was to ensure that all use of references should be absolutely safe, with checking performed automatically by the compiler. But I couldn't resist the temptation to put in a null reference, simply because it was so easy to implement. This has led to innumerable errors, vulnerabilities, and system crashes, which have probably caused a billion dollars of pain and damage in the last forty years.
 >
@@ -198,7 +198,7 @@ The _rel-expression_ names a local variable object or subobject and relocates th
 
 We have to reimagine our standard library in the presence of relocation. Most kinds of resource handles include null states. These should all be replaced by safe versions to reduce exposure to unsafe APIs.
 
-## Type safety - union variety
+### Type safety - union variety
 
 The compiler can only relocate local variables. How do we move objects that live on the heap, or for which we only have a pointer or reference? We need to use optional types.
 
@@ -295,13 +295,13 @@ The compiler also performs exhaustiveness testing. Users must name all the alter
 
 Pattern matching and choice types aren't just a qualify-of-life improvement. They're a critical part of the memory safety puzzle and all modern languages provide them.
 
-## Thread safety
+### Thread safety
 
 A memory-safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread should be allowed access to it. Rust provides thread safety using a really novel extension of the type system.
 
 TODO
 
-## Runtime checks
+### Runtime checks
 
 TODO
 
@@ -450,7 +450,7 @@ These kind of constraints are idiomatic in C++ but not supported in Rust, becaus
 
 ### _unsafe-block_
 
-The `unsafe` token is required to escape the safe context and perform operations whose soundness cannot be checked by the toolchain. The most basic unsafe escape is the _unsafe-block_. At the statement level, write `unsafe { }` and put the unsafe operations inside the braces. The _unsafe-block_ does _not_ open a new lexical scope.
+The `unsafe` token is required to escape the safe context and perform operations for which soundness cannot be guaranteed by the toolchain. The most basic unsafe escape is the _unsafe-block_. At the statement level, write `unsafe { }` and put the unsafe operations inside the braces. The _unsafe-block_ does _not_ open a new lexical scope.
 
 ```cpp
 SHOW unsafe { }
@@ -605,6 +605,8 @@ int main() safe {
 
 This program is well-formed. As with the previous example, there's a direct initialization of a String object using its unsafe constructor. But this time it's allowed, because the type being initialized is `T`, which is substituted with `unsafe String`: unsafe constructors are permitted to initialize unsafe types.
 
+The [unsafe type qualifier](#the-unsafe-type-qualifier) is a powerful mechanism for incorporating legacy code into new, safe templates. But propagating the qualifier through all template parameters may be too permissive. C++ templates won't be expecting the `unsafe` qualifier, and it may break dependencies. Functions that are explicitly instantiated won't have `unsafe` instantiations, and that would cause link errors. It may be prudent to get some usage experience, and limit this type qualifier to being deduced only by type template parameters with a certain token, eg `typename T?`. That way, `typename T+?` would become a common incantation for containers: create template lifetime parameters for this template parameter _and_ deduce the unsafe qualifier for it.
+
 [^atomic-types]: [_Atomic types](https://en.cppreference.com/w/c/language/atomic)
 
 ### Exempted calls
@@ -672,9 +674,46 @@ loan created at str0.cxx:6:28
 
 The compiler flags the use of the dangling view, `println(sv)`. It marks the invalidating action, the drop of the temporary string. And it indicates where the loan was created, which is the conversion to `string_view` right after the string concatenation. See the [error reporting](#lifetime-error-reporting) section for details on lifetime diagnostics.
 
+The borrow checking mechanics is visible by examining the declaration of the conversion function on `std2::string` which produces a `std2::string_view`. This is gets called during sv's initialization.
+
+```cpp
+class basic_string_view/(a) {
+public:
+  basic_string_view(const [value_type; dyn]^/a str, no_utf_check) noexcept
+    : p_(str)
+  {
+  }
+};
+
+class basic_string {
+public:
+  basic_string_view<value_type> str(self const^) noexcept safe {
+    using no_utf_check = typename basic_string_view<value_type>::no_utf_check;
+    unsafe { return basic_string_view<value_type>(self.slice(), no_utf_check{}); }
+  }
+
+  operator basic_string_view<value_type>(self const^) noexcept safe {
+    return self.str();
+  }
+  ...
+};
+```
+
+`basic_string_view` declares a named lifetime parameter, `a`, which models the lifetime of of the view. The view has _reference semantics_, and it needs a lifetime for the purpose of live analysis. The lifetime of this view will originate with a loan on a string, which owns the data, and is kept live when using the view. Mutating or dropping the string while there's a live loan on it makes the program ill-formed. This is how borrow checking protects against use-after-free errors.
+
+String concatenation forms a temporary string. Initializing `sv` invokes the conversion function on that temporary. The conversion function _borrows_ self, meaning there's a loan on the object of the call (that is, the temporary object). The lifetime argument written out in the conversion functions' declaration; rather, it's assigned during lifetime elision, which is part of [normalization](#lifetime-normalization). The return type of the conversion function is a string_view. Since string_view has a lifetime parameter, `a`, lifetime elision invents a lifetime argument for the return type and constrains the lifetime of the `self` reference to outlive it. This is all established in the declaration. Callers don't look inside function definitions during borrow checking. Both the caller and callee agree on the lifetime contracts. This creates a chain of constraints that relate all uses of a reference to its original loan.
+
+The `str` accessor provides the implementation. It constructs a `basic_string_view` and bypasses the runtime UTF-8 check by passing a `no_utf_check` argument. As with Rust, Safe C++ strings guarantee their contents are well-formed UNICODE code points. 
+
+When we print the view the compiler raises this use-after-free error. The call to `println` _uses_ the lifetime arguments associated with the function argument `sv`. The middle-end solves the [constraint equation](#systems-of-constraints), and puts the original loan on the string temporary object _in scope_ at all program points between the string concatenation and the `println` call. The borrow checker pass looks for invalidating actions on places that overloap in-scope loans. There's a drop of the temporary string at the end of the full expression containing the string concatenation. This isn't anything special to Safe C++, this is ordinary RAII cleanup of objects as they fall out of lexical scope. The drop is a kind of write, and it invalidates the shared borrow taken on the temporary when its conversion operator to `string_view` was called.
+
+Unlike previous attempts at lifetime safety[^P1179R1], borrow checking is absolutely robust. It does not rely on heuristics that can fail. It allows for any distance between the use of a borrow and an invalidating action on an originating loan, with any amount of complex control flow between. MIR analysis will solve the constraint equation, run the borrow checker, and issue a diagnostic. 
+
 ### Iterator invalidation
 
 Modern C++ design is sometimes more prone to memory safety bugs than the C-with-classes style of programming it is intended to replace. 
+
+WRITE IT UP
 
 ### Scope and liveness
 
@@ -812,7 +851,7 @@ safety: during safety checking of int main() safe
                              ^
 ```
 
-When helpful, Circle tries to identify all three of these points when forming borrow checker errors. Usually they're printed in bottom-to-top order. That is, the first source location printed is the location of the use of the invalidated loan. Next, the invalidating action is categorized and located. Lastly, the creation of the loan is indicated.
+Circle tries to identify all three of these points when forming borrow checker errors. Usually they're printed in bottom-to-top order. That is, the first source location printed is the location of the use of the invalidated loan. Next, the invalidating action is categorized and located. Lastly, the creation of the loan is indicated.
 
 The invariants that are tested are established with a network of lifetime constraints. It might not be the case that the invalidating action is obviously related to either the place of the loan or the use that extends the loan. More completely describing the chain of constraints could users diagnose borrow checker errors. But there's a fine line between presenting an error like the one above, which is already pretty wordy, and inundating programmers with too much information.
 
@@ -1479,7 +1518,7 @@ The relocation object model also supports _drp-expression_, noted by the `drp` t
 
 Consider a function like `std::unique_ptr::reset`.[^unique_ptr-reset] It destructs the existing object, if one is engaged, and sets the unique_ptr to its null state. But in our safe version, box doesn't have a default state. It doesn't supply the `reset` member function. Instead, users just drop it, running its destructor and leaving it uninitialized.
 
-You've noticed the nonsense spellings for these keywords. Why not call them `move`, `copy` and `drop`? Alternative token spellings avoids shadowing these common identifiers and improves results when searching code or the web.
+You've noticed the nonsense spellings for these keywords. Why not call them `move`, `copy` and `drop`? Alternative token spelling avoids shadowing these common identifiers and improves results when searching code or the web.
 
 
 ### Tuples
@@ -1827,13 +1866,11 @@ box<T> make_box(Ts... args) safe where(T:T(rel args...));
 
 There's a unique tooling aspect to this. To evaluate the implied constraints of the outlives expression, we have lower the expression to MIR, create new region variables for the locals, generate constraints, solve the constraint equation, and propagate region end points up to the function's lifetime parameters.
 
-## Unsafe type qualifier suppression
-
 ## Function parameter ownership
 
 The C++ Standard does not specify parameter passing conventions. That's left to implementers. Unfortunately, different implementers settled on different conventions.
 
-> If the type has a non-trivial destructor, the caller calls that destructor after control returns to it (including when the caller throws an exception).[^itanium-abi]
+> If the type has a non-trivial destructor, the caller calls that destructor after control returns to it (including when the caller throws an exception).
 >
 > -- Itanium C++ ABI: Non-Trivial Parameters[^itanium-abi]
 
@@ -2003,6 +2040,8 @@ All this took about 18 months to design and implement in Circle. I spent six mon
 [^string-view-use-after-free]: [std::string_view encourages use-after-free; the Core Guidelines Checker doesn't complain](https://github.com/isocpp/CppCoreGuidelines/issues/1038)
 
 [^string_conversion]: [std::string::operator string_view](https://en.cppreference.com/w/cpp/string/basic_string/operator_basic_string_view)
+
+[^P1179R1]: [P1179R1 - Lifetime safety: Preventing common dangling](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1179r1.pdf)
 
 [^dataflow-analysis]: [Data-flow analysis](https://en.wikipedia.org/wiki/Data-flow_analysis)
 
