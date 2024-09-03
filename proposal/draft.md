@@ -4,7 +4,7 @@ document: PXXXXR0
 date: 2024-09-15
 audience: SG23
 toc: true
-toc-depth: 3
+toc-depth: 2
 ---
 
 \pagebreak
@@ -622,7 +622,7 @@ Garbage collection requires storing objects on the _heap_. But C++ is about _man
 
 ### Use-after-free
 
-`std::string_view`[^string_view] was added to C++ as a safer alternatives to passing character pointers around. Unfortunately, it's rvalue reference constructorn is so dangerously designed that its reported to _encourage_ use-after-free bugs.[^string-view-use-after-free]
+`std::string_view`[^string_view] was added to C++ as a safer alternatives to passing character pointers around. Unfortunately, its rvalue reference constructorn is so dangerously designed that its reported to _encourage_ use-after-free bugs.[^string-view-use-after-free]
 
 ```cpp
 #include <iostream>
@@ -983,8 +983,6 @@ P4:   f(<loan R0>, <loan R1>);
 The _where-clause_ establishes the relationship that `/a` outlives `/b`. Does this mean that the variable pointed at by `x` goes out of scope later than the variable pointed at by `y`? No, that would be too straight-forward. This declaration emits a _lifetime-constraint_ at the point of the function call. The regions of the arguments already constrain the regions of the lifetime parameters. The _where-clause_ constrains the lifetime parameters to one another. `f`'s outlives constraint is responsible for the constraint `'R2 : 'R3 @ P4`.
 
 Lifetime parameters and _where-clauses_ are a facility for instructing the borrow checker. The obvious mental model is that the lifetimes of references are connected to the scope of the objects they point to. But this is not accurate. Think about lifetimes as defining rules that can't be violated, with the borrow checker looking for contradictions of these rules.
-
-At this point in development, lifetime parameters are not supported for non-static member functions where the enclosing class has lifetime parameters, including including template lifetime parameters. Use the `self` parameter to declare an explicit object parameter. Non-static member functions don't have full object parameter types, which makes it confusing to know where to stick lifetime arguments. As the project matures it's likely that this capability will be included.
 
 ### Free regions
 
@@ -1832,11 +1830,60 @@ There's a unique tooling aspect to this. To evaluate the implied constraints of 
 
 ## Function parameter ownership
 
-* If the type has a non-trivial destructor, the caller calls that destructor after control returns to it (including when the caller throws an exception).[^itanium-abi]
+The C++ Standard does not specify parameter passing conventions. That's left to implementers. Unfortunately, different implementers settled on different conventions.
+
+> If the type has a non-trivial destructor, the caller calls that destructor after control returns to it (including when the caller throws an exception).[^itanium-abi]
+> -- Itanium C++ ABI: Non-Trivial Parameters[^itanium-abi]
+
+In the Itanium C++ ABI, callers destruct function arguments after the callee has returned. This isn't compatible with Safe C++'s relocation object model. If you relocate from a function parameter into a local object, then the object would be destructed _twice_: once by the callee when the local object goes out of scope and once by the caller on the function parameter's address when the callee returns. Safe C++ specifies this aspect of parameter passing: the callee is responsible for destroying its own function parameters. If a function parameter is relocated out of, that parameter becomes uninitialized and drop elaboration elides its destructor call.
+
+Let's say all functions declared in the [safety] feature implement the _relocate calling convention_. Direct calls to them should be no problem. This includes virtual calls. Direct calls to the legacy ABI from the relocate ABI should be no problem. And calls going the other way--where the caller is in the legacy ABI and the callee implemetns the relocate ABI is not an issue either. The friction comes when forming function pointers or pointers-to-member functions for indirect calls. The pointer has to contain ABI information in its type, and a pointer to a relocate ABI function must have a different type than a pointer to the equivalent legacy ABI function.
+
+
+```cxx
+#feature on safety
+#include <std2.h>
+
+// func implements the relocate ABI, meaning it can relocate its std2::string
+// function parameter.
+void func(std2::string) safe;
+
+void (rel *PF1)(std2::string) safe = func;
+void (    *PF2)(std2::string) safe = func;
+```
+
+
+
 
 [^itanium-abi]: [Itanium C++ ABI: Non-Trivial Parameters](https://itanium-cxx-abi.github.io/cxx-abi/abi.html#non-trivial-parameters)
 
 ## Non-static member functions with lifetimes
+
+At this point in development, lifetime parameters are not supported for non-static member functions where the enclosing class has lifetime parameters, including including template lifetime parameters. Use the `self` parameter to declare an explicit object parameter. Non-static member functions don't have full object parameter types, which makes it confusing to know where to attach lifetime arguments. As the project matures it's likely that this capability will be included.
+
+Constructors, destructors and the relocation constructor don't take explicit `self` parameters. But that's less problematic because the language won't form function pointers to these or allow pointer-to-member function calls.
+
+```cpp
+struct Foo/a {
+  // Self parameter syntax. Supported.
+  void func1(Foo^/a self, int x) safe;
+
+  // Equivalent abbreviated self parameter syntax. Supported. 
+  void func2(self^, int x) safe;
+
+  // Possible non-static member function syntax.
+  // Bind a mutable borrow.
+  void func3(int x) ^ safe;
+
+  // Bind a shared borrow.
+  void func4(int x) const^ safe;
+
+  // Bind a consuming object. cv-qualifiers are unsupported.
+  void func5(int x) rel safe;
+};
+```
+
+Supporting `^` and `rel` in the _ref-qualifier_ on a function declarator is a prospective syntax for supporting borrows and relocation on the implicit object. However, inside the functions, you'd still need to use the `self` keyword rather than `this`, because `this` produces pointers and it's unsafe dereferencing pointers.
 
 ## Relocation out of references
 
@@ -1868,10 +1915,9 @@ This code doesn't compile under Rust or Safe C++ because the operand of the relo
 
 In Rust, every function call is potentially throwing, including destructors. In some builds, panics are throwing, allowing array subscripts to exit a function on the cleanup path. In debug builds, integer arithmetic may panic to protect against overflow. There are many non-return paths out functions, and unlike C++, Rust lacks a _noexcept-specifier_ to disable cleanup. Matsakis suggests that relocating out of references is not implemented because its use would be limited by the many unwind paths out of a function, making it rather uneconomical to support.
 
-It's already possible to write C++ code that is less burdened by cleanup paths than Rust. If Safe C++ adopted the `throw()` specifier from the Static Exception Specification,[^static-exception-specifications] we could statically verify that functions don't have internal cleanup paths. Reducing cleanup paths extends the supported interval between relocating out of a reference and restoring an object there, helping justify the cost of more complex initialization analysis.
+It's already possible to write C++ code that is less burdened by cleanup paths than Rust. If Safe C++ adopted the `throw()` specifier from the Static Exception Specification,[^static-exception-specification] we could statically verify that functions don't have internal cleanup paths. Reducing cleanup paths extends the supported interval between relocating out of a reference and restoring an object there, helping justify the cost of more complex initialization analysis.
 
-I feel this relocation feature is some of the best low-hanging fruit for improving the safety experience in Safe C++.
-
+This extended relocation feature is some of the best low-hanging fruit for improving the safety experience in Safe C++.
 
 # Implementation guidance
 
