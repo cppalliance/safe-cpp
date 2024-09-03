@@ -39,25 +39,6 @@ Rust lacks function overloading, templates, inheritance and exceptions. C++ lack
 
 The foreignness of Rust for career C++ developers combined with the the friction of interop tools makes hardening C++ applications by rewriting critical sections in Rust difficult. Why is there no in-language solution to memory safety? _Why not a Safe C++?_
 
-[^nsa-guidance]: [NSA Releases Guidance on How to Protect Against Software Memory Safety Issues](https://www.nsa.gov/Press-Room/News-Highlights/Article/Article/3215760/nsa-releases-guidance-on-how-to-protect-against-software-memory-safety-issues/)
-
-[^cisa-urgent]: [The Urgent Need for Memory Safety in Software Products](https://www.cisa.gov/news-events/news/urgent-need-memory-safety-software-products)
-
-[^cisa-roadmaps]: [CISA Releases Joint Guide for Software Manufacturers: The Case for Memory Safe Roadmaps](https://www.cisa.gov/news-events/alerts/2023/12/06/cisa-releases-joint-guide-software-manufacturers-case-memory-safe-roadmaps)
-
-[^white-house]: [Future Software Should Be Memory Safe](https://www.whitehouse.gov/oncd/briefing-room/2024/02/26/press-release-technical-report/)
-
-[^ncsi-plan]: [National Cybersecurity Strategy Implementation Plan](https://www.whitehouse.gov/wp-content/uploads/2024/05/NCSIP-Version-2-FINAL-May-2024.pdf)
-
-[^ms-vulnerabilities]: [We need a safer systems programming language](https://msrc.microsoft.com/blog/2019/07/we-need-a-safer-systems-programming-language)
-
-[^google-0day]: [0day "In the Wild"](https://googleprojectzero.blogspot.com/p/0day.html)
-
-[^secure-by-design]: [Secure by Design: Google's Perspective on Memory Safety](https://research.google/pubs/secure-by-design-googles-perspective-on-memory-safety/)
-
-[^rust-language]: [The Rust Programming Language](https://doc.rust-lang.org/book/)
-
-[^vocabulary-types]: [CXX — safe interop between Rust and C++](https://cxx.rs/bindings.html)
 
 ## Extend C++ for safety
 
@@ -73,8 +54,6 @@ What are the properties we're trying to deliver with Safe C++?
 * The safe and unsafe parts of the language are clearly delineated, and users must explicitly leave the safe context to use unsafe operations.
 * The safe subset must remain _useful_. If we get rid of a crucial unsafe technology, like unions or pointers, we should supply a safe alternative, like choice types or borrows. A perfectly safe language is not useful if it's so inexpressive you can't get your work done.
 * The new system can't break existing code. If you point a Safe C++ compiler at existing C++ code, that code must compile normally. Users opt into the new safety mechanisms. Safe C++ is an extension of C++. It's not a new language.
-
-[^borrow-checking]: [The Rust RFC Book - Non-lexical lifetimes](https://rust-lang.github.io/rfcs/2094-nll.html)
 
 ## A safe program
 
@@ -125,16 +104,6 @@ If `main` checks out syntatically, its AST is lowered to MIR, where it is borrow
 
 This sample is only a few lines, but it introduces several new mechanisms and types. A comprehensive effort is needed to supply a superset of the language with a safe subset that has enough flexibility to remain expressive.
 
-[^borrow-checking]: [The Rust RFC Book - Non-lexical lifetimes](https://rust-lang.github.io/rfcs/2094-nll.html)
-
-[^mir]: [The MIR (Mid-level IR)](https://rustc-dev-guide.rust-lang.org/mir/index.html)
-
-[^init-list]: [std::initializer_list](https://en.cppreference.com/w/cpp/utility/initializer_list)
-
-[^ranged-for]: [Range-based for loop](https://en.cppreference.com/w/cpp/language/range-for)
-
-[^rust-iterator]: [`Iterator` in `std::iter`](https://doc.rust-lang.org/std/iter/trait.Iterator.html)
-
 ## Memory safety as terms and conditions
 
 Memory-safe languages are predicated on a basic observation of human nature: people would rather try something, and only then ask for help if it doesn't work. For programming, this means developers try to use a library, and only then read the docs if they can't get it to work. This has proven very dangerous, since appearing to work is not the same as working.
@@ -158,11 +127,6 @@ Consider the design of a future `std2::isprint` function. If it's marked `safe`,
 
 In ISO C++, soundness holes often occur because caller and callee don't agree on who should enforce preconditions, so neither of them do. In Safe C++, there's a convention backed up by the compiler, eliminating this confusion and improving software quality.
 
-[^isprint]: [`std::isprint`](https://en.cppreference.com/w/cpp/string/byte/isprint)
-
-[^safe-unsafe-meaning]: [How Safe and Unsafe Interact](https://doc.rust-lang.org/nomicon/safe-unsafe-meaning.html)
-
-[^safety-comments]: [Safety comments policy](https://std-dev-guide.rust-lang.org/policy/safety-comments.html)
 
 # Categories of safety
 
@@ -175,10 +139,6 @@ How do we ensure that dangling references are never used? There are two safe tec
 Borrow checking is an advanced form of live analysis. It keeps track of the _live references_ (meaning those that have a future use) at every point in the function, and errors when there's a _conflicting action_ on a place associated with a live reference. For example, writing to, moving or dropping an object with a live shared borrow will raise a borrow checkerror. Pushing to a vector with a live iterator will raise an iterator invalidation error. This is a good system for C++, because it's compatible with manual memory management and RAII.
 
 Borrow checking a function only has to consider the body of that function. It avoids whole-program analysis by instituting the _law of exclusivity_. Checked references (borrows) come in two flavors: mutable and shared, noted respectively as `T^` and `const T^`. There can be one live mutable reference to a place, or any number of shared references to a place, but not both at once. Upholding this principle makes it much easier to reason about your program. Since the law of exclusivity prohibits mutable aliasing, if a function is passed a mutable reference and some shared references, you can be certain that the function won't have side effects that, through the mutable reference, cause the invalidation of those shared references.
-
-[^dangling-pointer]: [Dangling pointer](https://en.wikipedia.org/wiki/Dangling_pointer)
-
-[^raii]: [Resource acquisition is initialization](https://en.wikipedia.org/wiki/Resource_acquisition_is_initialization)
 
 ## Type safety - null pointer variety
 
@@ -237,8 +197,6 @@ safety: during safety checking of int main() safe
 The _rel-expression_ names a local variable object or subobject and relocates that into a new value. The old object becomes uninitialized. Any uses of uninitialized objects generates a compiler error. Using a null `std::unique_ptr` was undefined behavior. Using an uninitialized `std2::box` is a compile-time error.
 
 We have to reimagine our standard library in the presence of relocation. Most kinds of resource handles include null states. These should all be replaced by safe versions to reduce exposure to unsafe APIs.
-
-[^hoare]: [Null References: The Billion Dollar Mistake](https://www.infoq.com/presentations/Null-References-The-Billion-Dollar-Mistake-Tony-Hoare/)
 
 ## Type safety - union variety
 
@@ -387,7 +345,7 @@ Some operations are potentially unsound, but can be checked at runtime. They are
 
 ### _safe-specifier_
 
-Similar to the _noexcept-specifier_,[^noexcept-spec] function types and declarations may be marked with a _safe-specifier_. Place this after the _noexcept-specifier_. Types and functions without the _noexcept-specifer_ are assumed to be potentially throwing. Similarly, types and functions without the _safe-specifier_ are assumed to be unsafe.
+Similar to the _noexcept-specifier_, function types and declarations may be marked with a _safe-specifier_. Place this after the _noexcept-specifier_. Types and functions without the _noexcept-specifer_ are assumed to be potentially throwing. Similarly, types and functions without the _safe-specifier_ are assumed to be unsafe.
 
 ```cpp
 // `safe` is part of the function type.
@@ -437,7 +395,7 @@ struct foo_t {
 
 ### _safe-operator_
 
-You can query the safeness of an expression in an unevaluated context with the _safe-operator_. It's analagous to the existing _noexcept-operator_.[^noexcept-operator] This is very useful when paired with _requires-clause_,[^requires-clause] as it lets you constrain inputs based on the safeness of a callable.
+You can query the safeness of an expression in an unevaluated context with the _safe-operator_. It's analagous to the existing _noexcept-operator_. This is very useful when paired with _requires-clause_, as it lets you constrain inputs based on the safeness of a callable.
 
 [**safe.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/safe.cxx)
 ```cpp
@@ -489,9 +447,6 @@ When the user provides a floating-point argument, the _requires-clause_ substitu
 
 These kind of constraints are idiomatic in C++ but not supported in Rust, because that uses early-checked traits to implement generics.
 
-[^noexcept-operator]: [Noexcept operator](https://en.cppreference.com/w/cpp/language/noexcept)
-
-[^requires-clause]: [Requires clauses](https://en.cppreference.com/w/cpp/language/constraints#Requires_clauses)
 
 ### _unsafe-block_
 
@@ -666,10 +621,6 @@ There's one widely deployed solution to lifetime safety: garbage collection. In 
 
 Garbage collection requires storing objects on the _heap_. But C++ is about _manual memory management_. We need to track references to objects on the _stack_ as well as on the heap. As the stack unwinds objects are destroyed. We can't extend their duration beyond their lexical scopes. Borrow checking[^borrow-checking] is a kind of compile-time analysis that prevents using a reference after an object has gone out of scope. That is, it solves use-after-free and iterator invalidation bugs.
 
-[^tracing-gc]: [Tracing garbage collection](https://en.wikipedia.org/wiki/Tracing_garbage_collection)
-
-[^arc]: [Automatic reference counting](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/automaticreferencecounting/)
-
 ### Use-after-free
 
 `std::string_view`[^string_view] was added to C++ as a safer alternatives to passing character pointers around. Unfortunately, it's rvalue reference constructorn is so dangerously designed that its reported to _encourage_ use-after-free bugs.[^string-view-use-after-free]
@@ -720,12 +671,6 @@ loan created at str0.cxx:6:28
 ```
 
 The compiler flags the use of the dangling view, `println(sv)`. It marks the invalidating action, the drop of the temporary string. And it indicates where the loan was created, which is the conversion to `string_view` right after the string concatenation. See the [error reporting](#lifetime-error-reporting) section for details on lifetime diagnostics.
-
-[^string_view]: [std::basic_string_view](https://en.cppreference.com/w/cpp/string/basic_string_view)
-
-[^string-view-use-after-free]: [std::string_view encourages use-after-free; the Core Guidelines Checker doesn't complain](https://github.com/isocpp/CppCoreGuidelines/issues/1038)
-
-[^string_conversion]: [std::string::operator string_view](https://en.cppreference.com/w/cpp/string/basic_string/operator_basic_string_view)
 
 ### Iterator invalidation
 
@@ -782,9 +727,6 @@ Borrows are checked references. It's a compile-time error to use a borrow after 
 
 It's not enough to compute liveness of references. To determine the invalidating actions, it's important to know which place the live borrow refers to. `ref` is live until the end of the function, but `x` going out of scope is not an invalidating function, because `ref` doesn't refer to `x` anymore. We need data structures that indicate not just when a borrow is live, but to which places it may refer.
 
-[^dataflow-analysis]: [Data-flow analysis](https://en.wikipedia.org/wiki/Data-flow_analysis)
-
-[^live-analysis]: [Live-variable analysis](https://en.wikipedia.org/wiki/Live-variable_analysis)
 
 ### Systems of constraints
 
@@ -1043,7 +985,6 @@ The _where-clause_ establishes the relationship that `/a` outlives `/b`. Does th
 
 Lifetime parameters and _where-clauses_ are a facility for instructing the borrow checker. The obvious mental model is that the lifetimes of references are connected to the scope of the objects they point to. But this is not accurate. Think about lifetimes as defining rules that can't be violated, with the borrow checker looking for contradictions of these rules.
 
-[^character-literal]: [Character literal](https://en.cppreference.com/w/cpp/language/character_literal)
 
 ### Free regions
 
@@ -1173,12 +1114,6 @@ When `DropOnly` is false, the destructor overload without the attribute is insta
 
 The `drop_only` attribute is currently unsafe because it's incumbent on the user to implement a destructor that doesn't use associated lifetime parameters outside of invoking their destructors. It is planned to make this attribute safe. The compiler should be able to monitor the user-defined destructor for use of lifetimes associated with T outside of drops and raise borrow checker errors.
 
-[^drop]: [`drop` in `std::ops`](https://doc.rust-lang.org/std/ops/trait.Drop.html)
-
-[^phantom-data]: [PhantomData](https://doc.rust-lang.org/nomicon/phantom-data.html)
-
-[^may-dangle]: [dropck_eyepatch](https://rust-lang.github.io/rfcs/1327-dropck-param-eyepatch.html)
-
 ### Lifetime canonicalization
 
 ```cpp
@@ -1212,7 +1147,6 @@ Think about lifetime parameterizations as a directed graph. Lifetime parameters 
 
 During the type relation pass that generates lifetime constraints for function calls in the MIR, arguments and result object regions are constrained to regions of the canonical type's SCCs, rather than the lifetime parameters of the declared type. This reduces the number of regions the borrow checker solves for. But the big reason for this process is to permit writing compatible functions even in the face lifetime normalization.
 
-[^scc]: [Strongly connected component](https://en.wikipedia.org/wiki/Strongly_connected_component)
 
 ### Lifetimes and templates
 
@@ -1548,13 +1482,6 @@ Consider a function like `std::unique_ptr::reset`.[^unique_ptr-reset] It destruc
 
 You've noticed the nonsense spellings for these keywords. Why not call them `move`, `copy` and `drop`? Alternative token spellings avoids shadowing these common identifiers and improves results when searching code or the web.
 
-[^copy-trait]: [`Copy` in `std::marker`](https://doc.rust-lang.org/std/marker/trait.Copy.html)
-
-[^clone-trait]: [`Clone` in `std::clone`](https://doc.rust-lang.org/std/clone/trait.Clone.html)
-
-[^pin]: [Module `std::pin`](https://doc.rust-lang.org/std/pin/index.html)
-
-[^unique_ptr-reset]: [`std::unique_ptr::reset`](https://en.cppreference.com/w/cpp/memory/unique_ptr/reset)
 
 ### Tuples
 
@@ -1726,14 +1653,10 @@ Forming a pointer to the mutable inner state through a shared borrow is _safe_, 
 
 Safe C++ and Rust and equate exclusive access with mutable types and shared access with const types. This is an economical choice, because one type qualifier, const, also determines exclusivity. This awkward cast-away-const model of interior mutability is the logical consequence. But it's not the only way. 
 
-The Ante language[^ante] experiments with separate mutable (exclusive) and mutable (shared) type qualifiers. The 
+The Ante language[^ante] experiments with separate mutable (exclusive) and mutable (shared) type qualifiers. 
 
-[^unsafe-cell]: [UnsafeCell](https://doc.rust-lang.org/std/cell/struct.UnsafeCell.html)
-[^cell]: [Cell](https://doc.rust-lang.org/std/cell/struct.Cell.html)
-[^ref-cell]: [RefCell](https://doc.rust-lang.org/std/cell/struct.RefCell.html)
-[^mutex]: [Mutex](https://doc.rust-lang.org/std/sync/struct.Mutex.html)
-[^rwlock]: [RwLock](https://doc.rust-lang.org/std/sync/struct.RwLock.html)
-[^ante]: [Ante Shared Interior Mutability](https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability)
+TODO 
+
 
 ## Thread safety
 
@@ -1852,10 +1775,6 @@ It's already possible to write C++ code that is less burdened by cleanup paths t
 
 I feel this relocation feature is some of the best low-hanging fruit for improving the safety experience in Safe C++.
 
-[^unwinding-puts-limits-on-the-borrow-checker]: [Unwinding puts limits on the borrow checker
-](https://smallcultfollowing.com/babysteps/blog/2024/05/02/unwind-considered-harmful/#unwinding-puts-limits-on-the-borrow-checker)
-
-[^static-exception-specification]: [P3166R0: Static Exception Specifications](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3166r0.html)
 
 # Implementation guidance
 
@@ -1879,11 +1798,110 @@ Implementing the _safe-specifier_ and _safe-operator_ is easily achieved by dupl
 
 Supporting the `unsafe` type qualifier is more challenging, because the `const` and `volatile` qualifiers offer less guidance. Unlike the cv-qualifiers, the unsafe qualifier is ignored when examining pairs of types for ref-relation, but is attached to prvalues that are the result of lvalue-to-rvalue conversions, pointer adjustments, subobject access and the like.
 
-There are some new syntax requirements. Circle chose the `#feature` directive to accommodate deep changes to the grammar and semantics of the language with a per-file scope, rather than per-translation scope. The directive is implemented by notionally including a mask of active features for each token in the translation unit. During tokenization, identifier tokens check their feature masks for the \[safety\] feature, which enables the promotion of the `safe`, `unsafe`, `cpy`, `rel`, `match`, `mut` and etc tokens as keywords. For the most part the frontend can simply match against these new keywords when parsing the input and building the AST. Certain aspects of the relocation object model, such as drop-and-replace instead of invoking assignment operators, don't involve new keywords and are implemented by testing the object model mode of the current function (which indicates the state of the \[safety\] flag at the start of the function's definition). 
+There are some new syntax requirements. Circle chose the `#feature` directive to accommodate deep changes to the grammar and semantics of the language with a per-file scope, rather than per-translation unit scope. The directive is implemented by notionally including a mask of active features for each token in the translation unit. During tokenization, identifier tokens check their feature masks for the \[safety\] feature, which enables the promotion of the `safe`, `unsafe`, `cpy`, `rel`, `match`, `mut` and etc tokens as keywords. For the most part the frontend can simply match against these new keywords when parsing the input and building the AST. Certain aspects of the relocation object model, such as drop-and-replace instead of invoking assignment operators, don't involve new keywords and are implemented by testing the object model mode of the current function (which indicates the state of the \[safety\] flag at the start of the function's definition). 
 
 In addition to the core safety features, there are many new types that put a demand on engineering resources: borrows, choice types (and pattern matching to use them), first-class tuples, arrays and slices. Interfaces and interface templates are a new language mechanism that provides customization points to C++, making it much easier to author libraries that are called directly by the language. Examples in Safe C++ are the iterator support for ranged-for statements, send/sync for thread safety and fmt interfaces for f-strings.
 
 All this took about 18 months to design and implement in Circle. I spent six months in advance learning Rust and reading the NLL RFC and Rustnomicon, which are critical resources for understanding the safety model. While Safe C++ is a large extension to the language, the cost of building the new tooling is not steep. If C++ continues to go forward without a memory safety strategy, it's because institutional users don't want one, not because memory-safe tooling is too expensive or difficult to build. 
+
+# References
+
+[^nsa-guidance]: [NSA Releases Guidance on How to Protect Against Software Memory Safety Issues](https://www.nsa.gov/Press-Room/News-Highlights/Article/Article/3215760/nsa-releases-guidance-on-how-to-protect-against-software-memory-safety-issues/)
+
+[^cisa-urgent]: [The Urgent Need for Memory Safety in Software Products](https://www.cisa.gov/news-events/news/urgent-need-memory-safety-software-products)
+
+[^cisa-roadmaps]: [CISA Releases Joint Guide for Software Manufacturers: The Case for Memory Safe Roadmaps](https://www.cisa.gov/news-events/alerts/2023/12/06/cisa-releases-joint-guide-software-manufacturers-case-memory-safe-roadmaps)
+
+[^white-house]: [Future Software Should Be Memory Safe](https://www.whitehouse.gov/oncd/briefing-room/2024/02/26/press-release-technical-report/)
+
+[^ncsi-plan]: [National Cybersecurity Strategy Implementation Plan](https://www.whitehouse.gov/wp-content/uploads/2024/05/NCSIP-Version-2-FINAL-May-2024.pdf)
+
+[^ms-vulnerabilities]: [We need a safer systems programming language](https://msrc.microsoft.com/blog/2019/07/we-need-a-safer-systems-programming-language)
+
+[^google-0day]: [0day "In the Wild"](https://googleprojectzero.blogspot.com/p/0day.html)
+
+[^secure-by-design]: [Secure by Design: Google's Perspective on Memory Safety](https://research.google/pubs/secure-by-design-googles-perspective-on-memory-safety/)
+
+[^rust-language]: [The Rust Programming Language](https://doc.rust-lang.org/book/)
+
+[^vocabulary-types]: [CXX — safe interop between Rust and C++](https://cxx.rs/bindings.html)
+
+
+[^borrow-checking]: [The Rust RFC Book - Non-lexical lifetimes](https://rust-lang.github.io/rfcs/2094-nll.html)
+
+[^mir]: [The MIR (Mid-level IR)](https://rustc-dev-guide.rust-lang.org/mir/index.html)
+
+[^init-list]: [std::initializer_list](https://en.cppreference.com/w/cpp/utility/initializer_list)
+
+[^ranged-for]: [Range-based for loop](https://en.cppreference.com/w/cpp/language/range-for)
+
+[^rust-iterator]: [`Iterator` in `std::iter`](https://doc.rust-lang.org/std/iter/trait.Iterator.html)
+
+
+[^isprint]: [`std::isprint`](https://en.cppreference.com/w/cpp/string/byte/isprint)
+
+[^safe-unsafe-meaning]: [How Safe and Unsafe Interact](https://doc.rust-lang.org/nomicon/safe-unsafe-meaning.html)
+
+[^safety-comments]: [Safety comments policy](https://std-dev-guide.rust-lang.org/policy/safety-comments.html)
+
+[^dangling-pointer]: [Dangling pointer](https://en.wikipedia.org/wiki/Dangling_pointer)
+
+[^raii]: [Resource acquisition is initialization](https://en.wikipedia.org/wiki/Resource_acquisition_is_initialization)
+
+[^hoare]: [Null References: The Billion Dollar Mistake](https://www.infoq.com/presentations/Null-References-The-Billion-Dollar-Mistake-Tony-Hoare/)
+
+[^noexcept-operator]: [Noexcept operator](https://en.cppreference.com/w/cpp/language/noexcept)
+
+[^requires-clause]: [Requires clauses](https://en.cppreference.com/w/cpp/language/constraints#Requires_clauses)
+
+[^tracing-gc]: [Tracing garbage collection](https://en.wikipedia.org/wiki/Tracing_garbage_collection)
+
+[^arc]: [Automatic reference counting](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/automaticreferencecounting/)
+
+[^string_view]: [std::basic_string_view](https://en.cppreference.com/w/cpp/string/basic_string_view)
+
+[^string-view-use-after-free]: [std::string_view encourages use-after-free; the Core Guidelines Checker doesn't complain](https://github.com/isocpp/CppCoreGuidelines/issues/1038)
+
+[^string_conversion]: [std::string::operator string_view](https://en.cppreference.com/w/cpp/string/basic_string/operator_basic_string_view)
+
+[^dataflow-analysis]: [Data-flow analysis](https://en.wikipedia.org/wiki/Data-flow_analysis)
+
+[^live-analysis]: [Live-variable analysis](https://en.wikipedia.org/wiki/Live-variable_analysis)
+
+[^character-literal]: [Character literal](https://en.cppreference.com/w/cpp/language/character_literal)
+
+[^drop]: [`drop` in `std::ops`](https://doc.rust-lang.org/std/ops/trait.Drop.html)
+
+[^phantom-data]: [PhantomData](https://doc.rust-lang.org/nomicon/phantom-data.html)
+
+[^may-dangle]: [dropck_eyepatch](https://rust-lang.github.io/rfcs/1327-dropck-param-eyepatch.html)
+
+[^scc]: [Strongly connected component](https://en.wikipedia.org/wiki/Strongly_connected_component)
+
+[^copy-trait]: [`Copy` in `std::marker`](https://doc.rust-lang.org/std/marker/trait.Copy.html)
+
+[^clone-trait]: [`Clone` in `std::clone`](https://doc.rust-lang.org/std/clone/trait.Clone.html)
+
+[^pin]: [Module `std::pin`](https://doc.rust-lang.org/std/pin/index.html)
+
+[^unique_ptr-reset]: [`std::unique_ptr::reset`](https://en.cppreference.com/w/cpp/memory/unique_ptr/reset)
+
+[^unsafe-cell]: [UnsafeCell](https://doc.rust-lang.org/std/cell/struct.UnsafeCell.html)
+
+[^cell]: [Cell](https://doc.rust-lang.org/std/cell/struct.Cell.html)
+
+[^ref-cell]: [RefCell](https://doc.rust-lang.org/std/cell/struct.RefCell.html)
+
+[^mutex]: [Mutex](https://doc.rust-lang.org/std/sync/struct.Mutex.html)
+
+[^rwlock]: [RwLock](https://doc.rust-lang.org/std/sync/struct.RwLock.html)
+
+[^ante]: [Ante Shared Interior Mutability](https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability)
+
+[^unwinding-puts-limits-on-the-borrow-checker]: [Unwinding puts limits on the borrow checker
+](https://smallcultfollowing.com/babysteps/blog/2024/05/02/unwind-considered-harmful/#unwinding-puts-limits-on-the-borrow-checker)
+
+[^static-exception-specification]: [P3166R0: Static Exception Specifications](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3166r0.html)
 
 [^gen-kill]: [Data-flow analysis](https://en.wikipedia.org/wiki/Data-flow_analysis#Bit_vector_problems)
 
