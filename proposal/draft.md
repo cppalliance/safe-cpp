@@ -1837,23 +1837,38 @@ The C++ Standard does not specify parameter passing conventions. That's left to 
 
 In the Itanium C++ ABI, callers destruct function arguments after the callee has returned. This isn't compatible with Safe C++'s relocation object model. If you relocate from a function parameter into a local object, then the object would be destructed _twice_: once by the callee when the local object goes out of scope and once by the caller on the function parameter's address when the callee returns. Safe C++ specifies this aspect of parameter passing: the callee is responsible for destroying its own function parameters. If a function parameter is relocated out of, that parameter becomes uninitialized and drop elaboration elides its destructor call.
 
-Let's say all functions declared in the [safety] feature implement the _relocate calling convention_. Direct calls to them should be no problem. This includes virtual calls. Direct calls to the legacy ABI from the relocate ABI should be no problem. And calls going the other way--where the caller is in the legacy ABI and the callee implemetns the relocate ABI is not an issue either. The friction comes when forming function pointers or pointers-to-member functions for indirect calls. The pointer has to contain ABI information in its type, and a pointer to a relocate ABI function must have a different type than a pointer to the equivalent legacy ABI function.
+Let's say all functions declared in the [safety] feature implement the _relocate calling convention_. Direct calls to them should be no problem. This includes virtual calls. Direct calls to the legacy ABI from the relocate ABI should be no problem. And calls going the other way--where the caller is in the legacy ABI and the callee implemetns the relocate ABI is not an issue either. 
 
+The friction comes when forming function pointers or pointers-to-member functions for indirect calls. The pointer has to contain ABI information in its type, and a pointer to a relocate ABI function must have a different type than a pointer to the equivalent legacy ABI function. Ideally we'd have an undecorated function pointer type that can point to either legacy or relocate ABI functions.
+
+This ambidextrous undecorated function pointer type has to use the relocate ABI internally. It can support a call to a relocate ABI function. It can support a call a _proxy function_ that wraps a legacy ABI function. The proxy calls the legacy ABI function, and when the call returns it destroys the function arguments. The reverse choice is not available: we can't choose the legacy ABI to implement undecorated function pointers and generate a shim about relocate ABI functions. An Itanium ABI function will always destruct its function parameters, and no shim can undo that.
 
 ```cxx
+#include <string>
+
+// Outside the [safety] feature. This function uses the legacy ABI.
+void func1(std::string) { }
+
 #feature on safety
-#include <std2.h>
 
-// func implements the relocate ABI, meaning it can relocate its std2::string
-// function parameter.
-void func(std2::string) safe;
+// Inside the [safety] feature. This function uses the relocate ABI.
+void func2(std::string) { }
 
-void (rel *PF1)(std2::string) safe = func;
-void (    *PF2)(std2::string) safe = func;
+// The undecorated pointer type will bind either legacy or relocate ABI
+// functions.
+// Binding to a legacy ABI function creates a shim that makes a legacy ABI
+// call.
+void (*PF1)(std::string) = func1;
+
+// Binding to a relocate ABI function creates a pointer to the real function.
+void (*PF2)(std::string) = func2;
+
+// Only bind legacy ABI functions.
+void (default *PF2)(std::string) = func;
+
+// Only bind relocate ABI functions.
+void (rel     *PF2)(std::string) = func;
 ```
-
-
-
 
 [^itanium-abi]: [Itanium C++ ABI: Non-Trivial Parameters](https://itanium-cxx-abi.github.io/cxx-abi/abi.html#non-trivial-parameters)
 
