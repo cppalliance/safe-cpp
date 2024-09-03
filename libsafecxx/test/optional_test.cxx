@@ -25,38 +25,13 @@ void optional_accessors() safe
   }
 
   {
-    assert_throws([]() safe
-    {
-      std2::optional<int> mx = .none;
-      std2::expected<int, error_code> mx2 = mx.ok_or(error_code{});
-      mx2.unwrap();
-    });
-  }
-
-  {
     std2::optional<int> mx = .some(-1);
     assert_eq(mx.expect("invalid optional used"), -1);
   }
 
   {
-    assert_throws([]() safe
-    {
-      std2::optional<int> mx = .none;
-      mx.expect("invalid optional used");
-    });
-  }
-
-  {
     std2::optional<int> mx = .some(-1);
     assert_eq(mx.unwrap(), -1);
-  }
-
-  {
-    assert_throws([]() safe
-    {
-      std2::optional<int> mx = .none;
-      mx.unwrap();
-    });
   }
 }
 

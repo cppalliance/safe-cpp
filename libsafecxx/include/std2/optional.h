@@ -3,7 +3,6 @@
 
 #include <std2/expected.h>
 #include <std2/panic.h>
-#include <std2/__config/config.h>
 
 namespace std2
 {
@@ -15,21 +14,21 @@ choice optional
   [[safety::unwrap]] some(T);
 
   template<class E+>
-  expected<T, E> ok_or(self, E e) SAFECXX_NOEXCEPT safe {
+  expected<T, E> ok_or(self, E e) noexcept safe {
     return match(self) -> expected<T, E> {
       .some(t) => .ok(rel t);
       .none => .err(rel e);
     };
   }
 
-  T expect(self, str msg) SAFECXX_NOEXCEPT safe {
+  T expect(self, str msg) noexcept safe {
     return match(self) -> T {
       .some(t) => rel t;
       .none => panic(msg);
     };
   }
 
-  T unwrap(self) SAFECXX_NOEXCEPT safe {
+  T unwrap(self) noexcept safe {
     return match(self) -> T {
       .some(t) => rel t;
       .none => panic("unwrapping invalid optional");

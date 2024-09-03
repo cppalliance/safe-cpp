@@ -7,7 +7,6 @@
 #feature on safety
 
 #include <std2/panic.h>
-#include <std2/__config/config.h>
 
 namespace std2
 {
@@ -17,7 +16,7 @@ choice expected {
   [[safety::unwrap]] ok(T),
   err(E);
 
-  T unwrap(self) SAFECXX_NOEXCEPT safe {
+  T unwrap(self) noexcept safe {
     return match(self) -> T {
       .ok(t) => rel t;
       .err(e) => panic("unwrapping an error-containing expected");
