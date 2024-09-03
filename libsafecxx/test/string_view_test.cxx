@@ -106,16 +106,12 @@ void string_view_slice_ordinary_utf8_constructor() safe
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
     // outside valid range
-    unsafe {
-      assert_throws([]() {
-        char const str[] = { (char)0xff };
-        std2::string_view sv = str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      char const str[] = { (char)0xff };
+      std2::string_view sv = str;
+      (void)sv;
+    });
   }
 
   // 2 byte code points
@@ -134,29 +130,21 @@ void string_view_slice_ordinary_utf8_constructor() safe
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
     // invalid lengths
-    unsafe {
-      assert_throws([]() {
-        char const str[] = { (char)0xcf };
-        std2::string_view sv = str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      char const str[] = { (char)0xcf };
+      std2::string_view sv = str;
+      (void)sv;
+    });
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
     // invalid continuation
-    unsafe {
-      assert_throws([]() {
-        char const str[] = { (char)0xcf, (char)0xcf };
-        std2::string_view sv = str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      char const str[] = { (char)0xcf, (char)0xcf };
+      std2::string_view sv = str;
+      (void)sv;
+    });
   }
 
   // 3 byte code points
@@ -175,55 +163,39 @@ void string_view_slice_ordinary_utf8_constructor() safe
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
     // invalid length
-    unsafe {
-      assert_throws([]() {
+      assert_throws([]() safe {
         char const str[] = { (char)0xed };
         std2::string_view sv = str;
         (void)sv;
       });
-    }
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
     // invalid length
-    unsafe {
-      assert_throws([]() {
-        char const str[] = { (char)0xed, (char)0x95 };
-        std2::string_view sv = str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      char const str[] = { (char)0xed, (char)0x95 };
+      std2::string_view sv = str;
+      (void)sv;
+    });
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
     // invalid continuation
-    unsafe {
-      assert_throws([]() {
-        char const str[] = { (char)0xed, (char)0x95, (char)0xcc };
-        std2::string_view sv = str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      char const str[] = { (char)0xed, (char)0x95, (char)0xcc };
+      std2::string_view sv = str;
+      (void)sv;
+    });
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
     // invalid continuation
-    unsafe {
-      assert_throws([]() {
-        char const str[] = { 	(char)0xed, (char)0xc5, (char)0x9c };
-        std2::string_view sv = str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      char const str[] = { 	(char)0xed, (char)0xc5, (char)0x9c };
+      std2::string_view sv = str;
+      (void)sv;
+    });
   }
 
   // 4 byte code points
@@ -242,68 +214,48 @@ void string_view_slice_ordinary_utf8_constructor() safe
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
     // invalid length
-    unsafe {
-      assert_throws([]() {
-        char const str[] = { 	(char)0xf0};
-        std2::string_view sv = str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      char const str[] = { 	(char)0xf0};
+      std2::string_view sv = str;
+      (void)sv;
+    });
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
     // invalid length
-    unsafe {
-      assert_throws([]() {
-        char const str[] = { 	(char)0xf0, (char)0x90, };
-        std2::string_view sv = str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      char const str[] = { 	(char)0xf0, (char)0x90, };
+      std2::string_view sv = str;
+      (void)sv;
+    });
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
     // invalid continuation
-    unsafe {
-      assert_throws([]() {
-        char const str[] = { 	(char)0xf0, (char)0xc0, (char)0x8d, (char)0x88, };
-        std2::string_view sv = str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      char const str[] = { 	(char)0xf0, (char)0xc0, (char)0x8d, (char)0x88, };
+      std2::string_view sv = str;
+      (void)sv;
+    });
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
     // invalid continuation
-    unsafe {
-      assert_throws([]() {
-        char const str[] = { 	(char)0xf0, (char)0x90, (char)0xcd, (char)0x88, };
-        std2::string_view sv = str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      char const str[] = { 	(char)0xf0, (char)0x90, (char)0xcd, (char)0x88, };
+      std2::string_view sv = str;
+      (void)sv;
+    });
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
     // invalid continuation
-    unsafe {
-      assert_throws([]() {
-        char const str[] = { 	(char)0xf0, (char)0x90, (char)0x8d, (char)0xc8, };
-        std2::string_view sv = str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      char const str[] = { 	(char)0xf0, (char)0x90, (char)0x8d, (char)0xc8, };
+      std2::string_view sv = str;
+      (void)sv;
+    });
   }
 
   // prove we can parse the entire utf space
@@ -395,42 +347,30 @@ void string_view_slice_utf16_constructor() safe
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
     // length error
-    unsafe {
-      assert_throws([]() {
-        const char16_t str[] = { (char16_t)0xd801 };
-        std2::u16string_view sv =  str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      const char16_t str[] = { (char16_t)0xd801 };
+      std2::u16string_view sv =  str;
+      (void)sv;
+    });
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
     // invalid leading surrogate
-    unsafe {
-      assert_throws([]() {
-        const char16_t str[] = { (char16_t)0xf801, (char16_t)0xdc37 };
-        std2::u16string_view sv =  str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      const char16_t str[] = { (char16_t)0xf801, (char16_t)0xdc37 };
+      std2::u16string_view sv =  str;
+      (void)sv;
+    });
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
     // invalid trailing surrogate
-    unsafe {
-      assert_throws([]() {
-        const char16_t str[] = { (char16_t)0xd801, (char16_t)0xfc37 };
-        std2::u16string_view sv =  str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      const char16_t str[] = { (char16_t)0xd801, (char16_t)0xfc37 };
+      std2::u16string_view sv =  str;
+      (void)sv;
+    });
   }
 
   {
@@ -464,27 +404,19 @@ void string_view_slice_utf16_constructor() safe
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
-    unsafe {
-      assert_throws([]() {
-        const char16_t str[] = { (char16_t)0xd800 };
-        std2::u16string_view sv =  str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      const char16_t str[] = { (char16_t)0xd800 };
+      std2::u16string_view sv =  str;
+      (void)sv;
+    });
   }
 
     {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
-    unsafe {
-      assert_throws([]() {
-        const char16_t str[] = { (char16_t)0xdfff };
-        std2::u16string_view sv =  str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      const char16_t str[] = { (char16_t)0xdfff };
+      std2::u16string_view sv =  str;
+      (void)sv;
+    });
   }
 }
 
@@ -504,27 +436,19 @@ void string_view_slice_utf32_constructor() safe
   }
 
   {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
-    unsafe {
-      assert_throws([]() {
-        const char32_t str[] = { (char32_t)0xd800 };
-        std2::u32string_view sv =  str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      const char32_t str[] = { (char32_t)0xd800 };
+      std2::u32string_view sv =  str;
+      (void)sv;
+    });
   }
 
     {
-    // TODO: figure out how to get safe lambdas so we can make this safe too
-
-    unsafe {
-      assert_throws([]() {
-        const char32_t str[] = { (char32_t)0xdfff };
-        std2::u32string_view sv =  str;
-        (void)sv;
-      });
-    }
+    assert_throws([]() safe {
+      const char32_t str[] = { (char32_t)0xdfff };
+      std2::u32string_view sv =  str;
+      (void)sv;
+    });
   }
 }
 

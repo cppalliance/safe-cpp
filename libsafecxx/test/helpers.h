@@ -17,7 +17,7 @@ void assert(bool b) safe
 }
 
 template<class F>
-void assert_throws(F f) // safe
+void assert_throws(F f) safe
 {
   bool threw = false;
   try {
