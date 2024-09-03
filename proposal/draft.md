@@ -39,7 +39,6 @@ Rust lacks function overloading, templates, inheritance and exceptions. C++ lack
 
 The foreignness of Rust for career C++ developers combined with the the friction of interop tools makes hardening C++ applications by rewriting critical sections in Rust difficult. Why is there no in-language solution to memory safety? _Why not a Safe C++?_
 
-
 ## Extend C++ for safety
 
 The goal of the authors is to define a superset of C++ with a _rigorously safe subset_. Begin a new project, or take an existing one, and start writing safe code in C++. Code in the safe context exhibits the same strong safety guarantees as safe code written in Rust.
@@ -985,6 +984,7 @@ The _where-clause_ establishes the relationship that `/a` outlives `/b`. Does th
 
 Lifetime parameters and _where-clauses_ are a facility for instructing the borrow checker. The obvious mental model is that the lifetimes of references are connected to the scope of the objects they point to. But this is not accurate. Think about lifetimes as defining rules that can't be violated, with the borrow checker looking for contradictions of these rules.
 
+At this point in development, lifetime parameters are not supported for non-static member functions where the enclosing class has lifetime parameters, including including template lifetime parameters. Use the `self` parameter to declare an explicit object parameter. Non-static member functions don't have full object parameter types, which makes it confusing to know where to stick lifetime arguments. As the project matures it's likely that this capability will be included.
 
 ### Free regions
 
@@ -1607,7 +1607,102 @@ Relocation constructors are always noexcept. It's used to implement the drop-and
 
 ## Choice types
 
+The new `choice` type is a type safe discriminated union. It's equivalent to Rust's `enum` type. Choice types contain a list of alternatives, each with an optional payload type. Choice does not replace C++'s enum type, which is still available to support support existing code. 
+
+Scoped enums and unscoped enums with fixed underlying types are permitted to hold values outside of the listed enumerators, as long as the value is within the range of the underlying type. But choice types only contain the alternatives listed in their definitions, making them easier to reason about. There's no safe conversion between choice types and their underlying types; programmers must use choice initializers to create new choice objects and _match-expressions_ to interrogate them.
+
+[**choice.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/choice.cxx)
+```cpp
+#feature on safety
+
+// An enum-like choice that has alternatives but no payloads.
+// Unlike enums, it is not permitted to cast between C1 and its underlying
+// integral type.
+choice C1 {
+  A, B, C,
+};
+
+// A choice type with payloads for each alternative.
+choice C2 {
+  i8(int8_t),
+  i16(int16_t),
+  i32(int32_t),
+  i64(int64_t),
+};
+
+// A choice type with mixed payload and no-payload alternatives.
+choice C3 {
+  // default allowed once per choice, on a no-payload alternative.
+  default none,
+  i(int),
+  f(float),
+};
+
+int main() safe {
+  // choice-initializer uses scope resolution to name the alternative.
+  C1 x1 = C1::B(); 
+
+  // abbreviated-choice-name infers the choice type from the lhs.
+  // If there's no payload type, using () is optional.
+  C1 x2 = .B();
+  C1 x3 = .B;
+
+  // Create choice objects with initializers.
+  C2 y1 = C2::i32(55);
+  C2 y2 = .i32(55);
+
+  // If there's a defaulted alternative, the choice type has a default
+  // initializer that makes an instance with that value.
+  C3 z1 { };
+  C3 z2 = C3();
+  C3 z3 = C3::none();
+  C3 z4 = .none;
+}
+```
+
+Choice types are kinds of record types, as are unions, classes and lambdas. The existing class template machinery is available to them. Additionally, you can extend a choice type with member functions, as you would a class type. 
+
+TODO: Add this to std2.
+
+```cxx
+template<typename T+, typename Err+>
+choice expected {
+  [[safety::unwrap]] ok(T),
+  err(Err)
+};
+
+template<class T+>
+choice optional {
+  default none,
+  [[safety::unwrap]] some(T);
+
+  template<typename Err>
+  expected<T, Err> ok_or(self, Err err) noexcept safe {
+    return match(self) -> expected<T, Err> {
+      .some(x) => .ok(rel x);
+      .none    => .err(rel err);
+    };
+  }
+
+  T expect(self, str msg) noexcept safe {
+    return match(self) {
+      .some(x) => rel x;
+      .none    => panic(msg);
+    };
+  }
+
+  T unwrap(self) noexcept safe {
+    return self rel.expect("{} is none".format(optional~string));
+  }
+};
+```
+
+Rust uses traits to extend data types with new member functions outside of their definitions. Safe C++ doesn't have that capability, so it's important that choice types support member functions directly. These member functions may internalize pattern matching on their `self` parameters, improving the ergonomics of these these type-safe variants.
+
 ### Pattern matching
+
+
+
 
 ## Interior mutability
 
@@ -1741,6 +1836,8 @@ There's a unique tooling aspect to this. To evaluate the implied constraints of 
 
 [^itanium-abi]: [Itanium C++ ABI: Non-Trivial Parameters](https://itanium-cxx-abi.github.io/cxx-abi/abi.html#non-trivial-parameters)
 
+## Non-static member functions with lifetimes
+
 ## Relocation out of references
 
 You can only relocate out of _owned places_, and owned places are subobjects of local variables. Dereferences of borrows are not owned places, so you can't relocate out of them. Niko Matsakis writes about a significant potential improvement in the ownership model, [^unwinding-puts-limits-on-the-borrow-checker] citing situations where it would be sound to relocate out of a reference, as long as you relocate back into it before the function returns.
@@ -1790,7 +1887,9 @@ The intelligence behind the _ownership and borrowing_ safety model resides in th
 
 Because of the importance of MIR analysis in enforcing type and lifetime safety, the first thing compiler engineers should focus on when pursuing Safe C++ is to lower their frontend's AST to MIR. Several compiled languages already pass through a mid-level IR: Swift passes through SIL,[^sil] Rust passes through MIR,[^mir] and Circle passes through it's mid-level IR when targeting the relocation object model. There is an effort called ClangIR[^clangir] to lower Clang to an MLIR dialect called CIR, but the project is in an early phase and doesn't have enough coverage to support the language or library features described in this document.
 
-Once there is a MIR representation with adequete coverage, most of the work involves piping information from the frontend down to the MIR. Most conspicuously are lifetime parameters on functions and classes and lifetime arguments on _lifetime binders_. This necessitates a comprehensive change to the compiler's type system. Whereever you had a type, you may now have a _lifetime-qualified type_. The compiler will have to strip the binders off to access the type inside, which would indicate a pointer, reference, struct, primitive, etc. 
+Once there is a MIR representation with adequete coverage, begin work on the MIR analysis. Borrow checking is a very intricate algorithm, but fortunately it's easy to print the MIR and the lifetime and outlives constraints as you lower and check functions, so developers know where they're at. The NLL RFC[^borrow-checking] is sufficient to get developers started on MIR analysis.
+
+The most demanding frontend work work involves piping information from the frontend down to the MIR. Lifetime parameters on functions and classes and lifetime arguments on lifetime binders necessitate a comprehensive change to the compiler's type system. Wherever there's a type, you may now have a _lifetime-qualified type_. (That is, a type with bound lifetimes.)
 
 Template specialization involves additional deduplication work, where lifetime arguments on template argument types are replaced by proxy lifetime arguments. This helps canonicalize specializations while preserving the relationship established by its lifetime parameterization. Lifetime normalization and canonicalization is also very challenging to implement, partly because there is no precedent for lifetime language entities in C++. This aspect of the frontend work is by far the most difficult programming that will be faced when implementing memory safety for C++. The dataflow analysis by contrast is very easy, mostly because the MIR is such an elegant language for expressing programs at that phase.
 
