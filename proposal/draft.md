@@ -703,6 +703,7 @@ Unlike previous attempts at lifetime safety[@P1179R1], borrow checking is absolu
 ### Iterator invalidation
 
 Let's take a closer look at the iterator invalidation example.
+
 [**iterator.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/iterator.cxx)
 ```cpp
 #feature on safety
@@ -736,7 +737,7 @@ The _ranged-for_ creates an iterator on the vector. The iterator is initialized 
 
 > The static analysis based on the proposed lifetime annotations cannot catch all memory safety problems in C++ code. Specifically, it cannot catch all temporal memory safety bugs (for example, ones caused by iterator invalidation), and of course lifetime annotations don’t help with spatial memory safety (for example, indexing C-style arrays out of bounds). See the comparison with Rust below for a detailed discussion.
 >
-> [RFC] Lifetime annotations for C++ Clang Frontend[@clang-lifetime-annotations]
+> -- <cite>[RFC] Lifetime annotations for C++ Clang Frontend</cite>[@clang-lifetime-annotations]
 
 To users, iterator invalidation looks like a different phenomenon than the use-after-free defect in the previous section. But to the compiler, and hopefully to library authors, they can be reasoned about similarly, as they're both borrow checker violations. Clang's lifetime annotations project doesn't implement borrow checking. For that project, iterator invalidation is out of scope, because it really is a different phenomenon than the lifetime tracking used to detect other use-after-free defects.
 
@@ -2258,6 +2259,11 @@ references:
     citation-label: arc
     title: Automatic reference counting
     URL: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/automaticreferencecounting/
+
+  - id: clang-lifetime-annotations
+    citation-label: clang-lifetime annotations
+    title: [RFC] Lifetime annotations for the C++ Clang Frontend
+    URL: https://discourse.llvm.org/t/rfc-lifetime-annotations-for-c/61377
 
   - id: string-view-use-after-free
     citation-label: string-view-use-after-free
