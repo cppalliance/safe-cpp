@@ -1,4 +1,4 @@
----
+j---
 title: "Safe C++"
 document: PXXXXR0
 date: 2024-09-15
@@ -93,9 +93,9 @@ Line 2: `#include <std2.h>` - Include the new safe containers and algorithms. Sa
 
 Line 4: `int main() safe` - The new _safe-specifier_ is part of a function's type, just like _noexcept-specifier_. To callers, the function is marked as safe, so that it can be called from a safe context. `main`'s definition starts in a safe context, so unsafe operations such as pointer dereferences, which may raise undefined behavior, is disallowed. Rust's functions are safe by default. C++'s are unsafe by default. But that's now just a syntax difference. Once you enter a safe context in C++ by using the _safe-specifier_, you're backed by the same rigorous safety guarantees that Rust provides.
 
-Line 5: `std2::vector<int> vec { 11, 15, 20 };` - List initialization of a memory-safe vector. This vector is aware of lifetime parameters, so borrow checking would extend to element types that have lifetimes. The vector's constructor doesn't use `std::initializer_list<int>`[^init-list]. That type is problematic for two reasons: first, users are given pointers into the argument data, and reading from pointers is unsafe; second, the `std::initializer_list` _doesn't own_ its data, making relocation impossible. For these reasons, Safe C++ introduces a `std2::initializer_list<T>`, which can be used in a safe context and supports our ownership object model.
+Line 5: `std2::vector<int> vec { 11, 15, 20 };` - List initialization of a memory-safe vector. This vector is aware of lifetime parameters, so borrow checking would extend to element types that have lifetimes. The vector's constructor doesn't use `std::initializer_list<int>`. That type is problematic for two reasons: first, users are given pointers into the argument data, and reading from pointers is unsafe; second, the `std::initializer_list` _doesn't own_ its data, making relocation impossible. For these reasons, Safe C++ introduces a `std2::initializer_list<T>`, which can be used in a safe context and supports our ownership object model.
 
-Line 7: `for(int x : vec)` - Ranged-for on the vector. The standard mechanism[^ranged-for] returns a pair of iterators, which are pointers wrapped in classes. C++ iterators are unsafe. They come in begin and end pairs, and don't share common lifetime parameters, making borrow checking them impractical. The Safe C++ version uses slice iterators, which resemble Rust's `Iterator`.[^rust-iterator] These safe types use lifetime parameters making them robust against iterator invalidation.
+Line 7: `for(int x : vec)` - Ranged-for on the vector. The standard mechanism returns a pair of iterators, which are pointers wrapped in classes. C++ iterators are unsafe. They come in begin and end pairs, and don't share common lifetime parameters, making borrow checking them impractical. The Safe C++ version uses slice iterators, which resemble Rust's `Iterator`.[^rust-iterator] These safe types use lifetime parameters making them robust against iterator invalidation.
 
 Line 10: `mut vec.push_back(x);` - Push a value onto the vector. What's the `mut` doing there? That token establishes a _mutable context_, which permits enables standard conversions from lvalues to mutable borrows and references. When [safety] is enabled, _all mutations are explicit_. Explicit mutation lends precision when choosing between shared borrows and mutable borrows of an object. Rust doesn't feature function overloading, so it will implicitly borrow (mutably or shared) from the member function's object. C++ of course has function overloading, so we'll need to be explicit in order to get the overload we want.
 
@@ -462,7 +462,7 @@ The Rust ecosystem was built from the bottom-up prioritizing safe code. Conseque
 
 **Safe C++'s answer to safe/unsafe interoperability is to make safeness part of the type system.**
 
-C++ has `const` and `volatile` type qualifiers. C++ compilers also support the `_Atomic` type qualifier,[^atomic-types] through C11. Safe C++ adds the `unsafe` type qualifier. Declare an object or data member with the unsafe qualifier and use it freely _even in safe contexts_. The `unsafe` token means the same thing here as it does with _unsafe-blocks_: the programmer is declaring responsibility for upholding the conditions of the object. Blame lies with the `unsafe` wielder.
+C++ has `const` and `volatile` type qualifiers. C++ compilers also support the `_Atomic` type qualifier, through C11. Safe C++ adds the `unsafe` type qualifier. Declare an object or data member with the unsafe qualifier and use it freely _even in safe contexts_. The `unsafe` token means the same thing here as it does with _unsafe-blocks_: the programmer is declaring responsibility for upholding the conditions of the object. Blame lies with the `unsafe` wielder.
 
 Naming an unsafe object yields an lvalue expression of the unsafe type. What are the effects of the unsafe qualifier on an expression?
 
@@ -607,8 +607,6 @@ This program is well-formed. As with the previous example, there's a direct init
 
 The [unsafe type qualifier](#the-unsafe-type-qualifier) is a powerful mechanism for incorporating legacy code into new, safe templates. But propagating the qualifier through all template parameters may be too permissive. C++ templates won't be expecting the `unsafe` qualifier, and it may break dependencies. Functions that are explicitly instantiated won't have `unsafe` instantiations, and that would cause link errors. It may be prudent to get some usage experience, and limit this type qualifier to being deduced only by type template parameters with a certain token, eg `typename T?`. That way, `typename T+?` would become a common incantation for containers: create template lifetime parameters for this template parameter _and_ deduce the unsafe qualifier for it.
 
-[^atomic-types]: [_Atomic types](https://en.cppreference.com/w/c/language/atomic)
-
 ### Exempted calls
 
 In order to be more accommodating of mixing unsafe with safe code, the unsafe qualifier has very liberal transitive properties. A function invoked with an unsafe-qualified object or argument, or a constructor that initializes an unsafe type, are _exempted calls_. When performing overload resolution for exempted calls, function parameters of candidates become unsafe qualified. This permits copy initialization of
@@ -625,7 +623,7 @@ Garbage collection requires storing objects on the _heap_. But C++ is about _man
 
 ### Use-after-free
 
-`std::string_view`[^string_view] was added to C++ as a safer alternatives to passing character pointers around. Unfortunately, its rvalue reference constructorn is so dangerously designed that its reported to _encourage_ use-after-free bugs.[^string-view-use-after-free]
+`std::string_view` was added to C++ as a safer alternatives to passing character pointers around. Unfortunately, its rvalue reference constructorn is so dangerously designed that its reported to _encourage_ use-after-free bugs.[^string-view-use-after-free]
 
 ```cpp
 #include <iostream>
@@ -644,7 +642,7 @@ $ ./string_view
 @.ooo World
 ```
 
-`s` is initialized with a long string, which makes it use storage on the heap. The `string::operator+` returns a temporary `std::string` object, also with the data stored on the heap. `sv` is initialized by calling the `string::operator string_view()` conversion function on the temporary.[^string_conversion] The temporary string goes out of scope at the end of that statement, its storage is returned to the heap, and the user prints a string view with dangling pointers.
+`s` is initialized with a long string, which makes it use storage on the heap. The `string::operator+` returns a temporary `std::string` object, also with the data stored on the heap. `sv` is initialized by calling the `string::operator string_view()` conversion function on the temporary. The temporary string goes out of scope at the end of that statement, its storage is returned to the heap, and the user prints a string view with dangling pointers.
 
 This design is full of sharp edges. It should not have made the ISO Standard. But C++ didn't have great alternatives, since it lacks borrow checking, which is the technology that flags these problems.
 
@@ -699,9 +697,9 @@ public:
 };
 ```
 
-`basic_string_view` declares a named lifetime parameter, `a`, which models the lifetime of of the view. The view has _reference semantics_, and it needs a lifetime for the purpose of live analysis. The lifetime of this view will originate with a loan on a string, which owns the data, and is kept live when using the view. Mutating or dropping the string while there's a live loan on it makes the program ill-formed. This is how borrow checking protects against use-after-free errors.
+String concatenation forms a temporary string. The temporary string doesn't have any lifetime parameters. It owns its data and has _value semantics_. We form a `string_view` using the temporary string. `basic_string_view` declares a named lifetime parameter, `a`, which models the lifetime of of the view. The view has _reference semantics_, and it needs a lifetime for the purpose of live analysis. The lifetime of this view will originate with a loan on a string, which owns the data, and is kept live when using the view. Mutating or dropping the string while there's a live loan on it makes the program ill-formed. This is how borrow checking protects against use-after-free errors.
 
-String concatenation forms a temporary string. Initializing `sv` invokes the conversion function on that temporary. The conversion function _borrows_ self, meaning there's a loan on the object of the call (that is, the temporary object). The lifetime argument written out in the conversion functions' declaration; rather, it's assigned during lifetime elision, which is part of [normalization](#lifetime-normalization). The return type of the conversion function is a string_view. Since string_view has a lifetime parameter, `a`, lifetime elision invents a lifetime argument for the return type and constrains the lifetime of the `self` reference to outlive it. This is all established in the declaration. Callers don't look inside function definitions during borrow checking. Both the caller and callee agree on the lifetime contracts. This creates a chain of constraints that relate all uses of a reference to its original loan.
+Initializing `sv` invokes the conversion function on that temporary. The conversion function _borrows_ self, meaning there's a loan on the object of the call (that is, the temporary object). The lifetime argument written out in the conversion functions' declaration; rather, it's assigned during lifetime elision, which is part of [normalization](#lifetime-normalization). The return type of the conversion function is a string_view. Since string_view has a lifetime parameter, `a`, lifetime elision invents a lifetime argument for the return type and constrains the lifetime of the `self` reference to outlive it. This is all established in the declaration. Callers don't look inside function definitions during borrow checking. Both the caller and callee agree on the lifetime contracts. This creates a chain of constraints that relate all uses of a reference to its original loan.
 
 The `str` accessor provides the implementation. It constructs a `basic_string_view` and bypasses the runtime UTF-8 check by passing a `no_utf_check` argument. As with Rust, Safe C++ strings guarantee their contents are well-formed UNICODE code points. 
 
@@ -719,9 +717,9 @@ WRITE IT UP
 
 Key to one's understanding of lifetime safety is the distinction between scope and liveness. Consider lowering your function to instructions which are indexed by points. The set of points at which an object is initialized is its _scope_. In normal C++, this corresponds to its lexical scope. In Safe C++, due to relocation/destructive move, there are points in the lexical scope where the object may not be initialized, making the scope a subset of the lexical scope.
 
-The compiler lowers AST to MIR control flow graph and runs _initialization analysis_, a form of forward dataflow analysis[^dataflow-analysis] that computes the scope of all local variables. If a local variable has been relocated or dropped, and is then named in an expression, the scope information helps the compiler flag this as an illegal usage.
+The compiler lowers AST to MIR control flow graph and runs _initialization analysis_, a form of forward dataflow analysis that computes the scope of all local variables. If a local variable has been relocated or dropped, and is then named in an expression, the scope information helps the compiler flag this as an illegal usage.
 
-Liveness is a different property than scope, but they're often confused: users speak of "lifetime" to mean initialization or scope, while backend engineers speak of "lifetime" to mean liveness. Liveness is the set of points where the value stored in a value is yet to be used.
+Liveness is a different property than scope, but they're often confused: users speak of lifetime to mean initialization or scope, while backend engineers speak of lifetime to mean liveness. Liveness is the set of points where the value (i.e. a specific bit pattern) stored in a variable is yet to be used. 
 
 ```cpp
 void f(int);
@@ -738,7 +736,7 @@ int main() {
 }
 ```
 
-Live analysis[^live-analysis] is a reverse dataflow computation. Start at the return instruction of the control flow graph and work your way up to the entry point. When you encounter a load instruction, that variable becomes live. When you encounter a store instruction, that variable is marked dead.
+Live analysis is a reverse dataflow computation. Start at the return instruction of the control flow graph and work your way up to the entry point. When you encounter a load instruction, that variable becomes live. When you encounter a store instruction, that variable is marked dead.
 
 The liveness property is useful in register alloction: you only care about representing a variable in register while it's holding a value that has yet to be used. But we're solving lifetime safety, we're not doing code generation. Here, we're only concerned with liveness as a property of _borrows_.
 
@@ -1233,7 +1231,7 @@ struct is_same<T, T> {
 };
 ```
 
-Should `std::is_same<string_view, string_view>::value` be true or false? Of course it should be true. But what if we invented template lifetime parameters for each lifetime binder in the _template-argument-list_? We'd get something like `std::is_same<string_view/T0.0.0, string_view/T1.0.0>::value`. Those arguments are different types, and they wouldn't match the partial specialization.
+Should `std::is_same<string_view, string_view>::value` be true or false? Of course it should be true. But if we invent template lifetime parameters for each lifetime binder in the _template-argument-list_, we'd get something like `std::is_same<string_view/T0.0.0, string_view/T1.0.0>::value`. Those arguments are different types, and they wouldn't match the partial specialization.
 
 When specializing a `typename T` template parameter, lifetimes are stripped from the template argument types. They become unbound types. When specializing a `typename T+` parameter, the compiler creates fully-bound types by implicitly adding placeholder arguments `/_` whenever needed. When a template specialization is matched, the lifetime arguments are replaced with the specialization's invented template lifetime parameters and he original lifetime arguments are hoisted onto the specialization. 
 
@@ -1516,7 +1514,7 @@ If an object is _trivially copyable_, as all scalar types are, then you don't ne
 
 The relocation object model also supports _drp-expression_, noted by the `drp` token, which calls the destructor on an object and leaves it uninitialized. See the [Destructors and phantom data](#destructors-and-phantom-data) for details.
 
-Consider a function like `std::unique_ptr::reset`.[^unique_ptr-reset] It destructs the existing object, if one is engaged, and sets the unique_ptr to its null state. But in our safe version, box doesn't have a default state. It doesn't supply the `reset` member function. Instead, users just drop it, running its destructor and leaving it uninitialized.
+Consider a function like `std::unique_ptr::reset`. It destructs the existing object, if one is engaged, and sets the unique_ptr to its null state. But in our safe version, box doesn't have a default state. It doesn't supply the `reset` member function. Instead, users just drop it, running its destructor and leaving it uninitialized.
 
 You've noticed the nonsense spellings for these keywords. Why not call them `move`, `copy` and `drop`? Alternative token spelling avoids shadowing these common identifiers and improves results when searching code or the web.
 
@@ -2008,10 +2006,6 @@ All this took about 18 months to design and implement in Circle. I spent six mon
 
 [^mir]: [The MIR (Mid-level IR)](https://rustc-dev-guide.rust-lang.org/mir/index.html)
 
-[^init-list]: [std::initializer_list](https://en.cppreference.com/w/cpp/utility/initializer_list)
-
-[^ranged-for]: [Range-based for loop](https://en.cppreference.com/w/cpp/language/range-for)
-
 [^rust-iterator]: [`Iterator` in `std::iter`](https://doc.rust-lang.org/std/iter/trait.Iterator.html)
 
 
@@ -2021,33 +2015,17 @@ All this took about 18 months to design and implement in Circle. I spent six mon
 
 [^safety-comments]: [Safety comments policy](https://std-dev-guide.rust-lang.org/policy/safety-comments.html)
 
-[^dangling-pointer]: [Dangling pointer](https://en.wikipedia.org/wiki/Dangling_pointer)
-
 [^raii]: [Resource acquisition is initialization](https://en.wikipedia.org/wiki/Resource_acquisition_is_initialization)
 
 [^hoare]: [Null References: The Billion Dollar Mistake](https://www.infoq.com/presentations/Null-References-The-Billion-Dollar-Mistake-Tony-Hoare/)
-
-[^noexcept-operator]: [Noexcept operator](https://en.cppreference.com/w/cpp/language/noexcept)
-
-[^requires-clause]: [Requires clauses](https://en.cppreference.com/w/cpp/language/constraints#Requires_clauses)
 
 [^tracing-gc]: [Tracing garbage collection](https://en.wikipedia.org/wiki/Tracing_garbage_collection)
 
 [^arc]: [Automatic reference counting](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/automaticreferencecounting/)
 
-[^string_view]: [std::basic_string_view](https://en.cppreference.com/w/cpp/string/basic_string_view)
-
 [^string-view-use-after-free]: [std::string_view encourages use-after-free; the Core Guidelines Checker doesn't complain](https://github.com/isocpp/CppCoreGuidelines/issues/1038)
 
-[^string_conversion]: [std::string::operator string_view](https://en.cppreference.com/w/cpp/string/basic_string/operator_basic_string_view)
-
 [^P1179R1]: [P1179R1 - Lifetime safety: Preventing common dangling](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1179r1.pdf)
-
-[^dataflow-analysis]: [Data-flow analysis](https://en.wikipedia.org/wiki/Data-flow_analysis)
-
-[^live-analysis]: [Live-variable analysis](https://en.wikipedia.org/wiki/Live-variable_analysis)
-
-[^character-literal]: [Character literal](https://en.cppreference.com/w/cpp/language/character_literal)
 
 [^drop]: [`drop` in `std::ops`](https://doc.rust-lang.org/std/ops/trait.Drop.html)
 
@@ -2062,8 +2040,6 @@ All this took about 18 months to design and implement in Circle. I spent six mon
 [^clone-trait]: [`Clone` in `std::clone`](https://doc.rust-lang.org/std/clone/trait.Clone.html)
 
 [^pin]: [Module `std::pin`](https://doc.rust-lang.org/std/pin/index.html)
-
-[^unique_ptr-reset]: [`std::unique_ptr::reset`](https://en.cppreference.com/w/cpp/memory/unique_ptr/reset)
 
 [^unsafe-cell]: [UnsafeCell](https://doc.rust-lang.org/std/cell/struct.UnsafeCell.html)
 
