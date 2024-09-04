@@ -8,6 +8,8 @@
 
 #include <std2/utility.h>
 
+#include <memory>
+
 namespace std2
 {
 
@@ -34,7 +36,7 @@ public:
 
   ~box() safe
   {
-    T t = __rel_read(p_);
+    std::destroy_at(p_);
     ::operator delete(p_);
   }
 
