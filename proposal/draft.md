@@ -126,7 +126,6 @@ Consider the design of a future `std2::isprint` function. If it's marked `safe`,
 
 In ISO C++, soundness holes often occur because caller and callee don't agree on who should enforce preconditions, so neither of them do. In Safe C++, there's a convention backed up by the compiler, eliminating this confusion and improving software quality.
 
-
 ## Categories of safety
 
 It's instructive to break the memory safety problem down into five categories. Each of these is addressed with a different strategy.
@@ -607,11 +606,7 @@ This program is well-formed. As with the previous example, there's a direct init
 
 The [unsafe type qualifier](#the-unsafe-type-qualifier) is a powerful mechanism for incorporating legacy code into new, safe templates. But propagating the qualifier through all template parameters may be too permissive. C++ templates won't be expecting the `unsafe` qualifier, and it may break dependencies. Functions that are explicitly instantiated won't have `unsafe` instantiations, and that would cause link errors. It may be prudent to get some usage experience, and limit this type qualifier to being deduced only by type template parameters with a certain token, eg `typename T?`. That way, `typename T+?` would become a common incantation for containers: create template lifetime parameters for this template parameter _and_ deduce the unsafe qualifier for it.
 
-### Exempted calls
-
-In order to be more accommodating of mixing unsafe with safe code, the unsafe qualifier has very liberal transitive properties. A function invoked with an unsafe-qualified object or argument, or a constructor that initializes an unsafe type, are _exempted calls_. When performing overload resolution for exempted calls, function parameters of candidates become unsafe qualified. This permits copy initialization of
-
-TODO
+To be more accommodating when mixing unsafe with safe code, the unsafe qualifier has very liberal transitive properties. A function invoked with an unsafe-qualified object or argument, or a constructor that initializes an unsafe type, are _exempted calls_. When performing overload resolution for exempted calls, function parameters of candidates become unsafe type qualified. This permits copy initialization of function arguments into parameter types when any argument is unsafe qualified. The intent is to make deployment of the `unsafe` token more strategic: use it less often but make it more impactful. It's not helpful to dilute its potency with many trivial _unsafe-block_ operations.
 
 ### _using-unsafe-declaration_
 
@@ -709,9 +704,116 @@ Unlike previous attempts at lifetime safety[^P1179R1], borrow checking is absolu
 
 ### Iterator invalidation
 
-Modern C++ design is sometimes more prone to memory safety bugs than the C-with-classes style of programming it is intended to replace. 
+Let's take a closer look at the iterator invalidation example.
+[**iterator.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/iterator.cxx)
+```cpp
+#feature on safety
+#include <std2.h>
 
-WRITE IT UP
+int main() safe {
+  std2::vector<int> vec { 11, 15, 20 };
+
+  for(int x : vec) {
+    // Ill-formed. mutate of vec invalidates iterator in ranged-for.
+    if(x % 2)
+      mut vec.push_back(x);
+
+    std2::println(x);
+  }
+}
+```
+```txt
+$ circle iterator.cxx -I ../libsafecxx/include/
+safety: during safety checking of int main() safe
+  borrow checking: iterator.cxx:10:11
+        mut vec.push_back(x); 
+            ^
+  mutable borrow of vec between its shared borrow and its use
+  loan created at iterator.cxx:7:15
+    for(int x : vec) { 
+                ^
+```
+
+The _ranged-for_ creates an iterator on the vector. The iterator is initialized for the whole duration of the loop. This is a shared borrow, because the iterator provides read-only access to the container. Inside the loop, we mutate the container. The `mut` keyword enters the [mutable context](#the-mutable-context) which enables binding mutable borrows to lvalues in the standard conversion during overload resolution for the push_back call. Now there's a shared borrow that's live, for the iterator, and a mutable borrow that's live, for the push_back. That violates exclusivity and the borrow checker raises an error.
+
+> The static analysis based on the proposed lifetime annotations cannot catch all memory safety problems in C++ code. Specifically, it cannot catch all temporal memory safety bugs (for example, ones caused by iterator invalidation), and of course lifetime annotations don’t help with spatial memory safety (for example, indexing C-style arrays out of bounds). See the comparison with Rust below for a detailed discussion.
+> 
+> [RFC] Lifetime annotations for C++ Clang Frontend[^clang-lifetime-annotations]
+
+To users, iterator invalidation looks like a different phenomenon than the use-after-free defect in the previous section. But to the compiler, and hopefully to library authors, they can be reasoned about similarly, as they're both borrow checker violations. Clang's lifetime annotations project doesn't implement borrow checking. For that project, iterator invalidation is out of scope, because it really is a different phenomenon than the lifetime tracking used to detect other use-after-free defects.
+
+```cpp
+template<class T>
+class slice_iterator/(a);
+
+template<class T>
+impl vector<T> : make_iter {
+  using iter_type = slice_iterator<T const>;
+  using iter_mut_type = slice_iterator<T>;
+  using into_iter_type  = into_iterator<T>;
+
+  iter_type iter(self const^) noexcept safe override {
+    return slice_iterator<const T>(self->slice());
+  }
+
+  iter_mut_type iter(self^) noexcept safe override {
+    return slice_iterator<T>(self^->slice());
+  }
+
+  into_iter_type iter(self) noexcept safe override {
+    auto p = self^.data();
+    auto len = self.size();
+    forget(rel self);
+    unsafe { return into_iter_type(p, p + len); }
+  }
+};
+```
+
+To opt into ranged-for iteration, containers implement the `std2::make_iter` interface. They can provide const iterators, mutable iterators or _consuming iterators_ which take ownership of of the operand's data and destroy that container in the process.
+
+Because the _range-initializer_ of the loop is an lvalue of vector that's outside of the mutable context, the const iterator overload of `make_iter::iter` is chosen. That returns an `std2::slice_iterator` into the vector's contents. Here's the first borrow: lifetime elision invents a lifetime parameter for the `self const^` parameter, which is also used for the named lifetime argument `a` of the `slice_iterator` return type. As with the use-after-free example, the `make_iter::iter` function declaration establishes an _outlives-constraint_: the self operand must outlive the result object.
+
+```cpp
+template<class T>
+class slice_iterator/(a)
+{
+  T* unsafe p_;
+  T* end_;
+  T^/a __phantom_data;
+
+public:
+  slice_iterator([T; dyn]^/a s) noexcept safe
+    : p_((*s)~as_pointer), unsafe end_((*s)~as_pointer + (*s)~length)
+  {
+  }
+
+  optional<T^/a> next(self^) noexcept safe {
+    if (self->p_ == self->end_) { return .none; }
+    return .some(^*self->p_++);
+  }
+};
+```
+
+The compiler drains the iterator by calling `next` until the optional it returns is `.none`. Each invocation of `slice_iterator:next` forms a borrow to the current element and advances the current pointer. Because we chose the const iterator, the template parameter is deduced as `T=const int`. Lifetime elision invents a lifetime parameter and attaches it to both the mutable self borrow and the shared borrow inside the optional. Again, the lifetime on the self parameter _outlives_ the lifetime on the result object. These lifetime constraints feed the [constraint equation](#systems-of-constraints) to enable inter-procedural live analysis.
+
+It's the periodic call into `next` that keeps the original borrow on `vec` live. Even though the use of next is lexically before the push_back (it's at the top of the loop, rather than inside the loop), control flow analysis shows that it's also _downstream_ of the push_back. MIR analysis follows the backedge from the end of the body of the loop back to its start. That establishes the liveness of the shared borrow on vec.
+
+```cpp
+template<class T+>
+class vector {
+  void push_back(self^, T t) safe {
+    if (self.capacity() == self.size()) { self.grow(); }
+
+    __rel_write(self->p_ + self->size_, rel t);
+    ++self->size_;
+  }
+  ...
+};
+```
+
+The user enters the mutable context with the `mut` token and calls push_back. This enables binding a mutable borrow to vec in a standard conversion during overload resolution to push_back. Since the shared borrow that was taken to produce slice_iterator is still in scope, the new mutable borrow violates exclusivity and the program is ill-formed.
+
+Borrow checking is attractive because it's a unified treatment for enforcing dependencies. Compiler engineers aren't forced to develop heuristics for use-after-free, different ones for iterator invalidation, and still more clever ones for thread safety. Developers can just use the borrow types and the compiler will enforce the attendant constraints.
 
 ### Scope and liveness
 
@@ -763,7 +865,6 @@ int main() {
 Borrows are checked references. It's a compile-time error to use a borrow after the data it refers to has gone out of scope. Consider the set of all live references at each point in the program. Is there an invalidating action on a place referred to by one of these live references? If so, that's a contradiction that makes the program ill-formed. In this example, the contradiction occurs when `y` goes out of scope, because at that point, `ref` is a live reference to it. What makes `ref` live at that point?--The last `f(*ref)` expression in the program.
 
 It's not enough to compute liveness of references. To determine the invalidating actions, it's important to know which place the live borrow refers to. `ref` is live until the end of the function, but `x` going out of scope is not an invalidating function, because `ref` doesn't refer to `x` anymore. We need data structures that indicate not just when a borrow is live, but to which places it may refer.
-
 
 ### Systems of constraints
 
@@ -1870,7 +1971,7 @@ The C++ Standard does not specify parameter passing conventions. That's left to 
 
 > If the type has a non-trivial destructor, the caller calls that destructor after control returns to it (including when the caller throws an exception).
 >
-> -- Itanium C++ ABI: Non-Trivial Parameters[^itanium-abi]
+> -- <cite>Itanium C++ ABI: Non-Trivial Parameters</cite>[^itanium-abi]
 
 In the Itanium C++ ABI, callers destruct function arguments after the callee has returned. This isn't compatible with Safe C++'s relocation object model. If you relocate from a function parameter into a local object, then the object would be destructed _twice_: once by the callee when the local object goes out of scope and once by the caller on the function parameter's address when the callee returns. Safe C++ specifies this aspect of parameter passing: the callee is responsible for destroying its own function parameters. If a function parameter is relocated out of, that parameter becomes uninitialized and drop elaboration elides its destructor call.
 
@@ -1949,9 +2050,17 @@ It's already possible to write C++ code that is less burdened by cleanup paths t
 
 This extended relocation feature is some of the best low-hanging fruit for improving the safety experience in Safe C++.
 
+## A change of defaults
+
+
+
 # Implementation guidance
 
-The intelligence behind the _ownership and borrowing_ safety model resides in the compiler's middle-end. Lower AST to mid-level IR (MIR), a typed control flow graph which abstracts your program from the complex details of the frontend. I count seven rounds of operations on the MIR in the compiler's middle-end:
+The intelligence behind the _ownership and borrowing_ safety model resides in the compiler's middle-end, in its _MIR analysis_ passes. The first thing compiler engineers should focus on when pursuing Safe C++ is to lower their frontend's AST to MIR. Several compiled languages already pass through a mid-level IR: Swift passes through SIL,[^sil] Rust passes through MIR,[^mir] and Circle passes through it's mid-level IR when targeting the relocation object model. There is an effort called ClangIR[^clangir] to lower Clang to an MLIR dialect called CIR, but the project is in an early phase and doesn't have enough coverage to support the language or library features described in this document.
+
+The AST->MIR and MIR->LLVM (or whatever codegen is used) fully replaces the compiler's old codegen. It's modestly more difficult to write the MIR path, due to greater hygiene required: subobjects and dereferences must be hierarchicallymust be  
+
+Once there is a MIR representation with adequete coverage, begin work on the MIR analysis. Borrow checking is a very intricate algorithm, but fortunately it's easy to print the MIR and the lifetime and outlives constraints as you lower and check functions, so developers know where they're at. The NLL RFC[^borrow-checking] is sufficient to get developers started on MIR analysis. By my count there are seven rounds of operations on the MIR in the compiler's middle-end:
 
 1. **Initialization analysis** - Perform forward dataflow analysis on the control flow graph, finding all program points where a place is initialized or uninitialized. This can be computed efficiently with gen-kill analysis,[^gen-kill] in which the gen and kill states within a basic block or computed once and memoized into a pair of bit vectors. An iterative fixed-point solver follows the control flow graph and applies the gen-kill vectors to each basic block. After establishing the initialization for each place, raise errors if any uninitialized, partially initialized or potentially initialized place is used. 
 2. **Live analysis** - Invent new region variables for each lifetime binder on each local variable in the function. Perform reverse dataflow analysis on the control flow graph to find all program points where a region is live or dead. A region is live when the borrow it is bound to may be dereferenced at a subsequent point in the program.
@@ -1960,10 +2069,6 @@ The intelligence behind the _ownership and borrowing_ safety model resides in th
 5. **Solve the constraint equation** - Iteratively grow region variables until all lifetime constraints emitted during type relation are satisfied. We now have _inter-procedural live analysis_: we know the full set of live borrows, _even through function calls_. 
 6. **Borrow checking** - Visit all instructions in the control flow graph. For all _loans in scope_ (i.e. the set of loans live at each program point) test for invalidating actions.[^how-the-borrow-check-works] If there's a read or write on an object with a mutable borrow in scope, or a write to an object with a shared borrow in scope, that violates exclusivity, and a borrowck errors is raised. The borrow checker also detects invalid end points in free region variables. 
 7. **Drop elaboration** - The relocation object model may leave objects uninitialized, partially initialized or potentially initialized at the point where they go out of scope. Drop elaboration erases drops on uninitialized places, replaces drops on partially initialized places with drops only on the initialized subobjects, and gates drops on potentially initialized places behind drop flags. Drop elaboration changes your program, and is the reason why MIR isn't just an analysis representation, but a transformation between the AST and the code generator.
-
-Because of the importance of MIR analysis in enforcing type and lifetime safety, the first thing compiler engineers should focus on when pursuing Safe C++ is to lower their frontend's AST to MIR. Several compiled languages already pass through a mid-level IR: Swift passes through SIL,[^sil] Rust passes through MIR,[^mir] and Circle passes through it's mid-level IR when targeting the relocation object model. There is an effort called ClangIR[^clangir] to lower Clang to an MLIR dialect called CIR, but the project is in an early phase and doesn't have enough coverage to support the language or library features described in this document.
-
-Once there is a MIR representation with adequete coverage, begin work on the MIR analysis. Borrow checking is a very intricate algorithm, but fortunately it's easy to print the MIR and the lifetime and outlives constraints as you lower and check functions, so developers know where they're at. The NLL RFC[^borrow-checking] is sufficient to get developers started on MIR analysis.
 
 The most demanding frontend work work involves piping information from the frontend down to the MIR. Lifetime parameters on functions and classes and lifetime arguments on lifetime binders necessitate a comprehensive change to the compiler's type system. Wherever there's a type, you may now have a _lifetime-qualified type_. (That is, a type with bound lifetimes.)
 
@@ -2026,6 +2131,8 @@ All this took about 18 months to design and implement in Circle. I spent six mon
 [^string-view-use-after-free]: [std::string_view encourages use-after-free; the Core Guidelines Checker doesn't complain](https://github.com/isocpp/CppCoreGuidelines/issues/1038)
 
 [^P1179R1]: [P1179R1 - Lifetime safety: Preventing common dangling](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1179r1.pdf)
+
+[^clang-lifetime-annotations]: [Lifetime annotations for C++](https://discourse.llvm.org/t/rfc-lifetime-annotations-for-c/61377)
 
 [^drop]: [`drop` in `std::ops`](https://doc.rust-lang.org/std/ops/trait.Drop.html)
 
