@@ -29,11 +29,11 @@ public:
   // compiler-provided
   // must live in namespace std2
 
-  initializer_list() = delete;
+  initializer_list() noexcept safe : _cur(nullptr), _end(nullptr) { }
   initializer_list(const initializer_list&) = delete;
   initializer_list& operator=(const initializer_list&) = delete;
 
-  ~initializer_list() requires(T~is_trivially_destructible) = default;
+  ~initializer_list() safe requires(T~is_trivially_destructible) = default;
 
   ~initializer_list() safe requires(!T~is_trivially_destructible) {
     std::destroy_n(_cur, _end - _cur);
