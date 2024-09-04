@@ -135,8 +135,8 @@ public:
   void push_back(self^, T t) safe {
     if (self.capacity() == self.size()) { self.grow(); }
 
-    unsafe { __rel_write(self->p_ + self->size_, rel t); }
-   ++self->size_;
+    __rel_write(self->p_ + self->size_, rel t);
+    ++self->size_;
   }
 
   [value_type; dyn]^ slice(self^) noexcept safe {

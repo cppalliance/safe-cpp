@@ -29,15 +29,13 @@ public:
   box(T t) safe
     : unsafe p_(static_cast<T*>(::operator new(sizeof(T))))
   {
-    unsafe { __rel_write(p_, rel t); }
+    __rel_write(p_, rel t);
   }
 
   ~box() safe
   {
-    unsafe {
-      T t = __rel_read(p_);
-      ::operator delete(p_);
-    }
+    T t = __rel_read(p_);
+    ::operator delete(p_);
   }
 
   T^ borrow(self^) noexcept safe {
