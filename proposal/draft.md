@@ -13,6 +13,8 @@ toc-depth: 2
 
 An earlier version of this work was presented to SG23 at the St Louis 2024 ISO meeting, with the closing poll "We should promise more committee time on borrow checking?" --- SF: 20, WF: 7, N: 1, WA: 0, SA: 0.
 
+There is a Safe C++ standard library being developed[@safecpp-stdlib] in tandem with this proposal which aims to co-evolve alongside the Safe C++ extensions. It contains basic implementations of common types such as `std2::vector`, `std2::string` and `std2::thread`, and serves as a useful proof-of-concept.
+
 ## The call for memory safety
 
 Over the past two years, the United States Government has been issuing warnings about memory-unsafe programming languages with increasing urgency. Much of the country's critical infrastructure relies on software written in C and C++, languages which are very memory _unsafe_, leaving these systems more vulnerable to exploits by adversaries.
@@ -829,14 +831,14 @@ using namespace std;
 int main() {
   initializer_list<string_view> initlist1;
   initializer_list<string_view> initlist2;
-  
+
   string s = "Hello";
   string t = "World";
 
   // initializer lists holds dangling pointers into backing array.
   initlist1 = { s, s, s, s };
   initlist2 = { t, t, t, t };
-  
+
   // Prints like normal.
   vector<string_view> vec(initlist1);
   for(string_view sv : vec)
@@ -857,7 +859,7 @@ Hello
 Hello
 __cxa_guard_release%s failed to broadcast__cxa_guard_abortunexpected_handler une
 xpectedly returnedterminate_handler unexpectedly returnedterminate_handler unexp
-ectedly threw an exceptionPure virtual function called!Deleted virtual function 
+ectedly threw an exceptionPure virtual function called!Deleted virtual function
 called!std::exceptionstd::bad_exceptionstd::bad_allocbad_array_new_lengthSt9exce
 ptionSt13bad_exceptionSt20bad_array_new_lengthSt9bad_alloc�a���a��b��b��0b��St12
 domain_errorSt11logic_errorSt16invalid_argumentSt12length_errorSt12out_of_rangeS
@@ -870,9 +872,9 @@ N10__cxxabiv117__class_type_infoEN10__cxxabiv117__pbase_type_infoEN10__cxxabiv11
 9__pointer_type_infoE
 ```
 
-This example declares two initializer lists of string views, `initlist1` and `initlist2`, declares two strings, and assigns views of the strings into the two initializer lists. Printing their contents is undefined behavior. It may go undetected. But compiling with clang -O2 and targeting libc++ manifests the defect: the program is printing uncontrollably from some arbitrary place in memory. This is the kind of memory safety defect that the NSA and corporate researchers have been warning industry about. 
+This example declares two initializer lists of string views, `initlist1` and `initlist2`, declares two strings, and assigns views of the strings into the two initializer lists. Printing their contents is undefined behavior. It may go undetected. But compiling with clang -O2 and targeting libc++ manifests the defect: the program is printing uncontrollably from some arbitrary place in memory. This is the kind of memory safety defect that the NSA and corporate researchers have been warning industry about.
 
-The defect is perplexing because the string objects `s` and `t` _are still in scope_! This is a use-after-free bug, but not with an object the user wrote. It's a use-after-free of implicit backing stores that C++ generates when lowering initializer list expressions. 
+The defect is perplexing because the string objects `s` and `t` _are still in scope_! This is a use-after-free bug, but not with an object the user wrote. It's a use-after-free of implicit backing stores that C++ generates when lowering initializer list expressions.
 
 ```cpp
   // initializer lists holds dangling pointers into backing array.
@@ -2261,8 +2263,8 @@ references:
     URL: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/automaticreferencecounting/
 
   - id: clang-lifetime-annotations
-    citation-label: clang-lifetime annotations
-    title: [RFC] Lifetime annotations for the C++ Clang Frontend
+    citation-label: clang-lifetime-annotations
+    title: Lifetime annotations for the C++ Clang Frontend
     URL: https://discourse.llvm.org/t/rfc-lifetime-annotations-for-c/61377
 
   - id: string-view-use-after-free
@@ -2384,4 +2386,9 @@ references:
     citation-label: clangir
     title: Upstreaming ClangIR
     URL: https://discourse.llvm.org/t/rfc-upstreaming-clangir/76587
+
+  - id: safecpp-stdlib
+    citation-label: safecpp-stdlib
+    title: Safe C&plus;&plus; Standard Library
+    URL: https://github.com/cppalliance/safe-cpp
 ---
