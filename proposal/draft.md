@@ -608,8 +608,6 @@ The [unsafe type qualifier](#the-unsafe-type-qualifier) is a powerful mechanism 
 
 To be more accommodating when mixing unsafe with safe code, the unsafe qualifier has very liberal transitive properties. A function invoked with an unsafe-qualified object or argument, or a constructor that initializes an unsafe type, are _exempted calls_. When performing overload resolution for exempted calls, function parameters of candidates become unsafe type qualified. This permits copy initialization of function arguments into parameter types when any argument is unsafe qualified. The intent is to make deployment of the `unsafe` token more strategic: use it less often but make it more impactful. It's not helpful to dilute its potency with many trivial _unsafe-block_ operations.
 
-### _using-unsafe-declaration_
-
 ## Lifetime safety
 
 There's one widely deployed solution to lifetime safety: garbage collection. In GC, the scope of an object is extended as long as there are live references to it. When there are no more live references, the system is free to destroy the object. Most memory safe languages use tracing garbage collection.[@tracing-gc] Some, like Python and Swift, use automatic reference counting,[@arc] a flavor of garbage collection with different tradeoffs.
@@ -813,7 +811,81 @@ class vector {
 
 The user enters the mutable context with the `mut` token and calls push_back. This enables binding a mutable borrow to vec in a standard conversion during overload resolution to push_back. Since the shared borrow that was taken to produce slice_iterator is still in scope, the new mutable borrow violates exclusivity and the program is ill-formed.
 
-Borrow checking is attractive because it's a unified treatment for enforcing dependencies. Compiler engineers aren't forced to develop heuristics for use-after-free, different ones for iterator invalidation, and still more clever ones for thread safety. Developers can just use the borrow types and the compiler will enforce the attendant constraints.
+Borrow checking is attractive because it's a unified treatment for enforcing dependencies. Compiler engineers aren't asked to develop heuristics for use-after-free, different ones for iterator invalidation, and still more clever ones for thread safety. Developers simply employ the borrow types and the compiler will enforce the attendant constraints.
+
+### Initializer lists
+
+Almost every part of the C++ Standard Library will exhibit unsound behavior even when used in benign-looking ways. Much of it was designed without consideration of memory safety. This goes even to the most core types, like `std::initializer_list`.
+
+[**initlist0.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/initlist0.cxx)
+```cpp
+#include <vector>
+#include <string_view>
+#include <iostream>
+
+using namespace std;
+
+int main() {
+  initializer_list<string_view> initlist1;
+  initializer_list<string_view> initlist2;
+  
+  string s = "Hello";
+  string t = "World";
+
+  // initializer lists holds dangling pointers into backing array.
+  initlist1 = { s, s, s, s };
+  initlist2 = { t, t, t, t };
+  
+  // Prints like normal.
+  vector<string_view> vec(initlist1);
+  for(string_view sv : vec)
+    cout<< sv<< "\n";
+
+  // Catastrophe.
+  vec = initlist2;
+  for(string_view sv : vec)
+    cout<< sv<< "\n";
+}
+```
+```
+$ clang++ initlist0.cxx -o initlist0 -stdlib=libc++ -O2
+$ ./initlist0
+Hello
+Hello
+Hello
+Hello
+__cxa_guard_release%s failed to broadcast__cxa_guard_abortunexpected_handler une
+xpectedly returnedterminate_handler unexpectedly returnedterminate_handler unexp
+ectedly threw an exceptionPure virtual function called!Deleted virtual function 
+called!std::exceptionstd::bad_exceptionstd::bad_allocbad_array_new_lengthSt9exce
+ptionSt13bad_exceptionSt20bad_array_new_lengthSt9bad_alloc�a���a��b��b��0b��St12
+domain_errorSt11logic_errorSt16invalid_argumentSt12length_errorSt12out_of_rangeS
+t11range_errorSt13runtime_errorSt14overflow_errorSt15underflow_errorstd::bad_cas
+tstd::bad_typeidSt9type_infoSt8bad_castSt10bad_typeidlibc++abi: reinterpret_cast
+<size_t>(p + 1) % RequiredAlignment == 0/home/sean/projects/llvm-new/libcxxabi/s
+rc/fallback_malloc.cppvoid *(anonymous namespace)::fallback_malloc(size_t)reinte
+rpret_cast<size_t>(ptr) % RequiredAlignment == 0N10__cxxabiv116__shim_type_infoE
+N10__cxxabiv117__class_type_infoEN10__cxxabiv117__pbase_type_infoEN10__cxxabiv11
+9__pointer_type_infoE
+```
+
+This example declares two initializer lists of string views, `initlist1` and `initlist2`, declares two strings, and assigns views of the strings into the two initializer lists. Printing their contents is undefined behavior. It may go undetected. But compiling with clang -O2 and targeting libc++ manifests the defect: the program is printing uncontrollably from some arbitrary place in memory. This is the kind of memory safety defect that the NSA and corporate researchers have been warning industry about. 
+
+The defect is perplexing because the string objects `s` and `t` _are still in scope_! This is a use-after-free bug, but not with an object the user wrote. It's a use-after-free of implicit backing stores that C++ generates when lowering initializer list expressions. 
+
+```cpp
+  // initializer lists holds dangling pointers into backing array.
+  initlist1 = { s, s, s, s };
+  initlist2 = { t, t, t, t };
+```
+
+Each statement provisions a 4-element `string_view` array as a backing store. An initializer list object is simply a pointer into the array and a length. It's the pointer and that gets copied into `initlist1` and `initlist2`. At the end of each full expression, those backing stores go out of scope, leaving dangling pointers. When compiled with sufficiently aggressive storage optimizations, the space on the stack that hosted the backing store for `{ t, t, t, t }` gets reused for other objects. A new initialization overwrites the pointer and length fields of the string views in that reclaimed backing store. Printing from the initializer lists prints from the smashed pointers.
+
+Safe C++ must provide safe alternatives to everything in the Standard Library.
+
+
+
+
 
 ### Scope and liveness
 
