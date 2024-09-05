@@ -62,7 +62,21 @@ choice cow/(a)
 
   auto to_mut(self^) safe -> T^ {
     return match(mut *self) {
-      .owned(^x) => x;
+      .owned(x) => ^x;
+      .borrowed(b) => std2::panic("");
+    };
+  }
+};
+
+template<class T+>
+choice cow2/(a)
+{
+  owned(T),
+  borrowed(T const^/a);
+
+  auto to_mut(self^) safe -> T^ {
+    return match(mut *self) {
+      .owned(x) => ^x;
       .borrowed(b) => std2::panic("");
     };
   }
@@ -100,6 +114,11 @@ void use_cow() safe
 
     std2::string s = str rel.into_owned();
     assert_eq(s, std2::string_view("rawr"));
+  }
+
+  {
+    cow2<std2::string> str = .owned(std2::string("rawr"));
+    mut str.to_mut();
   }
 }
 
