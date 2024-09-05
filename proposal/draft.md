@@ -636,6 +636,31 @@ fn subscript_vector(mut vec: Vec<i32>, i: usize, j: usize) {
 
 Rust's unchecked subscript story is not elegant. You have to use the separately named functions `get_unchecked` and `get_unchecked_mut` which are associated with arrays, slices and vectors using traits. These are unsafe functions, so your calls have to be wrapped in _unsafe-blocks_. That exposes other operations to the unsafe context. Since we're invoking functions directly, as opposed to using the `[]` operator, we don't get automatic dereference of the returned borrows.
 
+```cpp
+template<class T+>
+class vector
+{
+  value_type^ operator[](self^, size_type i) noexcept safe {
+    if (i >= self.size()) panic_bounds("vector subscript is out-of-bounds");
+    unsafe { return ^self.data()[i]; }
+  }
+  value_type^ operator[](self^, size_type i, no_runtime_check) noexcept {
+    return ^self.data()[i];
+  }
+
+  const value_type^ operator[](const self^, size_type i) noexcept safe {
+    if (i >= self.size()) panic_bounds("vector subscript is out-of-bounds");
+    unsafe { return ^self.data()[i]; }
+  }
+  const value_type^ operator[](const self^, size_type i, no_runtime_check) noexcept {
+    return ^self.data()[i];
+  }
+  ...
+};
+```
+
+The unsafe subscript works with user-defined types by introducing a new library type `std2::no_runtime_check`. Use this as last parameter in a user-defined `operator[]` call, including multi-dimensional subscript operators, to enable unsafe subscript binding. The compiler default-initializes a no_runtime_check and attempts to pass that during overload resolution. Since `operator[]` can't verify that its sound for all inputs, since it doesn't perform bounds checking, it's an unsafe call. But it can still be used in safe contexts! That's because the user wrote out the `unsafe` at the point of use, exempting this function call from the unsafe check.
+
 ## Lifetime safety
 
 There's one widely deployed solution to lifetime safety: garbage collection. In GC, the scope of an object is extended as long as there are live references to it. When there are no more live references, the system is free to destroy the object. Most memory safe languages use tracing garbage collection.[@tracing-gc] Some, like Python and Swift, use automatic reference counting,[@arc] a flavor of garbage collection with different tradeoffs.
