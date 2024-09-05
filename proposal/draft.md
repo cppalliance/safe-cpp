@@ -206,17 +206,17 @@ choice optional {
 
 struct Data {
   // May be engaged (some) or disengaged (none).
-  optional<std2::unique_ptr<int>> value;
+  optional<std2::box<int>> value;
 };
 ```
 
-We use an optional type to represent both aspects of our the smart pointer: disengaged (`none`) and engaged (`some`). If you want to move the pointer, detach it from the optional, which changes the state of the optional from `some` to `none`. The C++ Standard Library has an optional type,[@optional] but it's not safe to use. The optional API is full of undefined behaviors.[@optional-undefined]
+We use an optional type to represent both aspects of our the smart pointer: disengaged (`none`) and engaged (`some`). If you want to move the pointer, detach it from the optional, which changes the state of the optional from `some` to `none`. The C++ Standard Library has an optional type,[@optional] but it's not safe to use. The optional API is full of undefined behaviors.
 
 ![std::optional::operator*](optional-undefined.png)
 
-A similar class, `std::expected`, which is new to C++23, is also full of undefined behaviors.[@expected-undefined]
+A similar class, `std::expected`, which is new to C++23, is also full of undefined behaviors.
 
-If we were to wrap the safe `std2::unique_ptr` in an `std::optional`, it would be just as unsafe as using `std::unique_ptr`. Using `->` with a disengaged value would cause undefined behavior.
+If we were to wrap the safe `std2::box` in an `std::optional`, it would be just as unsafe as using `std::box`. Using `->` with a disengaged value would cause undefined behavior.
 
 The new `std2::optional` is a _choice type_, a first-class discriminated union, that can only be accessed with _pattern matching_. Pattern matching makes the union variety of type safety violations impossible: we can't access the wrong state of the sum type.
 
@@ -292,7 +292,7 @@ Pattern matching and choice types aren't just a qualify-of-life improvement. The
 
 ### Thread safety
 
-A memory-safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread should be allowed access to it. Rust provides thread safety using a really novel extension of the type system.
+A memory-safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread should be allowed access to it. Rust provides thread safety using a novel extension of the type system. 
 
 TODO
 
@@ -458,7 +458,7 @@ Naming an unsafe object yields an lvalue expression of the unsafe type. What are
 
 Calling unsafe member functions on expressions with unsafe types is permitted in the unsafe context. Calling initializers of unsafe types is also permitted. In fact, these operations on unsafe types are "safe" for the purpose of _safe-operator_.
 
-Expressions carry noexcept and safe information which is outside of the type's expression; this information is moved transitively between subexpressions and feeds the _noexcept-_- and _safe-operator_. Why make unsafe a type qualifier, which represents a significant change to the type system, rather than some other kind of property of an object or member declaration, propagate it like the noexcept and safe flags?
+Expressions carry noexcept and safe information which is outside of the type's expression; this information is moved transitively between subexpressions and feeds the _noexcept-_ and _safe-operator_. Why make unsafe a type qualifier, which represents a significant change to the type system, rather than some other kind of property of an object or member declaration, propagate it like the noexcept and safe flags?
 
 The answer is that template specialization works on types and it doesn't work on these other kinds of properties. A template argument with an unsafe qualifier instantiates a template with an unsafe qualifier on the corresponding template parameter. The unsafe qualifier drills through templates in a way that other language entities don't.
 
@@ -594,6 +594,47 @@ This program is well-formed. As with the previous example, there's a direct init
 The [unsafe type qualifier](#the-unsafe-type-qualifier) is a powerful mechanism for incorporating legacy code into new, safe templates. But propagating the qualifier through all template parameters may be too permissive. C++ templates won't be expecting the `unsafe` qualifier, and it may break dependencies. Functions that are explicitly instantiated won't have `unsafe` instantiations, and that would cause link errors. It may be prudent to get some usage experience, and limit this type qualifier to being deduced only by type template parameters with a certain token, eg `typename T?`. That way, `typename T+?` would become a common incantation for containers: create template lifetime parameters for this template parameter _and_ deduce the unsafe qualifier for it.
 
 To be more accommodating when mixing unsafe with safe code, the unsafe qualifier has very liberal transitive properties. A function invoked with an unsafe-qualified object or argument, or a constructor that initializes an unsafe type, are _exempted calls_. When performing overload resolution for exempted calls, function parameters of candidates become unsafe type qualified. This permits copy initialization of function arguments into parameter types when any argument is unsafe qualified. The intent is to make deployment of the `unsafe` token more strategic: use it less often but make it more impactful. It's not helpful to dilute its potency with many trivial _unsafe-block_ operations.
+
+### unsafe subscripts
+
+There's one more prominent use of the `unsafe` token. It'll suppress runtime bounds checks during subscript operations on both builtin and user-defined types. For applications where nanoseconds matter, developers may want to forego runtime bounds checking. In Safe C++, this is exceptionally easy. Just write `; unsafe` in your array, slice or vector subscript.
+
+[**unsafe_bounds.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe_bounds.cxx)
+```cpp
+#feature on safety
+#include <std2.h>
+
+void subscript_array([int; 10] array, size_t i, size_t j) safe {
+  array[i; unsafe] += array[j; unsafe];
+}
+
+void subscript_slice([int; dyn]^ slice, size_t i, size_t j) safe {
+  slice[i; unsafe] += slice[j; unsafe];
+}
+
+void subscript_vector(std2::vector<int> vec, size_t i, size_t j) safe {
+  mut vec[i; unsafe] += vec[j; unsafe];
+}
+```
+
+The unsafe subscript cleary indicates that runtime bounds checks is relaxed, while keeping a consistent syntax with ordinary checked subscripts. It doesn't expose any other operations, including preparation of the subscript index, to an unsafe context. The use of the `unsafe` token is the programmer's way of taking responsibility for correct behavior. If something goes wrong, you know who to blame.
+
+[**unsafe_bounds.rs**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe_bounds.rs)
+```rust
+fn subscript_array(mut array: [i32; 10], i: usize, j: usize) {
+  unsafe { *array.get_unchecked_mut(i) += *array.get_unchecked(j); }
+}
+
+fn subcript_slice(slice: &mut [i32], i: usize, j: usize) {
+  unsafe { *slice.get_unchecked_mut(i) += *slice.get_unchecked(j); }
+}
+
+fn subscript_vector(mut vec: Vec<i32>, i: usize, j: usize) {
+  unsafe { *vec.get_unchecked_mut(i) += *vec.get_unchecked(j); }
+}
+```
+
+Rust's unchecked subscript story is not elegant. You have to use the separately named functions `get_unchecked` and `get_unchecked_mut` which are associated with arrays, slices and vectors using traits. These are unsafe functions, so your calls have to be wrapped in _unsafe-blocks_. That exposes other operations to the unsafe context. Since we're invoking functions directly, as opposed to using the `[]` operator, we don't get automatic dereference of the returned borrows.
 
 ## Lifetime safety
 
@@ -900,7 +941,8 @@ safety: during safety checking of int main() safe
     vector<string_view> vec(rel initlist); 
                                 ^
   use of initlist depends on expired loan
-  drop of temporary object std2::string_view[4] while mutable borrow of temporary object std2::string_view[4][..] is in scope
+  drop of temporary object std2::string_view[4] while mutable borrow of 
+    temporary object std2::string_view[4][..] is in scope
   loan created at initlist1.cxx:13:14
     initlist = { s, t, s, t }; 
                ^
@@ -1242,7 +1284,7 @@ template<typename T>
 void f/(a, b where a : b)(T^/a x, const T^/b y) { }
 ```
 
-Rust uses single-quotes to introduce lifetime parameters and lifetime arguments. That's not a workable choice for us, because C supports multi-character literals.[@character-literal] This cursed feature, in which literals like `'abcd'` evaluate to constants of type `int`, makes lexing Rust-style lifetime arguments very messy.
+Rust uses single-quotes to introduce lifetime parameters and lifetime arguments. That's not a workable choice for us, because C supports multi-character literals. This cursed feature, in which literals like `'abcd'` evaluate to constants of type `int`, makes lexing Rust-style lifetime arguments very messy.
 
 ```cpp
 template<typename T>
@@ -1539,11 +1581,11 @@ During normalization of this function specialization, the _outlives-constraint_ 
 
 ## Explicit mutation
 
-Reference binding convention is important in the context of borrow checking. Const and non-const borrows differ by more than just constness. By the law of exclusivity, users are allowed multiple live shared borrows, but only one live mutable borrow. C++'s convention of always preferring non-const references would tie the borrow checker into knots, as mutable borrows don't permit aliasing. This is one reason why there's no way to borrow check existing C++ code: the standard conversion contirbutes to mutable aliasing.
+Reference binding convention is important in the context of borrow checking. Const and non-const borrows differ by more than just constness. By the law of exclusivity, users are allowed multiple live shared borrows, but only one live mutable borrow. C++'s convention of always preferring non-const references would tie the borrow checker into knots, as mutable borrows don't permit aliasing. This is one reason why there's no way to borrow check existing C++ code: the standard conversion contributes to mutable aliasing.
 
-Unlike in ISO C++, expressions can have reference types. Naming a reference object yields an lvalue expression with reference type, rather than implicitly dereferencing the reference and giving you an lvalue to the pointed-at thing.
+Unlike in Standard C++, expressions can have reference types. Naming a reference object yields an lvalue expression with reference type, rather than implicitly dereferencing the reference and giving you an lvalue to the pointed-at thing. Since dereferencing legacy references is unsafe, if references were implicitly dereferenced, you'd never be able to use them in safe contexts. In Safe C++, references are more like pointers, and passed around in safe contexts, but not dereferenced.
 
-Rather than binding the mutable overload of functions by default, Safe C++ prefers binding  const overloads. Shared borrows are less likely to bring borrow checker errors. To improve reference binding precision, the relocation object model takes a new approach to references. The standard conversion will bind const borrows and const lvalue references to lvalues of the same type. But standard conversions won't bind mutable borrows and mutable lvalue references. Those require an opt-in.
+Rather than binding the mutable overload of functions by default, Safe C++ prefers binding const overloads. Shared borrows are less likely to bring borrow checker errors. To improve reference binding precision, the relocation object model takes a new approach to references. The standard conversion will bind const borrows and const lvalue references to lvalues of the same type. But standard conversions won't bind mutable borrows and mutable lvalue references. Those require an opt-in.
 
 ```cpp
 struct Obj {
@@ -2033,12 +2075,7 @@ public:
 
 Forming a pointer to the mutable inner state through a shared borrow is _safe_, but dereferencing that pointer is unsafe. Safe C++ implements `std2::cell`, `std2::ref_cell`, `std2::mutex` and `std2::shared_mutex`, which provide safe member functions to access interior state through their deconfliction strategies.
 
-Safe C++ and Rust and equate exclusive access with mutable types and shared access with const types. This is an economical choice, because one type qualifier, const, also determines exclusivity. This awkward cast-away-const model of interior mutability is the logical consequence. But it's not the only way.
-
-The Ante language[@ante] experiments with separate mutable (exclusive) and mutable (shared) type qualifiers.
-
-TODO
-
+Safe C++ and Rust and equate exclusive access with mutable types and shared access with const types. This is an economical choice, because one type qualifier, const, also determines exclusivity. This awkward cast-away-const model of interior mutability is the logical consequence. But it's not the only way. The Ante language[@ante] experiments with separate mutable (exclusive) and mutable (shared) type qualifiers. It uses `own mut` and `shared mut` as compound type qualifiers. This three-state system doesn't map onto C++'s existing type system as easily, but that doesn't mean the const/mutable borrow treatment, which does integrate elegantly, is really the most expressive.
 
 ## Thread safety
 
@@ -2124,6 +2161,7 @@ Let's say all functions declared in the [safety] feature implement the _relocate
 The friction comes when forming function pointers or pointers-to-member functions for indirect calls. The pointer has to contain ABI information in its type, and a pointer to a relocate ABI function must have a different type than a pointer to the equivalent legacy ABI function. Ideally we'd have an undecorated function pointer type that can point to either legacy or relocate ABI functions, creating a unified type for indirect function calls.
 
 Consider these three new ABIs:
+
 * `__relocate` - Relocate CC. Callee destroys parameters. This is opt-in for both legacy and [safety] modes.
 * `__legacy` - Legacy CC. The system's default calling convention. For Itanium ABI, the caller destroys arguments.
 * `__unified` - A unified CC that holds function pointers of either the above types. The implementer can use the most significant bit to store a discriminator between CCs: set=`__relocate`, cleared=`__legacy`. This is the default for the [safety] mode.
@@ -2228,10 +2266,14 @@ In addition to the core safety features, there are many new types that put a dem
 
 # Conclusion
 
-The US Government is telling industry to stop using C++ for reasons of national security. Academia is turning away in favor of languages like Rust and Swift that are built on modern technology. C++ risks becoming a legacy language 
+The US Government is telling industry to stop using C++ for reasons of national security. Academia is turning away in favor of languages like Rust and Swift that are built on modern technology. C++ risks becoming a legacy language. This dilutes the language's value and that's trouble for companies which rely on access to a pipeline of young C++ developers to run their operations.
+
+_Ownership and borrowing_ is the only viable safety model for C++. The Rust project holds a lot of value for C++: it's generated _soundness knowledge_ which is instructive for implementing and using this safety model. 
+
+Everything in this proposal took about 18 months to design and implement in Circle. With participation from industry, we could resolve the remaining design questions and in another 18 months have a language and standard library robust enough for mainstream evaluation. While Safe C++ is a large extension to the language, the cost of building new tooling is not steep. If C++ continues to go forward without a memory safety strategy, it's because institutional choose not to have one; it's not because memory-safe tooling is too expensive or difficult to build.
 
 
-All this took about 18 months to design and implement in Circle. I spent six months in advance learning Rust and reading the NLL RFC and Rustnomicon, which are critical resources for understanding the safety model. While Safe C++ is a large extension to the language, the cost of building the new tooling is not steep. If C++ continues to go forward without a memory safety strategy, it's because institutional users don't want one, not because memory-safe tooling is too expensive or difficult to build.
+
 
 There is a Safe C++ standard library being developed[@safecpp-stdlib] in tandem with this proposal which aims to co-evolve alongside the Safe C++ extensions. It contains basic implementations of common types such as `std2::vector`, `std2::string` and `std2::thread`, and serves as a useful proof-of-concept.
 
