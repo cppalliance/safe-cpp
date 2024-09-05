@@ -27,7 +27,7 @@ using u32string = basic_string<char32_t>;
 
 template<class CharT>
 class [[unsafe::send, unsafe::sync]]
-  __attribute__((preferred_name(string))) 
+  __attribute__((preferred_name(string)))
   __attribute__((preferred_name(wstring)))
   __attribute__((preferred_name(u8string)))
   __attribute__((preferred_name(u16string)))

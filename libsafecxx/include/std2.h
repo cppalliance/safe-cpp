@@ -10,6 +10,7 @@
 #include <std2/atomic.h>
 #include <std2/box.h>
 #include <std2/cell.h>
+#include <std2/expected.h>
 #include <std2/initializer_list.h>
 #include <std2/io.h>
 #include <std2/iterator.h>
@@ -20,9 +21,9 @@
 #include <std2/shared_mutex.h>
 #include <std2/slice.h>
 #include <std2/source_location.h>
+#include <std2/string.h>
 #include <std2/string_constant.h>
 #include <std2/string_view.h>
-#include <std2/string.h>
 #include <std2/thread.h>
 #include <std2/tuple.h>
 #include <std2/type_traits.h>
