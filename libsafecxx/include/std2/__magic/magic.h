@@ -1,3 +1,5 @@
+#pragma once
+
 namespace std2 {
 
 // N must be deduced by the implementation.
