@@ -17,7 +17,7 @@ template<class T+>
 class initializer_list/(a) {
   // Point to byte data on the stack.
   T* unsafe _cur;
-  T* unsafe _end;
+  T* _end;
   T^/a __phantom_data;
 
   explicit
@@ -35,16 +35,17 @@ public:
 
   ~initializer_list() safe requires(T~is_trivially_destructible) = default;
 
+  [[unsafe::drop_only(T)]] 
   ~initializer_list() safe requires(!T~is_trivially_destructible) {
     std::destroy_n(_cur, _end - _cur);
   }
 
   [T; dyn]^ slice(self^) noexcept safe {
-    unsafe { return slice_from_raw_parts(self->_cur, self->size()); }
+    return slice_from_raw_parts(self->_cur, self->size());
   }
 
   const [T; dyn]^ slice(const self^) noexcept safe {
-    unsafe { return slice_from_raw_parts(self->_cur, self->size()); }
+    return slice_from_raw_parts(self->_cur, self->size());
   }
 
   optional<T> next(self^) noexcept safe {
