@@ -11,6 +11,7 @@
 #include <std2/slice.h>
 #include <std2/initializer_list.h>
 #include <std2/optional.h>
+#include <std2/__magic/magic.h>
 
 #include <cstddef>
 #include <cstring>
@@ -151,10 +152,16 @@ public:
     if (i >= self.size()) panic_bounds("vector subscript is out-of-bounds");
     unsafe { return ^self.data()[i]; }
   }
+  value_type^ operator[](self^, size_type i, no_runtime_check) noexcept {
+    return ^self.data()[i];
+  }
 
   const value_type^ operator[](const self^, size_type i) noexcept safe {
     if (i >= self.size()) panic_bounds("vector subscript is out-of-bounds");
     unsafe { return ^self.data()[i]; }
+  }
+  const value_type^ operator[](const self^, size_type i, no_runtime_check) noexcept {
+    return ^self.data()[i];
   }
 
   void reserve(self^, size_type n) safe {
