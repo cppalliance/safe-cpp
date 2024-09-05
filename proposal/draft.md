@@ -7,13 +7,7 @@ toc: true
 toc-depth: 2
 ---
 
-\pagebreak
-
 # Introduction
-
-An earlier version of this work was presented to SG23 at the St Louis 2024 ISO meeting, with the closing poll "We should promise more committee time on borrow checking?" --- SF: 20, WF: 7, N: 1, WA: 0, SA: 0.
-
-There is a Safe C++ standard library being developed[@safecpp-stdlib] in tandem with this proposal which aims to co-evolve alongside the Safe C++ extensions. It contains basic implementations of common types such as `std2::vector`, `std2::string` and `std2::thread`, and serves as a useful proof-of-concept.
 
 ## The call for memory safety
 
@@ -309,15 +303,6 @@ TODO
 
 
 # Design overview
-
-## Tour of Safe C++
-
-Get 4-6 small samples to illustrate strenghts of this language. Ideas from the chat:
-
-* box never being in a null state is approachable from a conceptual understanding
-* borrow checking essentially fixes everything wrong with std::string_view
-* relocatable semantics dramatically simplifies implementations of containers like std::vector
-* borrow checking can also trivialize API design where you hand out a RAII-like handles
 
 ## The `safe` context
 
@@ -882,13 +867,103 @@ The defect is perplexing because the string objects `s` and `t` _are still in sc
   initlist2 = { t, t, t, t };
 ```
 
-Each statement provisions a 4-element `string_view` array as a backing store. An initializer list object is simply a pointer into the array and a length. It's the pointer and that gets copied into `initlist1` and `initlist2`. At the end of each full expression, those backing stores go out of scope, leaving dangling pointers. When compiled with sufficiently aggressive storage optimizations, the space on the stack that hosted the backing store for `{ t, t, t, t }` gets reused for other objects. A new initialization overwrites the pointer and length fields of the string views in that reclaimed backing store. Printing from the initializer lists prints from the smashed pointers.
+Each statement provisions a 4-element `string_view` array as a backing store. An initializer list object is simply a pointer into the array and a length. It's the pointer into the backing store that's copied into `initlist1` and `initlist2`. At the end of each full expression, those backing stores go out of scope, leaving dangling pointers in the initializer lists. When compiled with aggressive local storage optimizations, the stack space that hosted the backing store for `{ t, t, t, t }` gets reused for other objects. A new initialization overwrites the pointer and length fields of the string views in that reclaimed backing store. Printing from the initializer lists prints from the smashed pointers.
 
 Safe C++ must provide safe alternatives to everything in the Standard Library.
 
+[**initlist1.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/initlist1.cxx)
+```cxx
+#feature on safety
+#include <std2.h>
 
+using namespace std2;
 
+int main() safe {
+  initializer_list<string_view> initlist;
+  
+  string s = "Hello";
+  string t = "World";
 
+  // initializer lists holds dangling pointers into backing array.
+  initlist = { s, t, s, t };
+  
+  // Borrow checker error. `use of initlist depends on expired loan`
+  vector<string_view> vec(rel initlist);
+  for(string_view sv : vec)
+    println(sv);
+}
+```
+```
+$ circle initlist1.cxx -I ../libsafecxx/include/
+safety: during safety checking of int main() safe
+  borrow checking: initlist1.cxx:16:31
+    vector<string_view> vec(rel initlist); 
+                                ^
+  use of initlist depends on expired loan
+  drop of temporary object std2::string_view[4] while mutable borrow of temporary object std2::string_view[4][..] is in scope
+  loan created at initlist1.cxx:13:14
+    initlist = { s, t, s, t }; 
+               ^
+```
+
+Safe C++ includes a new `std2::initializer_list` which sits side-by-side with the legacy type. The compiler provisions a backing store to hold the data, and the new initializer list also keeps pointers into that. The backing store expires at the end of the assignment state. But borrow checking prevents the kind of use-after-free defect that troubles `std::initializer_list`. An error is filed where the initializer list constructs a vector: `use of initlist depends on expired loan`.
+
+The Safe C++ replacement for initializer lists takes the _ownership and borrowing_ model to heart by doing both. It borrows the storage its elements are held in, but it also owns the elements and calls their destructors. We want to support relocation out of the initializer list. That means the backing store can't call the element destructors, because those elements may have been relocated out by the user. `std2::initializer_list` is more a vector, in that it destroys un-consumed objects when dropped, but also like a view, in that sees into another object's storage.
+
+```cpp
+template<class T+>
+class initializer_list/(a) {
+  // Point to byte data on the stack.
+  T* unsafe _cur;
+  T* _end;
+  T^/a __phantom_data;
+
+  explicit
+  initializer_list([T; dyn]^/a data) noexcept safe :
+    _cur((*data)~as_pointer),
+    unsafe _end((*data)~as_pointer + (*data)~length) { }
+
+public:
+
+  ~initializer_list() safe requires(T~is_trivially_destructible) = default;
+
+  [[unsafe::drop_only(T)]] 
+  ~initializer_list() safe requires(!T~is_trivially_destructible) {
+    std::destroy_n(_cur, _end - _cur);
+  }
+
+  optional<T> next(self^) noexcept safe {
+    if(self->_cur != self->_end)
+      return .some(__rel_read(self->_cur++));
+    else
+      return .none;
+  }
+
+  T* data(self^) noexcept safe {
+    return self->_cur;
+  }
+
+  const T* data(const self^) noexcept safe {
+    return self->_cur;
+  }
+
+  std::size_t size(const self^) noexcept safe {
+    return (std::size_t)(self->_end - self->_cur);
+  }
+
+  // Unsafe call to advance. Use this after relocating data out of
+  // data().
+  void advance(self^, std::size_t size) noexcept {
+    self->_cur += static_cast<std::ptrdiff_t>(size);
+  }
+
+  ...
+};
+```
+
+`std2::initializer_list` has a named lifetime parameter, `a`, which puts a constraint on the backing store. The private explicit constructor is called with compiler magic. The argument is a [slice](#arrays-and-slice) borrow to the backing store. Note the lifetime argument on the borrow is the class's named lifetime parameter. This means the backing store outlives the initializer list.
+
+This initializer has a relatively rich interface. Of course you can query for the pointer to the data and its length. But users may also call `next` to pop off an elmeent at a time. `initializer_list` is essentially an iterator. But for element types that are trivially relocatable, users can call `data` and `size` to relocate them in bulk, and then `advance` by the number of consumed elements. When the init list goes out of scope, it destroys all unconsumed elements.
 
 ### Scope and liveness
 
@@ -2017,19 +2092,13 @@ t rel.join();
 
 Making sound thread-safe code necessitates interior mutability, which requires a compiler primitive to make the `const_cast` valid. The library is manually upholding invariants around exlusivity via unsafe constructs but what results is a sound interface that is impossible to misuse.
 
-
-## Types with compiler magic
-
-std2::initializer_list
-std2::string_constant
-
 # Unresolved or unimplemented design issues
 
 ## _expression-outlives-constraint_
 
 C++ variadics don't convey lifetime constraints from the function's return type to its parameters. Calls like `make_unique` and `emplace_back` take parameters `Ts... args` and return an unrelated type `T`. This may trigger the borrow checker, because the implementation of the function will produce free regions with unrelated endpoints. It's not a soundness issue, but it is a serious usability issue.
 
-We need an _expression-outlives-constraint_, a programmatic version of _outlives-constrant_ `/(where a : b)`. It consists of an _expression_ in an unevaluated context, which names the actual function parameters and harvests the lifetime constraints (and variances?) implied by those expressions. We should name function parameters rather than declvals of their types, because they may be borrows with additional constraints than their template lifetime parameters have.
+We need an _expression-outlives-constraint_, a programmatic version of _outlives-constrant_ `/(where a : b)`. It consists of an _expression_ in an unevaluated context, which names the actual function parameters and harvests the lifetime constraints implied by those expressions. We should name function parameters rather than declvals of their types, because they may be borrows with additional constraints than their template lifetime parameters have.
 
 In order to name the function parameters, we'll need a trailing _expression-lifetime-constraint_ syntax. Something like,
 
@@ -2157,7 +2226,16 @@ There are some new syntax requirements. Circle chose the `#feature` directive to
 
 In addition to the core safety features, there are many new types that put a demand on engineering resources: borrows, choice types (and pattern matching to use them), first-class tuples, arrays and slices. Interfaces and interface templates are a new language mechanism that provides customization points to C++, making it much easier to author libraries that are called directly by the language. Examples in Safe C++ are the iterator support for ranged-for statements, send/sync for thread safety and fmt interfaces for f-strings.
 
+# Conclusion
+
+The US Government is telling industry to stop using C++ for reasons of national security. Academia is turning away in favor of languages like Rust and Swift that are built on modern technology. C++ risks becoming a legacy language 
+
+
 All this took about 18 months to design and implement in Circle. I spent six months in advance learning Rust and reading the NLL RFC and Rustnomicon, which are critical resources for understanding the safety model. While Safe C++ is a large extension to the language, the cost of building the new tooling is not steep. If C++ continues to go forward without a memory safety strategy, it's because institutional users don't want one, not because memory-safe tooling is too expensive or difficult to build.
+
+There is a Safe C++ standard library being developed[@safecpp-stdlib] in tandem with this proposal which aims to co-evolve alongside the Safe C++ extensions. It contains basic implementations of common types such as `std2::vector`, `std2::string` and `std2::thread`, and serves as a useful proof-of-concept.
+
+An earlier version of this work was presented to SG23 at the St Louis 2024 ISO meeting, with the closing poll "We should promise more committee time on borrow checking?" --- SF: 20, WF: 7, N: 1, WA: 0, SA: 0.
 
 ---
 references:
