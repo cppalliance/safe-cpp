@@ -6,6 +6,8 @@
 #pragma once
 #feature on safety
 
+#include <std2/utility.h>
+
 namespace std2
 {
 
