@@ -17,6 +17,7 @@
 #include <std2/mutex.h>
 #include <std2/optional.h>
 #include <std2/panic.h>
+#include <std2/rc.h>
 #include <std2/ref_cell.h>
 #include <std2/shared_mutex.h>
 #include <std2/slice.h>

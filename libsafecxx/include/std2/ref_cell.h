@@ -95,12 +95,28 @@ class ref_cell
     return .some(ref{self->t_.get(), self->borrow_count_});
   }
 
+  ref borrow(self const^) noexcept safe {
+    auto opt = self.try_borrow();
+    return match(opt) {
+      .some(b) => rel b;
+      .none => panic("ref_cell failed to acquire const borrow");
+    };
+  }
+
   optional<ref_mut> try_borrow_mut(self const^) noexcept safe
   {
     auto b = self->borrow_count_.get();
     if (b > 0) return .none;
     if (b == -1) return .none;
     return .some(ref_mut{self->t_.get(), self->borrow_count_});
+  }
+
+  ref_mut borrow_mut(self const^) noexcept safe {
+    auto opt = self.try_borrow_mut();
+    return match(opt) {
+      .some(b) => rel b;
+      .none => panic("ref_cell failed to acquire const borrow");
+    };
   }
 
   T^ get_mut(self^) noexcept safe {
