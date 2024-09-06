@@ -292,9 +292,39 @@ Pattern matching and choice types aren't just a qualify-of-life improvement. The
 
 ### Thread safety
 
-A memory-safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread should be allowed access to it. Rust provides thread safety using a novel extension of the type system. 
+A memory-safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread should be allowed access to it. Rust provides thread safety using a novel extension of the type system.
 
-TODO
+To this end, Rust (and now subsequently the Safe C++ extensions) introduce compiler-intrinsic traits known as `send` and `sync`. These are marker traits that the type system and libraries uses to reason about the thread-safety of objects.
+
+The semantic meaning of `send` is that an instance of a type is safe to relocate across thread boundaries. For many types, such as those who uniquely own a resource, being `send` is almost trivial as all that's happening is a pointer is being passed to another thread, i.e. it's safe for `std2::string` to be sent to a new thread because all it does is deallocate a simple char array.
+
+`std2::arc` is another example of a type that's `send` because even though there can be multiple concurrent instances of the `arc`, it internally uses atomic referece counting which means it's safe to run the destructors on other threads. `std2::rc` is an example of a type that can never be soundly `send`, because there can be multiple copies of the same `rc` and the reference counting is not atomic which creates a data race.
+
+`sync` is a trait that denotes if an immutable reference to a type is safe to be shared among multiple threads. In the general case, a type is `sync` if `T const^` is `send`. Elaborating, this means that if it's safe to send a reference across thread boundaries, we can infer that the type is safe in a multi-threaded context. Again, `std2::arc` is `sync` because it's safe to send `std2::arc const^` across threads. A calling thread can freely copy the `arc` via its immutable reference without introducing a data race. Conversely, `std2::rc const^` cannot be `send` because if a calling thread copies the `rc`, then it non-atomically modifies the reference count which is a data race.
+
+It is worth noting that on a pedantic level, many of these types are conditionally `send` and `sync` based on the underlying `T` they're templated on. Consider the declaration of `std2::arc`:
+
+```cpp
+template<class T+>
+class [[unsafe::send(T~is_send && T~is_sync), unsafe::sync(T~is_send && T~is_sync)]] arc;
+```
+
+We see here that `arc` is only `send` and `sync` if the underlying `T` is both `sync` _and_ `sync`. This is because to be fully sound, the type must be able to have its destructor run on any thread (hence `send`) and because `arc`s support dereferencing, `T const^` is available to any and all threads.
+
+Authors of types are free to manually implement these traits as they see fit, so long as the author of the type understands they honor this at the penalty of breaking memory safety.
+
+By default, types with interior mutability are inherently not `send`/`sync`. The root of all interior mutability is `std2::unsafe_cell<T>` which is uncoditionally `[[unsafe::sync(false)]]`. If `T` is not `sync` then by definition we know that `T const^` is not `send` because it cannot be sent safely across thread boundaries so we only need to specify one market trait in its definition.
+
+Types that wrap `unsafe_cell` are able to manually implement the marker traits, provided the author ensures soundness. This is how `std2::mutex` is implemented:
+
+```cpp
+template<class T+>
+class [[unsafe::send(T~is_send), unsafe::sync(T~is_send)]] mutex;
+```
+
+Note for `mutex` that the `send` and `sync` bounds are defined based on the `send`-ability of the type. This is because the `mutex` is responsible for implementing the `sync` aspect but because the `mutex` enables mutable access to the underlying data, the wrapped object can be relocated out of and the destructor of the type can be run on a new thread.
+
+Creating the correct `send` and `sync` bounds is often a non-trivial task but we have prior art to base our code off of.
 
 ### Runtime checks
 
@@ -453,7 +483,7 @@ int func(const int* p) safe {
     // Pointer difference is unsafe.
     ptrdiff_t diff = p - p;
 
-    // unsafe-blocks do not open lexical scopes. Declarations will be 
+    // unsafe-blocks do not open lexical scopes. Declarations will be
     // visible below.
     int x = p[4];
   }
@@ -482,12 +512,12 @@ struct Foo {
 int main() safe {
   // Support unsafe before conditions.
   if(unsafe pred()) { }
-  while(unsafe pred()) { } 
+  while(unsafe pred()) { }
 
   int x = match(1) {
     // Support unsafe after the => in a match-clause.
     _ => unsafe pred();
-  }; 
+  };
 }
 ```
 
@@ -997,13 +1027,13 @@ using namespace std2;
 
 int main() safe {
   initializer_list<string_view> initlist;
-  
+
   string s = "Hello";
   string t = "World";
 
   // initializer lists holds dangling pointers into backing array.
   initlist = { s, t, s, t };
-  
+
   // Borrow checker error. `use of initlist depends on expired loan`
   vector<string_view> vec(rel initlist);
   for(string_view sv : vec)
@@ -1014,13 +1044,13 @@ int main() safe {
 $ circle initlist1.cxx -I ../libsafecxx/include/
 safety: during safety checking of int main() safe
   borrow checking: initlist1.cxx:16:31
-    vector<string_view> vec(rel initlist); 
+    vector<string_view> vec(rel initlist);
                                 ^
   use of initlist depends on expired loan
-  drop of temporary object std2::string_view[4] while mutable borrow of 
+  drop of temporary object std2::string_view[4] while mutable borrow of
     temporary object std2::string_view[4][..] is in scope
   loan created at initlist1.cxx:13:14
-    initlist = { s, t, s, t }; 
+    initlist = { s, t, s, t };
                ^
 ```
 
@@ -1045,7 +1075,7 @@ public:
 
   ~initializer_list() safe requires(T~is_trivially_destructible) = default;
 
-  [[unsafe::drop_only(T)]] 
+  [[unsafe::drop_only(T)]]
   ~initializer_list() safe requires(!T~is_trivially_destructible) {
     std::destroy_n(_cur, _end - _cur);
   }
@@ -2344,7 +2374,7 @@ In addition to the core safety features, there are many new types that put a dem
 
 The US Government is telling industry to stop using C++ for reasons of national security. Academia is turning away in favor of languages like Rust and Swift that are built on modern technology. C++ risks becoming a legacy language. This dilutes the language's value and that's trouble for companies which rely on access to a pipeline of young C++ developers to run their operations.
 
-_Ownership and borrowing_ is the only viable safety model for C++. The Rust project holds a lot of value for C++: it's generated _soundness knowledge_ which is instructive for implementing and using this safety model. 
+_Ownership and borrowing_ is the only viable safety model for C++. The Rust project holds a lot of value for C++: it's generated _soundness knowledge_ which is instructive for implementing and using this safety model.
 
 Everything in this proposal took about 18 months to design and implement in Circle. With participation from industry, we could resolve the remaining design questions and in another 18 months have a language and standard library robust enough for mainstream evaluation. While Safe C++ is a large extension to the language, the cost of building new tooling is not steep. If C++ continues to go forward without a memory safety strategy, it's because institutional choose not to have one; it's not because memory-safe tooling is too expensive or difficult to build.
 
