@@ -325,8 +325,7 @@ Creating the correct `send` and `sync` bounds is often a non-trivial task but we
 
 One of the most common vulnerabilities is out-of-bounds access. By default, all array-like accesses are checked in Safe C++. This includes both arrays and slices.
 
-Example:
-
+[**subscript_array.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/subscript_array.cxx)
 ```cpp
 int main() safe {
   int array[4] { };
@@ -339,6 +338,7 @@ int main() safe {
 
 and:
 
+[**subscript_slice.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/subscript_slice.cxx)
 ```cpp
 int main() safe {
   int array[4] { };
@@ -357,10 +357,9 @@ int main() safe {
 }
 ```
 
-Sum types such as `choice` only support checking at runtime via a `match` statement which must be exhaustive. This is another form of runtime checking that forces developers to handle all possible cases that can occur.
-
 Arithmetic is also checked and will result in panics on overflow or underflow.
 
+[**divide_overflow.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/divide_overflow.cxx)
 ```cpp
 int main() safe {
   // Panic to prevent undefined behavior with int overflow.
