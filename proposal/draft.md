@@ -323,9 +323,53 @@ Creating the correct `send` and `sync` bounds is often a non-trivial task but we
 
 ### Runtime checks
 
-TODO
+One of the most common vulnerabilities is out-of-bounds access. By default, all array-like accesses are checked in Safe C++. This includes both arrays and slices.
 
+Example:
 
+```cpp
+int main() safe {
+  int array[4] { };
+  size_t index = 10;
+
+  // Panic on out-of-bounds array subscript.
+  int x = array[index];
+}
+```
+
+and:
+
+```cpp
+int main() safe {
+  int array[4] { };
+
+  // Stardard conversion from array borrow to slice borrow.
+  [int; dyn]^ slice = ^array;
+
+  // The slice borrow is the size of 2 pointers. It contains:
+  // 1. A pointer to the data.
+  // 2. A size_t of the elements after the pointer.
+  static_assert(2 * sizeof(void*) == sizeof slice);
+
+  // Panic on out-of-bounds slice subscript.
+  size_t index = 10;
+  int x = slice[index];
+}
+```
+
+Sum types such as `choice` only support checking at runtime via a `match` statement which must be exhaustive. This is another form of runtime checking that forces developers to handle all possible cases that can occur.
+
+Arithmetic is also checked and will result in panics on overflow or underflow.
+
+```cpp
+int main() safe {
+  // Panic to prevent undefined behavior with int overflow.
+  // This occurs regardless of safe context.
+  int x = INT_MIN;
+  int y = -1;
+  int z = x / y;
+}
+```
 
 # Design overview
 
