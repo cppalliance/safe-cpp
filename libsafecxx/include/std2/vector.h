@@ -217,11 +217,11 @@ impl vector<T>: make_iter {
   using into_iter_type  = into_iterator<T>;
 
   iter_type iter(self const^) noexcept safe override {
-    return slice_iterator<const T>(self->slice());
+    return slice_iterator<const T>(self.slice());
   }
 
   iter_mut_type iter(self^) noexcept safe override {
-    return slice_iterator<T>(self^->slice());
+    return slice_iterator<T>(self.slice());
   }
 
   into_iter_type iter(self) noexcept safe override {

@@ -128,11 +128,14 @@ It's instructive to break the memory safety problem down into four categories. E
 
 ### Lifetime safety
 
-How do we ensure that dangling references are never used? There are two safe technologies: garbage collection and borrow checking. Garbage collection is simple to implement and use, but moves object allocations to the heap, making it incompatible with manual memory manegement. It extends object lifetimes as long as there are live references to them, making it incompatible with C++'s RAII[@raii] object model.
+How do we ensure that dangling references are never used? There are two mainstream lifetime safety technologies: garbage collection and borrow checking. Garbage collection is simple to implement and use, but moves object allocations to the heap, making it incompatible with manual memory manegement. It extends object lifetimes as long as there are live references to them, making it incompatible with C++'s RAII[@raii] object model.
 
-Borrow checking is an advanced form of live analysis. It keeps track of the _live references_ (meaning those that have a future use) at every point in the function, and errors when there's a _conflicting action_ on a place associated with a live reference. For example, writing to, moving or dropping an object with a live shared borrow will raise a borrow checkerror. Pushing to a vector with a live iterator will raise an iterator invalidation error. This is a good system for C++, because it's compatible with manual memory management and RAII.
+Borrow checking is an advanced form of live analysis. It keeps track of the _live references_ (meaning those that have a future use) at every point in the function, and errors when there's a _conflicting action_ on a place associated with a live reference. For example, writing to, moving or dropping an object with a live shared borrow will raise a borrow check error. Pushing to a vector with a live iterator will raise an iterator invalidation error. This system is compatible with manual memory management and RAII, making it a good fit for C++.
 
 Borrow checking a function only has to consider the body of that function. It avoids whole-program analysis by instituting the _law of exclusivity_. Checked references (borrows) come in two flavors: mutable and shared, noted respectively as `T^` and `const T^`. There can be one live mutable reference to a place, or any number of shared references to a place, but not both at once. Upholding this principle makes it much easier to reason about your program. Since the law of exclusivity prohibits mutable aliasing, if a function is passed a mutable reference and some shared references, you can be certain that the function won't have side effects that, through the mutable reference, cause the invalidation of those shared references.
+
+
+
 
 ### Type safety
 
@@ -843,9 +846,7 @@ The borrow checking mechanics is visible by examining the declaration of the con
 class basic_string_view/(a) {
 public:
   basic_string_view(const [value_type; dyn]^/a str, no_utf_check) noexcept
-    : p_(str)
-  {
-  }
+    : p_(str) { }
 };
 
 class basic_string {
@@ -924,11 +925,11 @@ impl vector<T> : make_iter {
   using into_iter_type  = into_iterator<T>;
 
   iter_type iter(self const^) noexcept safe override {
-    return slice_iterator<const T>(self->slice());
+    return slice_iterator<const T>(self.slice());
   }
 
   iter_mut_type iter(self^) noexcept safe override {
-    return slice_iterator<T>(self^->slice());
+    return slice_iterator<T>(self.slice());
   }
 
   into_iter_type iter(self) noexcept safe override {
@@ -954,9 +955,7 @@ class slice_iterator/(a)
 
 public:
   slice_iterator([T; dyn]^/a s) noexcept safe
-    : p_((*s)~as_pointer), unsafe end_((*s)~as_pointer + (*s)~length)
-  {
-  }
+    : p_((*s)~as_pointer), unsafe end_((*s)~as_pointer + (*s)~length) { }
 
   optional<T^/a> next(self^) noexcept safe {
     if (self->p_ == self->end_) { return .none; }
