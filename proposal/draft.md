@@ -1,4 +1,4 @@
----
+ ---
 title: "Safe C++"
 document: PXXXXR0
 date: 2024-09-15
@@ -41,7 +41,7 @@ The goal of the authors is to define a superset of C++ with a _rigorously safe s
 
 Rigorous safety is a carrot-and-stick approach. The stick comes first. The stick is what security researchers and regulators care about. Safe C++ developers are prohibited from writing operations that may result in lifetime safety, type safety or thread safety undefined behaviors. Sometimes these operations are prohibited by the compiler frontend, as is the case with pointer arithmetic. Sometimes the operations are prohibited by static analysis in the compiler's middle-end; that stops use of initialized variables and use-after-free bugs, and it's the technology enabling the _ownership and borrowing_ safety model. The remainder of issues, like out-of-bounds array subscripts, are averted with runtime panic and aborts.
 
-The carrot is a suite of new capabilities which improve on the unsafe ones denied to users. The affine type system (aka linear types, aka relocation, aka destructive move) makes it easier to relocate objects without breaking type safety. Pattern matching is safe and expressive, and interfaces with the system's new choice types. Borrow checking[@borrow-checking] is the most sophisticated part of the extension, providing a new reference type that flags use-after-free and iterator invalidation defects at compile time.
+The carrot is a suite of new capabilities which improve on the unsafe ones denied to users. The affine type system makes it easier to relocate objects without breaking type safety. Pattern matching is safe and expressive, and interfaces with the system's new choice types. Borrow checking[@borrow-checking] is the most sophisticated part of the extension, providing a new reference type that flags use-after-free and iterator invalidation defects at compile time.
 
 What are the properties we're trying to deliver with Safe C++?
 
@@ -124,7 +124,7 @@ In ISO C++, soundness holes often occur because caller and callee don't agree on
 
 ## Categories of safety
 
-It's instructive to break the memory safety problem down into five categories. Each of these is addressed with a different strategy.
+It's instructive to break the memory safety problem down into four categories. Each of these is addressed with a different strategy.
 
 ### Lifetime safety
 
@@ -134,7 +134,7 @@ Borrow checking is an advanced form of live analysis. It keeps track of the _liv
 
 Borrow checking a function only has to consider the body of that function. It avoids whole-program analysis by instituting the _law of exclusivity_. Checked references (borrows) come in two flavors: mutable and shared, noted respectively as `T^` and `const T^`. There can be one live mutable reference to a place, or any number of shared references to a place, but not both at once. Upholding this principle makes it much easier to reason about your program. Since the law of exclusivity prohibits mutable aliasing, if a function is passed a mutable reference and some shared references, you can be certain that the function won't have side effects that, through the mutable reference, cause the invalidation of those shared references.
 
-### Type safety - null pointer variety
+### Type safety
 
 > I call it my billion-dollar mistake. It was the invention of the null reference in 1965. At that time, I was designing the first comprehensive type system for references in an object oriented language (ALGOL W). My goal was to ensure that all use of references should be absolutely safe, with checking performed automatically by the compiler. But I couldn't resist the temptation to put in a null reference, simply because it was so easy to implement. This has led to innumerable errors, vulnerabilities, and system crashes, which have probably caused a billion dollars of pain and damage in the last forty years.
 >
@@ -142,14 +142,13 @@ Borrow checking a function only has to consider the body of that function. It av
 
 The "billion-dollar mistake" is a type safety problem. Consider `std::unique_ptr`. It has two states: engaged and disengaged. The class presents member functions like `operator*` and `operator->` that are valid when the object is in the engaged state and _undefined_ when the object is disengaged. `->` is the most important API for smart pointers. Calling it when the pointer is null? That's your billion-dollar mistake.
 
-As Hoare observes, the problem was conflating two different things, a pointer to an object and an empty state, into the same type and giving them the same interface. Smart pointers should only hold valid pointers. If you want to represent an empty state, use some other mechanism that has its own interface. Denying the null state eliminates undefined behavior.
+As Hoare observes, the problem comes from conflating two different things, a pointer to an object and an empty state, into the same type and giving them the same interface. Smart pointers should only hold valid pointers. Denying the null state eliminates undefined behavior.
 
-`std2::box` has no null state. There's no default constructor. If the object is in scope, you can dereference it without risk of undefined behavior. Why doesn't C++ simply introduce its own fixed `unique_ptr` without a null state? Blame C++11 move semantics.
+We address the type safety problem by overhauling the object model. Safe C++ features a new kind of move: [_relocation_](type.md#relocation-object-model), also called _destructive move_. This is called an _affine_ or a _linear_ type system. Unless explicitly initialized, objects start out _uninitialized_. They can't be used in this state. When you assign to an object, it becomes initialized. When you relocate from an object, it's value is moved and it's reset to uninitialized. If you relocate from an object inside control flow, it becomes _potentially uninitialized_, and its destructor is conditionally executed after reading a compiler-generated drop flag.
+
+`std2::box` is our version of `unique_ptr`. It has no null state. There's no default constructor. If the object is in scope, you can dereference it without risk of undefined behavior. Why doesn't C++ simply introduce its own fixed `unique_ptr` without a null state? Blame C++11 move semantics.
 
 How do you move objects around in C++? Use `std::move` to select the move constructor. That moves data out of the old object, leaving it in a default state. For smart pointers, that's the null state. If `unique_ptr` didn't have a null state, it couldn't be moved in C++.
-
-Addressing the null type safety problem means entails overhauling the object model. Safe C++ features a new kind of move: [_relocation_](type.md#relocation-object-model), also called _destructive move_. Unless explicitly initialized, objects start out _uninitialized_. They can't be used in this state. When you assign to an object, it becomes initialized. When you relocate from an object, it's value is moved and it's reset to uninitialized. If you relocate from an object inside control flow, it becomes _potentially uninitialized_, and its destructor is conditionally executed after reading a compiler-generated drop flag.
-
 [**box.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/box.cxx)
 ```cpp
 #feature on safety
@@ -193,8 +192,6 @@ The _rel-expression_ names a local variable object or subobject and relocates th
 
 We have to reimagine our standard library in the presence of relocation. Most kinds of resource handles include null states. These should all be replaced by safe versions to reduce exposure to unsafe APIs.
 
-### Type safety - union variety
-
 The compiler can only relocate local variables. How do we move objects that live on the heap, or for which we only have a pointer or reference? We need to use optional types.
 
 ```cpp
@@ -210,13 +207,11 @@ struct Data {
 };
 ```
 
-We use an optional type to represent both aspects of our the smart pointer: disengaged (`none`) and engaged (`some`). If you want to move the pointer, detach it from the optional, which changes the state of the optional from `some` to `none`. The C++ Standard Library has an optional type,[@optional] but it's not safe to use. The optional API is full of undefined behaviors.
+We use an optional type to represent both aspects of our the smart pointer: disengaged (`none`) and engaged (`some`). If you want to move the pointer, detach it from the optional, which changes the state of the optional from `some` to `none`. The C++ Standard Library has an optional type, but it's not safe to use. The optional API is full of undefined behaviors: using `operator*` or `operator->` while the optional is disengaged, that's undefined behavior.
 
-![std::optional::operator*](optional-undefined.png)
+A similar class, `std::expected`, which is new to C++23, also has the same set of undefined behaviors.
 
-A similar class, `std::expected`, which is new to C++23, is also full of undefined behaviors.
-
-If we were to wrap the safe `std2::box` in an `std::optional`, it would be just as unsafe as using `std::box`. Using `->` with a disengaged value would cause undefined behavior.
+If we were to wrap the safe `std2::box` in an `std::optional`, it would be just as unsafe as using `std::box`. Using `->` while the optional is disengaged would cause undefined behavior. We need a new _sum type_ that doesn't exhibit the union-like defects of `std::optional` and `std::expected`.
 
 The new `std2::optional` is a _choice type_, a first-class discriminated union, that can only be accessed with _pattern matching_. Pattern matching makes the union variety of type safety violations impossible: we can't access the wrong state of the sum type.
 
@@ -284,7 +279,7 @@ int main() safe {
 }
 ```
 
-Choice types are Safe C++'s type-safe offering. They're just like Rust's enums,[@rust-enum] one of features most credited for that language's enviable ergonomics. Accessing members of a choice object requires testing for the active type with a _match-expression_. If the match succeeds, a new declaration is bound to the corresponding payload, and that declaration is visible in the scope following the `=>`.
+Choice types are Safe C++'s type-safe offering. They're just like Rust's enums, one of features most credited for that language's enviable ergonomics. Accessing members of a choice object requires testing for the active type with a _match-expression_. If the match succeeds, a new declaration is bound to the corresponding payload, and that declaration is visible in the scope following the `=>`.
 
 The compiler also performs exhaustiveness testing. Users must name all the alternatives, or use a wildcard `_` to default the unnamed ones.
 
@@ -740,7 +735,7 @@ class vector
 };
 ```
 
-The unsafe subscript works with user-defined types by introducing a new library type `std2::no_runtime_check`. Use this as last parameter in a user-defined `operator[]` call, including multi-dimensional subscript operators, to enable unsafe subscript binding. The compiler default-initializes a no_runtime_check and attempts to pass that during overload resolution. Since `operator[]` can't verify that its sound for all inputs, since it doesn't perform bounds checking, it's an unsafe call. But it can still be used in safe contexts! That's because the user wrote out the `unsafe` at the point of use, exempting this function call from the unsafe check.
+The unsafe subscript works with user-defined types by introducing a new library type `std2::no_runtime_check`. Use this as last parameter in a user-defined `operator[]` call, including multi-dimensional subscript operators, to enable unsafe subscript binding. The compiler default-initializes a no_runtime_check and attempts to pass that during overload resolution. `no_runtime_check` overloads are _unsafe functions_, as they aren't sound for all valid inputs. However, when invoked as part of an unsafe subscript, they can still be used in safe contexts. That's because the user wrote out the `unsafe` at the point of use, exempting this function call from the unsafe check.
 
 ## Lifetime safety
 
@@ -1547,7 +1542,7 @@ When `DropOnly` is true, the destructor overload with the `[[unsafe::drop_only]]
 
 When `DropOnly` is false, the destructor overload without the attribute is instantiated. In this case, the user-defined destructor is assumed to use all of the class's lifetime parameters outside of the drop check. If the Vec held a borrow to out-of-scope data, as it does in this example, loading that data through the borrow would be a use-after-free defect. To prevent this unsound behavior, the compiler uses all the class's lifetime parameters when its user-defined destructor is called. This raises the borrow checker error, indicating that the _drp-expression_ depends on an expired loan on `x`.
 
-The `drop_only` attribute is currently unsafe because it's incumbent on the user to implement a destructor that doesn't use associated lifetime parameters outside of invoking their destructors. It is planned to make this attribute safe. The compiler should be able to monitor the user-defined destructor for use of lifetimes associated with T outside of drops and raise borrow checker errors.
+The `drop_only` attribute is currently unsafe because it's incumbent on the programmer implementing a destructor that doesn't use associated lifetime parameters outside of invoking their destructors. We plan to make this attribute safe. The compiler should be able to monitor the user-defined destructor for use of lifetimes associated with T outside of drops and raise borrow checker errors. However, that may require extending `drop_only` to all functions, not just destructors. `std::destruct_at` involves a non-drop use of the parameter type. But a `drop_only`-attributed `std2::destruct_at` would only permit and qualify as a drop use.
 
 ### Lifetime canonicalization
 
@@ -2169,9 +2164,7 @@ public:
 
   explicit
   unsafe_cell(T t) noexcept safe
-    : t_(rel t)
-  {
-  }
+    : t_(rel t) { }
 
   T* get(self const^) noexcept safe {
     return const_cast<T*>(addr self->t_);
@@ -2181,7 +2174,11 @@ public:
 
 Forming a pointer to the mutable inner state through a shared borrow is _safe_, but dereferencing that pointer is unsafe. Safe C++ implements `std2::cell`, `std2::ref_cell`, `std2::mutex` and `std2::shared_mutex`, which provide safe member functions to access interior state through their deconfliction strategies.
 
-Safe C++ and Rust and equate exclusive access with mutable types and shared access with const types. This is an economical choice, because one type qualifier, const, also determines exclusivity. This awkward cast-away-const model of interior mutability is the logical consequence. But it's not the only way. The Ante language[@ante] experiments with separate mutable (exclusive) and mutable (shared) type qualifiers. It uses `own mut` and `shared mut` as compound type qualifiers. This three-state system doesn't map onto C++'s existing type system as easily, but that doesn't mean the const/mutable borrow treatment, which does integrate elegantly, is really the most expressive.
+Safe C++ and Rust and equate exclusive access with mutable types and shared access with const types. This is an economical choice, because one type qualifier, const, also determines exclusivity. This awkward cast-away-const model of interior mutability is the logical consequence. But it's not the only way. The Ante language[@ante] experiments with separate mutable (exclusive) and mutable (shared) type qualifiers. It uses `own mut` and `shared mut` as compound type qualifiers. That's really attractive, because the "all mutations are explicit" ideal can remain in effect--you're never mutating something through a const reference. This three-state system doesn't map onto C++'s existing type system as easily, but that doesn't mean the const/mutable borrow treatment, which does integrate elegantly, is really the most expressive.
+
+< RC/CELL example > 
+
+
 
 ## Thread safety
 
@@ -2334,7 +2331,7 @@ This code doesn't compile under Rust or Safe C++ because the operand of the relo
 
 In Rust, every function call is potentially throwing, including destructors. In some builds, panics are throwing, allowing array subscripts to exit a function on the cleanup path. In debug builds, integer arithmetic may panic to protect against overflow. There are many non-return paths out functions, and unlike C++, Rust lacks a _noexcept-specifier_ to disable cleanup. Matsakis suggests that relocating out of references is not implemented because its use would be limited by the many unwind paths out of a function, making it rather uneconomical to support.
 
-It's already possible to write C++ code that is less burdened by cleanup paths than Rust. If Safe C++ adopted the `throw()` specifier from the Static Exception Specification,[@static-exception-specification] we could statically verify that functions don't have internal cleanup paths. Reducing cleanup paths extends the supported interval between relocating out of a reference and restoring an object there, helping justify the cost of more complex initialization analysis.
+It's already possible to write C++ code that is less burdened by cleanup paths than Rust. If Safe C++ adopted the `throw()` specifier from the Static Exception Specification,[@P3166R0] we could statically verify that functions don't have internal cleanup paths. Reducing cleanup paths extends the supported interval between relocating out of a reference and restoring an object there, helping justify the cost of more complex initialization analysis.
 
 This extended relocation feature is some of the best low-hanging fruit for improving the safety experience in Safe C++.
 
@@ -2372,14 +2369,15 @@ In addition to the core safety features, there are many new types that put a dem
 
 # Conclusion
 
-The US Government is telling industry to stop using C++ for reasons of national security. Academia is turning away in favor of languages like Rust and Swift that are built on modern technology. C++ risks becoming a legacy language. This dilutes the language's value and that's trouble for companies which rely on access to a pipeline of young C++ developers to run their operations.
+The US Government is telling industry to stop using C++ for reasons of national security. Academia is turning away in favor of languages like Rust and Swift that are built on modern technology. Tech executives are pushing their organizations to move to Rust.[@russinovich] All this dilutes the language's value to novices. That's trouble for companies which rely on a pipeline of new C++ developers to continue their operations.
 
-_Ownership and borrowing_ is the only viable safety model for C++. The Rust project holds a lot of value for C++: it's generated _soundness knowledge_ which is instructive for implementing and using this safety model.
+Instead of being received as a threat, the safety model developed by Rust can be viewed as a way through for C++. The Rust community has spent a decade generating _soundness knowledge_, which is the tactics and strategies (interior mutability, send/sync, borrow checking, and so on) for achieving memory safety without the overhead of garbage collection. That soundness knowledge directly informs this memory-safe overhaul of C++. The sensible thing to do is to adopt the safety technology that security professionals insist that we use by bringing it into C++.
 
-Everything in this proposal took about 18 months to design and implement in Circle. With participation from industry, we could resolve the remaining design questions and in another 18 months have a language and standard library robust enough for mainstream evaluation. While Safe C++ is a large extension to the language, the cost of building new tooling is not steep. If C++ continues to go forward without a memory safety strategy, it's because institutional choose not to have one; it's not because memory-safe tooling is too expensive or difficult to build.
+Everything in this proposal took about 18 months to design and implement in Circle. With participation from industry, we could resolve the remaining design questions and in another 18 months have a language and standard library robust enough for mainstream evaluation. While Safe C++ is a large extension to the language, the cost of building new tooling is not steep. If C++ continues to go forward without a memory safety strategy, that's because institutional users are choosing not to pursue it; it's not because memory-safe tooling is too expensive or difficult to build.
 
 
 
+[@slack]
 
 There is a Safe C++ standard library being developed[@safecpp-stdlib] in tandem with this proposal which aims to co-evolve alongside the Safe C++ extensions. It contains basic implementations of common types such as `std2::vector`, `std2::string` and `std2::thread`, and serves as a useful proof-of-concept.
 
@@ -2573,11 +2571,6 @@ references:
     title: Unwinding puts limits on the borrow checker
     URL: https://smallcultfollowing.com/babysteps/blog/2024/05/02/unwind-considered-harmful/#unwinding-puts-limits-on-the-borrow-checker
 
-  - id: static-exception-specification
-    citation-label: static-exception-specification
-    title: P3166R0&colon; Static Exception Specifications
-    URL: https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3166r0.html
-
   - id: gen-kill
     citation-label: gen-kill
     title: Data-flow analysis
@@ -2613,8 +2606,18 @@ references:
     title: Upstreaming ClangIR
     URL: https://discourse.llvm.org/t/rfc-upstreaming-clangir/76587
 
+  - id: russinovich
+    citation-label: russinovich
+    title: It's time to start halting any new projects in C/C++ and use Rust
+    URL: https://x.com/markrussinovich/status/1571995117233504257?lang=en
+
   - id: safecpp-stdlib
     citation-label: safecpp-stdlib
     title: Safe C&plus;&plus; Standard Library
     URL: https://github.com/cppalliance/safe-cpp
+
+  - id: slack
+    citation-label: slack
+    title: #safe-cpp Slack channel
+    URL: https://cpplang.slack.com/archives/C07GH9NFK0F
 ---
