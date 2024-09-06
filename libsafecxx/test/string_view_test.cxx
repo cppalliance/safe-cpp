@@ -507,6 +507,36 @@ void string_view_slice() safe
   }
 }
 
+void literal_test() safe
+{
+  using namespace std2::literals::string_literals;
+
+  {
+    std2::string_view sv = "hello, world!"sv;
+    assert_true(sv == std2::string_view("hello, world!"));
+  }
+
+  {
+    std2::u8string_view sv = u8"hello, world!"sv;
+    assert_true(sv == std2::u8string_view(u8"hello, world!"));
+  }
+
+  {
+    std2::u16string_view sv = u"hello, world!"sv;
+    assert_true(sv == std2::u16string_view(u"hello, world!"));
+  }
+
+  {
+    std2::u32string_view sv = U"hello, world!"sv;
+    assert_true(sv == std2::u32string_view(U"hello, world!"));
+  }
+
+  {
+    std2::wstring_view sv = L"hello, world!"sv;
+    assert_true(sv == std2::wstring_view(L"hello, world!"));
+  }
+}
+
 int main() safe
 {
   string_view_constructor();
@@ -517,4 +547,5 @@ int main() safe
   string_view_slice_wstring_constructor();
   string_view_compare();
   string_view_slice();
+  literal_test();
 }

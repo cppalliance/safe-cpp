@@ -92,8 +92,37 @@ void string_append() safe
   }
 }
 
+void literal_test() safe
+{
+  using namespace std2::literals::string_literals;
+
+  {
+    std2::string s = "hello, world!"s;
+    assert_true(s == std2::string_view("hello, world!"));
+  }
+
+  {
+    std2::u8string s = u8"hello, world!"s;
+    assert_true(s == std2::u8string_view(u8"hello, world!"));
+  }
+  {
+    std2::u16string s = u"hello, world!"s;
+    assert_true(s == std2::u16string_view(u"hello, world!"));
+  }
+  {
+    std2::u32string s = U"hello, world!"s;
+    assert_true(s == std2::u32string_view(U"hello, world!"));
+  }
+  {
+    std2::wstring s = L"hello, world!"s;
+    assert_true(s == std2::wstring_view(L"hello, world!"));
+  }
+
+}
+
 int main() safe
 {
   string_constructor();
   string_append();
+  literal_test();
 }
