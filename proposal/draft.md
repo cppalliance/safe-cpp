@@ -1,4 +1,4 @@
- ---
+---
 title: "Safe C++"
 document: PXXXXR0
 date: 2024-09-15
@@ -2220,7 +2220,7 @@ Forming a pointer to the mutable inner state through a shared borrow is _safe_, 
 
 Safe C++ and Rust and equate exclusive access with mutable types and shared access with const types. This is an economical choice, because one type qualifier, const, also determines exclusivity. This awkward cast-away-const model of interior mutability is the logical consequence. But it's not the only way. The Ante language[@ante] experiments with separate mutable (exclusive) and mutable (shared) type qualifiers. It uses `own mut` and `shared mut` as compound type qualifiers. That's really attractive, because the "all mutations are explicit" ideal can remain in effect--you're never mutating something through a const reference. This three-state system doesn't map onto C++'s existing type system as easily, but that doesn't mean the const/mutable borrow treatment, which does integrate elegantly, is really the most expressive.
 
-< RC/CELL example > 
+< RC/CELL example >
 
 
 
