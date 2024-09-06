@@ -436,11 +436,62 @@ These kind of constraints are idiomatic in C++ but not supported in Rust, becaus
 
 ### _unsafe-block_
 
-The `unsafe` token is required to escape the safe context and perform operations for which soundness cannot be guaranteed by the toolchain. The most basic unsafe escape is the _unsafe-block_. At the statement level, write `unsafe { }` and put the unsafe operations inside the braces. The _unsafe-block_ does _not_ open a new lexical scope.
+The `unsafe` token escapes the safe context and admits operations for which soundness cannot be guaranteed by the compiler. The primary unsafe escape is the _unsafe-block_. At the statement level, write `unsafe { }` and put the unsafe operations inside the braces. Unlike in Rust, _unsafe-blocks_ do _not_ open new lexical scopes.
 
 ```cpp
-SHOW unsafe { }
+#feature on safety
+
+int func(const int* p) safe {
+  // Most pointer operations are unsafe. Use unsafe-block to perform them in
+  // a safe function.
+
+  // Pointer offset is unsafe.
+  unsafe { ++p; }
+
+  // Put multiple statements in an unsafe-block.
+  unsafe {
+    // Pointer difference is unsafe.
+    ptrdiff_t diff = p - p;
+
+    // unsafe-blocks do not open lexical scopes. Declarations will be 
+    // visible below.
+    int x = p[4];
+  }
+
+  // Can use unsafe-block like compound-statement inside control flow.
+  if(x == 1) unsafe { return p[5]; }
+
+  return x;
+}
 ```
+
+Unsafe blocks are supported in different forms in a couple places:
+
+```cpp
+#feature on safety
+
+// Unsafe function.
+bool pred();
+
+struct Foo {
+  // Support unsafe before subobject initializers.
+  Foo() : unsafe b(pred()) { }
+  bool b;
+};
+
+int main() safe {
+  // Support unsafe before conditions.
+  if(unsafe pred()) { }
+  while(unsafe pred()) { } 
+
+  int x = match(1) {
+    // Support unsafe after the => in a match-clause.
+    _ => unsafe pred();
+  }; 
+}
+```
+
+In all uses, `unsafe` represents an auditable token where the user expressly takes responsibility for sound execution.
 
 ### The `unsafe` type qualifier
 
