@@ -49,6 +49,7 @@ class [[unsafe::send(false)]] rc
     ++p_->strong_;
   }
 
+  [[unsafe::drop_only(T)]]
   ~rc() safe
   {
     std::size_t s = --p_->strong_;

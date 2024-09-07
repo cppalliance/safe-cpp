@@ -49,6 +49,7 @@ public:
     ++p_->strong_;
   }
 
+  [[unsafe::drop_only(T)]]
   ~arc() safe
   {
     std::size_t s = --p_->strong_;

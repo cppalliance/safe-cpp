@@ -87,6 +87,7 @@ public:
     ilist^.advance(ilist.size());
   }
 
+  [[unsafe::drop_only(T)]]
   ~vector() safe {
     // TODO: std::destroy_n() doesn't seem to like `int^` as a value_type
     // eventually we should fix this

@@ -34,6 +34,7 @@ public:
     __rel_write(p_, rel t);
   }
 
+  [[unsafe::drop_only(T)]]
   ~box() safe
   {
     std::destroy_at(p_);
