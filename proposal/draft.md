@@ -1237,7 +1237,7 @@ A loan is the action that forms a borrow to a place. In the example above, there
 
 Liveness is stored in bit vectors called `regions`. There's a region for loans `^x` and `^y` and there's a region for variables with borrow types, such as `ref`. There are also regions for user-defined types with lifetime parameters, such as `string_view`.
 
-A lifetime constraint `'R0 : 'R1 : P` reads as "region 0 outlives region 1 at point P." The compiler emits constraints when encountering assignment and function calls involving types with regions.
+A lifetime constraint `'R0 : 'R1 : P` reads "region 0 outlives region 1 at point P." The compiler emits constraints when encountering assignment and function calls involving types with regions.
 
 ```cpp
     #feature on safety
@@ -2160,9 +2160,7 @@ int main() safe {
 }
 ```
 
-Choice types are kinds of record types, as are unions, classes and lambdas. The existing class template machinery is available to them. Additionally, you can extend a choice type with member functions, as you would a class type.
-
-TODO: Add this to std2.
+Rust uses traits to extend data types with new member functions outside of their definitions. Safe C++ doesn't have that capability, so it's important that choice types support member functions directly. These member functions may internalize pattern matching on their `self` parameters, improving the ergonomics of these type-safe variants.
 
 ```cxx
 template<class T+, class E+>
@@ -2208,25 +2206,9 @@ choice optional
 };
 ```
 
-Rust uses traits to extend data types with new member functions outside of their definitions. Safe C++ doesn't have that capability, so it's important that choice types support member functions directly. These member functions may internalize pattern matching on their `self` parameters, improving the ergonomics of these these type-safe variants.
-
 ### Pattern matching
 
 The _match-expression_ in Safe C++ offers much the same capabilities as the pattern matching implemented in C# and Swift and proposed for C++ in [@P2688R1]. But the requirements of borrow checking and relocation make it most similar to Rust's feature. Pattern matching is the only way to access alternatives of choice types. It's important in achieving Safe C++'s type safety goals.
-
-A _match-expression_'s operand is expression of class, choice, array, slice or arithmetic, builtin vector or builtin matrix type. The match body is a set of _match-clauses_. Each _match-clause_ has a _pattern_ on the left, an optional _match-guard_ in the middle, and a _match-body_ after the `=>` token.
-
-A match is rich in the kind of patterns it supports:
-
-* **structured pattern** `[p1, p2]` - Matches aggregates and C++ types implementing the `tuple_size`/`tuple_element` customization point. These are useful when destructuring Safe C++'s first-class tuple and array types. Nest the patterns to destructure multiple levels of subobjects. The pattern corresponding to structured bindings and aggregate initializers.
-* **designated pattern** `[x: p1, y: p2]` - Matches aggregates by member name rather than ordinal. The pattern corresponding to designated bindings and designated initializers.
-* **choice pattern** `.alt` or `.alt(p)` - Matches a choice alternative. If the choice alternative has a payload type, the `.alt(p)` opens a pattern on the payload.
-* **variant pattern** `{type}` or `{type}(p)` - Matches all choice alternatives with a payload type of _type_. The `{type}(p)` form opens a pattern on the payload.
-* **wildcard pattern** `_` Matches any pattern. These correspond to the `default` case of a _switch-statement_ and may be required to satisfy a _match-expression_'s exhaustiveness requirement.
-* **rest pattern** - `..` Matches any number of elements. Use inside structured patterns to produce patterns on the beginning or end elements. Also used to supports patterns on slice operands.
-* **binding declaration** _binding-mode_ `decl` - Bind a declaration to the pattern's operand. There are six binding modes: _default_, `cpy`, `rel`, `^` for mutable borrows, `^const` for shared borrows and `&` for lvalue references.
-* **test pattern** - Name a constant literal or constant expression inside parentheses. These can be formed into range expressions with an operand on either or both sides of `..` or `..=`. The current operand of the match must match the test pattern to go to the body.
-* **disjunction pattern** `p1 | p2` - Separate patterns with the disjunction operator `|`. 
 
 [**match1.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/match1.cxx)
 ```cpp
@@ -2258,7 +2240,7 @@ int test(Primitive obj) noexcept safe {
     // variant-style access. Match all alternatives with 
     // a `int64_t` type. In this case, i64, i64_2 or i64_3
     // matches the pattern.
-    {int64_t}(500 | 1000..2000)    => 4;
+    {int64_t}(500 | 1000..2000)     => 4;
 
     // Match a 2-tuple/aggregate. Bind declarations x and y to 
     // the tuple elements. The match-guard passes when x > y.
@@ -2271,7 +2253,62 @@ int test(Primitive obj) noexcept safe {
 }
 ```
 
-This example uses choice, test, variant, binding, disjunction and wildcard patterns.
+A _match-expression_'s operand is expression of class, choice, array, slice, arithmetic, builtin vector or builtin matrix type. The match body is a set of _match-clauses_. Each _match-clause_ has a _pattern_ on the left, an optional _match-guard_ in the middle, and a _match-body_ after the `=>` token.
+
+A match is rich in the kind of patterns it supports:
+
+* **structured pattern** `[p1, p2]` - Matches aggregates and C++ types implementing the `tuple_size`/`tuple_element` customization point. These are useful when destructuring Safe C++'s first-class tuple and array types. Nest the patterns to destructure multiple levels of subobjects. The pattern corresponding to structured bindings and aggregate initializers.
+* **designated pattern** `[x: p1, y: p2]` - Matches aggregates by member name rather than ordinal. The pattern corresponding to designated bindings and designated initializers.
+* **choice pattern** `.alt` or `.alt(p)` - Matches a choice alternative. If the choice alternative has a payload type, the `.alt(p)` opens a pattern on the payload.
+* **variant pattern** `{type}` or `{type}(p)` - Matches all choice alternatives with a payload type of _type_. The `{type}(p)` form opens a pattern on the payload.
+* **wildcard pattern** `_` Matches any pattern. These correspond to the `default` case of a _switch-statement_ and may be required to satisfy a _match-expression_'s exhaustiveness requirement.
+* **rest pattern** - `..` Matches any number of elements. Use inside structured patterns to produce patterns on the beginning or end elements. Also used to supports patterns on slice operands.
+* **binding declaration** _binding-mode_ `decl` - Bind a declaration to the pattern's operand. There are six binding modes: _default_, `cpy`, `rel`, `^` for mutable borrows, `^const` for shared borrows and `&` for lvalue references.
+* **test pattern** - Name a constant literal or constant expression inside parentheses. These can be formed into range expressions with an operand on either or both sides of `..` or `..=`. The current operand of the match must match the test pattern to go to the body.
+* **disjunction pattern** `p1 | p2` - Separate patterns with the disjunction operator `|`. 
+
+This example uses choice, test, variant, binding, disjunction and wildcard patterns. The wildcard pattern at the end proves exhaustiveness. 
+
+[**match2.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/match2.cxx)
+```cpp
+#feature on safety
+#include <std2.h>
+
+using namespace std2;
+
+choice Primitive {
+  i8(int8_t),
+  u8(uint8_t),
+  i16(int16_t),
+  u16(uint16_t),
+  i32(int32_t),
+  u32(uint32_t),
+  i64(int64_t),
+  u64(uint64_t),
+  s(string);
+
+  bool is_signed(const self^) noexcept safe {
+    // concise form. Equivalent to Rust's matches! macro.
+    return match(*self; .i8 | .i16 | .i32 | .i64);
+  }
+
+  bool is_unsigned(const self^) noexcept safe {
+    return match(*self; .u8 | .u16 | .u32 | .u64);
+  }
+
+  bool is_string(const self^) noexcept safe {
+    return match(*self; .s);
+  }
+};
+
+int main() safe {
+  println(Primitive::i16(5i16).is_signed());
+  println(Primitive::u32(100ui32).is_unsigned());
+  println(Primitive::s("Hello safety").is_string());
+}
+```
+
+The _concise-match-expression_ is a form of pattern matching that applies a test and optional _match-guard_ on the operand and returns true or false. This maps directly to Rust's [@matches] facility, although instead of being a macro, this is a first-class language feature.
 
 ## Interior mutability
 
@@ -2708,6 +2745,11 @@ references:
     citation-label: pin
     title: Module std&colon;&colon;pin
     URL: https://doc.rust-lang.org/std/pin/index.html
+
+  - id: matches
+    citation-label: matches
+    title: matches! macro
+    URL: https://doc.rust-lang.org/std/macro.matches.html
 
   - id: unsafe-cell
     citation-label: unsafe-cell

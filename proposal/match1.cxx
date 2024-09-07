@@ -26,7 +26,7 @@ int test(Primitive obj) noexcept safe {
     // variant-style access. Match all alternatives with 
     // a `int64_t` type. In this case, i64, i64_2 or i64_3
     // matches the pattern.
-    {int64_t}(500 | 1000..2000)    => 4;
+    {int64_t}(500 | 1000..2000)     => 4;
 
     // Match a 2-tuple/aggregate. Bind declarations x and y to 
     // the tuple elements. The match-guard passes when x > y.
