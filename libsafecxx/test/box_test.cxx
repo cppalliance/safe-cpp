@@ -4,9 +4,7 @@
 
 #feature on safety
 
-#include <std2/box.h>
-#include <std2/unique_ptr.h>
-
+#include <std2.h>
 #include "helpers.h"
 
 void box_constructor() safe

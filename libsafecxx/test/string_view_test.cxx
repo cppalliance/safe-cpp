@@ -4,10 +4,8 @@
 
 #feature on safety
 
-#include <std2/string_view.h>
-
+#include <std2.h>
 #include "helpers.h"
-#include <std2/string_constant.h>
 
 void string_view_constructor() safe
 {

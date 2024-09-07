@@ -4,7 +4,7 @@
 
 #feature on safety
 
-#include <std2/arc.h>
+#include <std2.h>
 
 int main()
 {

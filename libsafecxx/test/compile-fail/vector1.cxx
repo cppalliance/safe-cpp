@@ -1,7 +1,6 @@
 #feature on safety
 
-#include <std2/vector.h>
-#include <std2/string_view.h>
+#include <std2.h>
 
 int main() safe {
   std2::vector<std2::string_view> strs = {};

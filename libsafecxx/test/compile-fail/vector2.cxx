@@ -1,6 +1,6 @@
 #feature on safety
 
-#include <std2/vector.h>
+#include <std2.h>
 
 int main() {
   std2::slice_iterator<int> it;

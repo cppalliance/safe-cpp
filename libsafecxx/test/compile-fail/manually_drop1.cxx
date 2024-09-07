@@ -4,8 +4,7 @@
 
 #feature on safety
 
-#include <std2/box.h>
-#include <std2/utility.h>
+#include <std2.h>
 
 int main()
 {

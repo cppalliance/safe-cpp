@@ -4,7 +4,7 @@
 
 #feature on safety
 
-#include <std2/box.h>
+#include <std2.h>
 
 struct incomplete;
 

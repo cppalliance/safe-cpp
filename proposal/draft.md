@@ -89,7 +89,7 @@ Line 2: `#include <std2.h>` - Include the new safe containers and algorithms. Sa
 
 Line 4: `int main() safe` - The new _safe-specifier_ is part of a function's type, just like _noexcept-specifier_. To callers, the function is marked as safe, so that it can be called from a safe context. `main`'s definition starts in a safe context, so unsafe operations such as pointer dereferences, which may raise undefined behavior, is disallowed. Rust's functions are safe by default. C++'s are unsafe by default. But that's now just a syntax difference. Once you enter a safe context in C++ by using the _safe-specifier_, you're backed by the same rigorous safety guarantees that Rust provides.
 
-Line 5: `std2::vector<int> vec { 11, 15, 20 };` - List initialization of a memory-safe vector. This vector is aware of lifetime parameters, so borrow checking would extend to element types that have lifetimes. The vector's constructor doesn't use `std::initializer_list<int>`. That type is problematic for two reasons: first, users are given pointers into the argument data, and reading from pointers is unsafe; second, the `std::initializer_list` _doesn't own_ its data, making relocation impossible. For these reasons, Safe C++ introduces a `std2::initializer_list<T>`, which can be used in a safe context and supports our ownership object model.
+Line 5: `std2::vector<int> vec { 11, 15, 20 };` - List initialization of a memory-safe vector. This vector is aware of lifetime parameters, so borrow checking would extend to element types that have lifetimes. The vector's constructor doesn't use `std::initializer_list<int>`. That type is problematic for two reasons: first, users are given pointers into the argument data, and reading from pointers is unsafe; second, the `std::initializer_list` _doesn't own_ its data, making relocation impossible. For these reasons, Safe C++ introduces a [`std2::initializer_list`](#initializer-lists), which can be used in a safe context and supports our ownership object model.
 
 Line 7: `for(int x : vec)` - Ranged-for on the vector. The standard mechanism returns a pair of iterators, which are pointers wrapped in classes. C++ iterators are unsafe. They come in begin and end pairs, and don't share common lifetime parameters, making borrow checking them impractical. The Safe C++ version uses slice iterators, which resemble Rust's `Iterator`.[@rust-iterator] These safe types use lifetime parameters making them robust against iterator invalidation.
 
@@ -347,10 +347,6 @@ Pattern matching and choice types aren't just a qualify-of-life improvement. The
 A memory-safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread may have access to it. C++ is not thread safe. Its synchronization objects, such as `std::mutex`, are opt-in. If a user reads shared mutable state from outside of a mutex, that's a potential data race. It's up to users to coordinate that the same synchronization objects are locked before accessing the same shared mutable state.
 
 A thread-safe language enforces data race safety in its type system. Safe C++ makes it impossible, in a safe context, to produce data race UB.
-
-
-** Figure out thread::join consuming function issue so we can do the thread sample.
-
 
 
 ### Runtime checks
@@ -2586,7 +2582,9 @@ In addition to the core safety features, there are many new types that put a dem
 
 The US Government is telling industry to stop using C++ for reasons of national security. Academia is turning away in favor of languages like Rust and Swift that are built on modern technology. Tech executives are pushing their organizations to move to Rust.[@russinovich] All this dilutes the language's value to novices. That's trouble for companies which rely on a pipeline of new C++ developers to continue their operations.
 
-Instead of being received as a threat, the safety model developed by Rust can be viewed as a way through for C++. The Rust community has spent a decade generating _soundness knowledge_, which is the tactics and strategies (interior mutability, send/sync, borrow checking, and so on) for achieving memory safety without the overhead of garbage collection. That soundness knowledge directly informs this memory-safe overhaul of C++. The sensible thing to do is to adopt the safety technology that security professionals insist that we use by bringing it into C++.
+Instead of being received as a threat, Rust's safety model should be received as a way to rapidly improve C++. The Rust community spent a decade generating _soundness knowledge_, the tactics and strategy (interior mutability, send/sync, borrow checking) for achieving memory safety without the overhead of garbage collection. That soundness knowledge directly informs our extension of C++. If we want to 
+
+The sensible thing to do is to adopt the safety technology that security professionals insist that we use by bringing it into C++.
 
 Everything in this proposal took about 18 months to design and implement in Circle. With participation from industry, we could resolve the remaining design questions and in another 18 months have a language and standard library robust enough for mainstream evaluation. While Safe C++ is a large extension to the language, the cost of building new tooling is not steep. If C++ continues to go forward without a memory safety strategy, that's because institutional users are choosing not to pursue it; it's not because memory-safe tooling is too expensive or difficult to build.
 

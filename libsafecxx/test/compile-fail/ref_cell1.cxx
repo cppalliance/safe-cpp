@@ -4,7 +4,7 @@
 
 #feature on safety
 
-#include <std2/ref_cell.h>
+#include <std2.h>
 
 int main()
 {
