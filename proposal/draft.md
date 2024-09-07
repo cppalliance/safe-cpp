@@ -200,7 +200,7 @@ The "billion-dollar mistake" is a type safety problem. Consider `std::unique_ptr
 
 As Hoare observes, the problem comes from conflating two different things, a pointer to an object and an empty state, into the same type and giving them the same interface. Smart pointers should only hold valid pointers. Denying the null state eliminates undefined behavior.
 
-We address the type safety problem by overhauling the object model. Safe C++ features a new kind of move: [_relocation_](type.md#relocation-object-model), also called _destructive move_. This is called an _affine_ or a _linear_ type system. Unless explicitly initialized, objects start out _uninitialized_. They can't be used in this state. When you assign to an object, it becomes initialized. When you relocate from an object, it's value is moved and it's reset to uninitialized. If you relocate from an object inside control flow, it becomes _potentially uninitialized_, and its destructor is conditionally executed after reading a compiler-generated drop flag.
+We address the type safety problem by overhauling the object model. Safe C++ features a new kind of move: [_relocation_](#relocation-object-model), also called _destructive move_. This is called an _affine_ or a _linear_ type system. Unless explicitly initialized, objects start out _uninitialized_. They can't be used in this state. When you assign to an object, it becomes initialized. When you relocate from an object, it's value is moved and it's reset to uninitialized. If you relocate from an object inside control flow, it becomes _potentially uninitialized_, and its destructor is conditionally executed after reading a compiler-generated drop flag.
 
 `std2::box` is our version of `unique_ptr`. It has no null state. There's no default constructor. If the object is in scope, you can dereference it without risk of undefined behavior. Why doesn't C++ simply introduce its own fixed `unique_ptr` without a null state? Blame C++11 move semantics.
 
@@ -1279,7 +1279,7 @@ The borrow checker is concerned with invalidating actions on in-scope loans. The
 * **(A)** The action that invalidates the loan. That includes taking a mutable borrow on a place with a shared loan, or taking any borrow or writing to a place with a mutable borrow. These actions could lead to use-after-free bugs.
 * **(U)** A use that extends the liveness of the borrow past the point of the invalidating action.
 
-[**view.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/view.cxx) -- [(Compiler Explorer)]()
+[**view.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/view.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/f663aeeoh)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -1930,7 +1930,7 @@ safety: unique1.cxx:11:12
 cannot use uninitialized object p
 ```
 
-The `std2::box` has no default state. It's safe against [null pointer type safety bugs](intro.md#2-type-safety-null-variety). A `box` that's declared without a constructor is not default initialized. It's uninitialized. It's illegal to use until it's been assigned to.
+The `std2::box` has no default state. It's safe against [null pointer type safety bugs](#type-safety). A `box` that's declared without a constructor is not default initialized. It's uninitialized. It's illegal to use until it's been assigned to.
 
 ```cpp
 #feature on safety

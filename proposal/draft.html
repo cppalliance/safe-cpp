@@ -918,8 +918,8 @@ and giving them the same interface. Smart pointers should only hold
 valid pointers. Denying the null state eliminates undefined
 behavior.</p>
 <p>We address the type safety problem by overhauling the object model.
-Safe C++ features a new kind of move: <a href="type.md#relocation-object-model"><em>relocation</em></a>, also
-called <em>destructive move</em>. This is called an <em>affine</em> or a
+Safe C++ features a new kind of move: <a href="#relocation-object-model"><em>relocation</em></a>, also called
+<em>destructive move</em>. This is called an <em>affine</em> or a
 <em>linear</em> type system. Unless explicitly initialized, objects
 start out <em>uninitialized</em>. They can’t be used in this state. When
 you assign to an object, it becomes initialized. When you relocate from
@@ -2379,7 +2379,7 @@ actions could lead to use-after-free bugs.</li>
 past the point of the invalidating action.</li>
 </ul>
 <p><a href="https://github.com/cppalliance/safe-cpp/blob/master/proposal/view.cxx"><strong>view.cxx</strong></a>
-– <a href>(Compiler Explorer)</a></p>
+– <a href="https://godbolt.org/z/f663aeeoh">(Compiler Explorer)</a></p>
 <div class="sourceCode" id="cb43"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
 <span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;std2.h&gt;</span></span>
 <span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -3317,10 +3317,10 @@ important for distinguishing between mutable and shared borrows.</p>
 <span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>cannot use uninitialized object p</span></code></pre></div>
 <p>The
 <code class="sourceCode cpp">std2<span class="op">::</span>box</code>
-has no default state. It’s safe against <a href="intro.md#2-type-safety-null-variety">null pointer type safety
-bugs</a>. A <code class="sourceCode cpp">box</code> that’s declared
-without a constructor is not default initialized. It’s uninitialized.
-It’s illegal to use until it’s been assigned to.</p>
+has no default state. It’s safe against <a href="#type-safety">null
+pointer type safety bugs</a>. A <code class="sourceCode cpp">box</code>
+that’s declared without a constructor is not default initialized. It’s
+uninitialized. It’s illegal to use until it’s been assigned to.</p>
 <div class="sourceCode" id="cb68"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
 <span id="cb68-2"><a href="#cb68-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;std2.h&gt;</span></span>
 <span id="cb68-3"><a href="#cb68-3" aria-hidden="true" tabindex="-1"></a></span>
