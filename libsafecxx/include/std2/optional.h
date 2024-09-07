@@ -13,25 +13,25 @@ choice optional
   default none,
   [[safety::unwrap]] some(T);
 
-  template<class E+>
+  template<class E>
   expected<T, E> ok_or(self, E e) noexcept safe {
     return match(self) -> expected<T, E> {
       .some(t) => .ok(rel t);
-      .none => .err(rel e);
+      .none    => .err(rel e);
     };
   }
 
   T expect(self, str msg) noexcept safe {
     return match(self) -> T {
       .some(t) => rel t;
-      .none => panic(msg);
+      .none    => panic(msg);
     };
   }
 
   T unwrap(self) noexcept safe {
     return match(self) -> T {
       .some(t) => rel t;
-      .none => panic("unwrapping invalid optional");
+      .none    => panic("{} is none".format(optional~string));
     };
   }
 };

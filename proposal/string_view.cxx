@@ -19,11 +19,6 @@ int main() safe {
     string s2 = "From string object 2";
     mut views.push_back(s2);
 
-    // Print the strings. All strings are in scope, so this should build.
-    println("Printing from the inner scope:");
-    for(string_view sv : views)
-      println(sv);
-
     // s2 goes out of scope. views now holds dangling pointers into
     // out-of-scope data.
   }

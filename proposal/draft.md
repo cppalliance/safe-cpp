@@ -112,11 +112,11 @@ Consider an old libc function, `std::isprint`,[@isprint] that exhibits unsafe de
 > Like all other functions from `<cctype>`, the behavior of `std::isprint` is undefined if the argument's value is neither representable as unsigned char nor equal to EOF. To use these functions safely with plain chars (or signed chars), the argument should first be converted to unsigned char.
 > Similarly, they should not be directly used with standard algorithms when the iterator's value type is char or signed char. Instead, convert the value to unsigned char first.
 
-It feels only right, in the year 2024, to pass Unicode code points to functions that are typed with `int` and deal with characters. But doing so may crash your application, or worse. While the mistake is the caller's for not reading the documentation and following the preconditions, it's the design that's really at fault. Do not rely on the programmer to closely read the docs before using your function. The safe context provided by memory safe languages prevents usage or authoring of functions like `std::isprint` which exhibit undefined behavior when called with invalid arguments.
+It feels only right, in the year 2024, to pass Unicode code points to functions that are typed with `int` and deal with characters. But doing so may crash your application, or worse. While the mistake is the caller's for not reading the documentation and following the preconditions, it's fair to blame the design of the API. The safe context provided by memory safe languages prevents usage or authoring of functions like `std::isprint` which exhibit undefined behavior when called with invalid arguments.
 
-Rust's approach to safety[@safe-unsafe-meaning] centers on defining responsibility for enforcing preconditions. In a safe context, the user can call safe functions without compromising program soundness. Failure to read the docs may risk correctness, but it won't risk undefined behavior. When the user wants to call an unsafe function from a safe context, they _explicitly take responsibility_ for sound usage of that unsafe function. The user writes the `unsafe` token as a kind of contract: the user has read the terms and conditions of the unsafe function and affirms that it's not being called in a way that violates its preconditions.
+Rust's approach to safety[@safe-unsafe-meaning] centers on defining responsibility for enforcing preconditions. In a safe context, the user can call safe functions without compromising program soundness. Failure to read the docs may risk correctness, but it won't risk undefined behavior. When the user wants to call an unsafe function from a safe context, they _explicitly take responsibility_ for sound usage of that unsafe function. The user writes the `unsafe` token as a kind of contract: the user has read the terms and conditions of the unsafe function and affirms that it's not being used in a way that violates its preconditions.
 
-Who is to blame when undefined behavior is detected, the caller or the callee? ISO C++ does not have an answer, making it an unreliable language. But Rust's safety model does: whoever typed out the `unsafe` token is at fault. Safe C++ adopts the same principle. Code is divided into unsafe and safe contexts. Unsafe operations may only occur in unsafe contexts. Dropping from a safe context to an unsafe context requires use of the `unsafe` keyword. This leaves an artifact that makes for easy audits: reviewers search for the `unsafe` keyword and focus their attention there first. Developers checking code into the standard library are even required to write _safety comments_[@safety-comments] before every unsafe block, indicating proper usage and explaining why it's sound.
+Who is to blame when undefined behavior is detected--the caller or the callee? Standard C++ does not address this. But Rust's safety model does: whoever typed out the `unsafe` token is to blame. Safe C++ adopts the same principle. Code is divided into unsafe and safe contexts. Unsafe operations may only occur in unsafe contexts. Dropping from a safe context to an unsafe context requires use of the `unsafe` keyword. This leaves an artifact that makes for easy audits: reviewers search for the `unsafe` keyword and focus their attention there first. Developers checking code into the standard library are even required to write _safety comments_[@safety-comments] before every unsafe block, indicating proper usage and explaining why it's sound.
 
 Consider the design of a future `std2::isprint` function. If it's marked `safe`, it must be sound for all argument values. If it's called with an argument that is out of its supported range, it must fail in a deterministic way: it could return an error code, it could throw an exception or it could panic and abort. Inside the `std2::isprint` implementation, there's probably a lookup table with capabilities for each supported character. If the lookup table is accessed with a slice, an out-of-bounds access will implicitly generate a bounds check and panic and abort on failure. If the lookup table is accessed through a pointer, the implementer writes the `unsafe` keyword, drops to the unsafe context, tests the subscript against the range of the lookup table, and fetches the data. The `unsafe` keyword is the programmer's oath that the subsequent unsafe operations are sound.
 
@@ -205,6 +205,7 @@ We address the type safety problem by overhauling the object model. Safe C++ fea
 `std2::box` is our version of `unique_ptr`. It has no null state. There's no default constructor. If the object is in scope, you can dereference it without risk of undefined behavior. Why doesn't C++ simply introduce its own fixed `unique_ptr` without a null state? Blame C++11 move semantics.
 
 How do you move objects around in C++? Use `std::move` to select the move constructor. That moves data out of the old object, leaving it in a default state. For smart pointers, that's the null state. If `unique_ptr` didn't have a null state, it couldn't be moved in C++.
+
 [**box.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/box.cxx)
 ```cpp
 #feature on safety
@@ -343,39 +344,14 @@ Pattern matching and choice types aren't just a qualify-of-life improvement. The
 
 ### Thread safety
 
-A memory-safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread should be allowed access to it. Rust provides thread safety using a novel extension of the type system.
+A memory-safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread may have access to it. C++ is not thread safe. Its synchronization objects, such as `std::mutex`, are opt-in. If a user reads shared mutable state from outside of a mutex, that's a potential data race. It's up to users to coordinate that the same synchronization objects are locked before accessing the same shared mutable state.
 
-To this end, Rust (and now subsequently the Safe C++ extensions) introduce compiler-intrinsic traits known as `send` and `sync`. These are marker traits that the type system and libraries uses to reason about the thread-safety of objects.
+A thread-safe language enforces data race safety in its type system. Safe C++ makes it impossible, in a safe context, to produce data race UB.
 
-The semantic meaning of `send` is that an instance of a type is safe to relocate across thread boundaries. For many types, such as those who uniquely own a resource, being `send` is almost trivial as all that's happening is a pointer is being passed to another thread, i.e. it's safe for `std2::string` to be sent to a new thread because all it does is deallocate a simple char array.
 
-`std2::arc` is another example of a type that's `send` because even though there can be multiple concurrent instances of the `arc`, it internally uses atomic referece counting which means it's safe to run the destructors on other threads. `std2::rc` is an example of a type that can never be soundly `send`, because there can be multiple copies of the same `rc` and the reference counting is not atomic which creates a data race.
+** Figure out thread::join consuming function issue so we can do the thread sample.
 
-`sync` is a trait that denotes if an immutable reference to a type is safe to be shared among multiple threads. In the general case, a type is `sync` if `T const^` is `send`. Elaborating, this means that if it's safe to send a reference across thread boundaries, we can infer that the type is safe in a multi-threaded context. Again, `std2::arc` is `sync` because it's safe to send `std2::arc const^` across threads. A calling thread can freely copy the `arc` via its immutable reference without introducing a data race. Conversely, `std2::rc const^` cannot be `send` because if a calling thread copies the `rc`, then it non-atomically modifies the reference count which is a data race.
 
-It is worth noting that on a pedantic level, many of these types are conditionally `send` and `sync` based on the underlying `T` they're templated on. Consider the declaration of `std2::arc`:
-
-```cpp
-template<class T+>
-class [[unsafe::send(T~is_send && T~is_sync), unsafe::sync(T~is_send && T~is_sync)]] arc;
-```
-
-We see here that `arc` is only `send` and `sync` if the underlying `T` is both `sync` _and_ `sync`. This is because to be fully sound, the type must be able to have its destructor run on any thread (hence `send`) and because `arc`s support dereferencing, `T const^` is available to any and all threads.
-
-Authors of types are free to manually implement these traits as they see fit, so long as the author of the type understands they honor this at the penalty of breaking memory safety.
-
-By default, types with interior mutability are inherently not `send`/`sync`. The root of all interior mutability is `std2::unsafe_cell<T>` which is uncoditionally `[[unsafe::sync(false)]]`. If `T` is not `sync` then by definition we know that `T const^` is not `send` because it cannot be sent safely across thread boundaries so we only need to specify one market trait in its definition.
-
-Types that wrap `unsafe_cell` are able to manually implement the marker traits, provided the author ensures soundness. This is how `std2::mutex` is implemented:
-
-```cpp
-template<class T+>
-class [[unsafe::send(T~is_send), unsafe::sync(T~is_send)]] mutex;
-```
-
-Note for `mutex` that the `send` and `sync` bounds are defined based on the `send`-ability of the type. This is because the `mutex` is responsible for implementing the `sync` aspect but because the `mutex` enables mutable access to the underlying data, the wrapped object can be relocated out of and the destructor of the type can be run on a new thread.
-
-Creating the correct `send` and `sync` bounds is often a non-trivial task but we have prior art to base our code off of.
 
 ### Runtime checks
 
@@ -555,8 +531,7 @@ When the user provides an integer argument, the _requires-clause_ substitutes to
 
 When the user provides a floating-point argument, the _requires-clause_ substitutes to `safe(f(1.1))`, which is false, because the best viable candidate is `void operator()(const self^, double);`. That's not a safe function.
 
-These kind of constraints are idiomatic in C++ but not supported in Rust, because that uses early-checked traits to implement generics.
-
+These kind of constraints are idiomatic in C++ but not supported in Rust, because that language uses early-checked traits to implement generics.
 
 ### _unsafe-block_
 
@@ -836,7 +811,7 @@ class vector
 
 The unsafe subscript works with user-defined types by introducing a new library type `std2::no_runtime_check`. Use this as last parameter in a user-defined `operator[]` call, including multi-dimensional subscript operators, to enable unsafe subscript binding. The compiler default-initializes a no_runtime_check and attempts to pass that during overload resolution. `no_runtime_check` overloads are _unsafe functions_, as they aren't sound for all valid inputs. However, when invoked as part of an unsafe subscript, they can still be used in safe contexts. That's because the user wrote out the `unsafe` at the point of use, exempting this function call from the unsafe check.
 
-## Lifetime safety
+## Borrow checking
 
 There's one widely deployed solution to lifetime safety: garbage collection. In GC, the scope of an object is extended as long as there are live references to it. When there are no more live references, the system is free to destroy the object. Most memory safe languages use tracing garbage collection.[@tracing-gc] Some, like Python and Swift, use automatic reference counting,[@arc] a flavor of garbage collection with different tradeoffs.
 
@@ -2190,34 +2165,45 @@ Choice types are kinds of record types, as are unions, classes and lambdas. The 
 TODO: Add this to std2.
 
 ```cxx
-template<typename T+, typename Err+>
+template<class T+, class E+>
 choice expected {
   [[safety::unwrap]] ok(T),
-  err(Err)
+  err(E);
+
+  T unwrap(self) noexcept safe {
+    return match(self) -> T {
+      .ok(t)  => rel t;
+      .err(e) => panic("{} is err".format(expected~string));
+    };
+  }
 };
 
 template<class T+>
-choice optional {
+choice optional
+{
   default none,
   [[safety::unwrap]] some(T);
 
-  template<typename Err>
-  expected<T, Err> ok_or(self, Err err) noexcept safe {
-    return match(self) -> expected<T, Err> {
-      .some(x) => .ok(rel x);
-      .none    => .err(rel err);
+  template<class E>
+  expected<T, E> ok_or(self, E e) noexcept safe {
+    return match(self) -> expected<T, E> {
+      .some(t) => .ok(rel t);
+      .none    => .err(rel e);
     };
   }
 
   T expect(self, str msg) noexcept safe {
-    return match(self) {
-      .some(x) => rel x;
+    return match(self) -> T {
+      .some(t) => rel t;
       .none    => panic(msg);
     };
   }
 
   T unwrap(self) noexcept safe {
-    return self rel.expect("{} is none".format(optional~string));
+    return match(self) -> T {
+      .some(t) => rel t;
+      .none    => panic("{} is none".format(optional~string));
+    };
   }
 };
 ```
@@ -2226,8 +2212,66 @@ Rust uses traits to extend data types with new member functions outside of their
 
 ### Pattern matching
 
+The _match-expression_ in Safe C++ offers much the same capabilities as the pattern matching implemented in C# and Swift and proposed for C++ in [@P2688R1]. But the requirements of borrow checking and relocation make it most similar to Rust's feature. Pattern matching is the only way to access alternatives of choice types. It's important in achieving Safe C++'s type safety goals.
 
+A _match-expression_'s operand is expression of class, choice, array, slice or arithmetic, builtin vector or builtin matrix type. The match body is a set of _match-clauses_. Each _match-clause_ has a _pattern_ on the left, an optional _match-guard_ in the middle, and a _match-body_ after the `=>` token.
 
+A match is rich in the kind of patterns it supports:
+
+* **structured pattern** `[p1, p2]` - Matches aggregates and C++ types implementing the `tuple_size`/`tuple_element` customization point. These are useful when destructuring Safe C++'s first-class tuple and array types. Nest the patterns to destructure multiple levels of subobjects. The pattern corresponding to structured bindings and aggregate initializers.
+* **designated pattern** `[x: p1, y: p2]` - Matches aggregates by member name rather than ordinal. The pattern corresponding to designated bindings and designated initializers.
+* **choice pattern** `.alt` or `.alt(p)` - Matches a choice alternative. If the choice alternative has a payload type, the `.alt(p)` opens a pattern on the payload.
+* **variant pattern** `{type}` or `{type}(p)` - Matches all choice alternatives with a payload type of _type_. The `{type}(p)` form opens a pattern on the payload.
+* **wildcard pattern** `_` Matches any pattern. These correspond to the `default` case of a _switch-statement_ and may be required to satisfy a _match-expression_'s exhaustiveness requirement.
+* **rest pattern** - `..` Matches any number of elements. Use inside structured patterns to produce patterns on the beginning or end elements. Also used to supports patterns on slice operands.
+* **binding declaration** _binding-mode_ `decl` - Bind a declaration to the pattern's operand. There are six binding modes: _default_, `cpy`, `rel`, `^` for mutable borrows, `^const` for shared borrows and `&` for lvalue references.
+* **test pattern** - Name a constant literal or constant expression inside parentheses. These can be formed into range expressions with an operand on either or both sides of `..` or `..=`. The current operand of the match must match the test pattern to go to the body.
+* **disjunction pattern** `p1 | p2` - Separate patterns with the disjunction operator `|`. 
+
+[**match1.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/match1.cxx)
+```cpp
+#feature on safety
+#include <std2.h>
+
+choice Primitive {
+  i8(int8_t),
+  i16(int16_t),
+  i32(int32_t),
+  i64(int64_t),
+  i64_2(int64_t),
+  i64_3(int64_t),
+  pair(int, int),
+  s(std2::string)
+};
+
+int test(Primitive obj) noexcept safe {
+  return match(obj) {
+    // Match 1, 2, 4, or 8 for either i32 or i64.
+    .i32(1|2|4|8) | .i64(1|2|4|8)   => 1;
+
+    // Match less than 0. ..a is half-open interval.
+    .i32(..0)                       => 2;
+
+    // Match 100 to 200 inclusive. ..= is closed interval.
+    .i32(100..=200)                 => 3;
+
+    // variant-style access. Match all alternatives with 
+    // a `int64_t` type. In this case, i64, i64_2 or i64_3
+    // matches the pattern.
+    {int64_t}(500 | 1000..2000)    => 4;
+
+    // Match a 2-tuple/aggregate. Bind declarations x and y to 
+    // the tuple elements. The match-guard passes when x > y.
+    .pair([x, y]) if (x > y)        => 5;
+
+    // Match everything else.
+    // Comment the wildcard for an exhaustiveness error.
+    _                               => 6;
+  };
+}
+```
+
+This example uses choice, test, variant, binding, disjunction and wildcard patterns.
 
 ## Interior mutability
 
@@ -2269,13 +2313,52 @@ public:
 
 Forming a pointer to the mutable inner state through a shared borrow is _safe_, but dereferencing that pointer is unsafe. Safe C++ implements `std2::cell`, `std2::ref_cell`, `std2::mutex` and `std2::shared_mutex`, which provide safe member functions to access interior state through their deconfliction strategies.
 
-Safe C++ and Rust and equate exclusive access with mutable types and shared access with const types. This is an economical choice, because one type qualifier, const, also determines exclusivity. This awkward cast-away-const model of interior mutability is the logical consequence. But it's not the only way. The Ante language[@ante] experiments with separate mutable (exclusive) and mutable (shared) type qualifiers. It uses `own mut` and `shared mut` as compound type qualifiers. That's really attractive, because the "all mutations are explicit" ideal can remain in effect--you're never mutating something through a const reference. This three-state system doesn't map onto C++'s existing type system as easily, but that doesn't mean the const/mutable borrow treatment, which does integrate elegantly, is really the most expressive.
+Safe C++ and Rust and equate exclusive access with mutable types and shared access with const types. This is an economical choice, because one type qualifier, const, also determines exclusivity. This awkward cast-away-const model of interior mutability is the logical consequence. But it's not the only way. The Ante language[@ante] experiments with separate mutable (exclusive) and mutable (shared) type qualifiers. It uses `own mut` and `shared mut` as compound type qualifiers. That's really attractive, because the "all mutations are explicit" ideal can remain in effect--you're never mutating something through a const reference. This three-state system doesn't map onto C++'s existing type system as easily, but that doesn't mean the const/mutable borrow treatment, which does integrate elegantly, is the most expressive.
 
 < RC/CELL example >
 
 
 
-## Thread safety
+## Send and sync
+
+
+
+Rust provides thread safety using a novel extension of the type system.
+
+To this end, Rust (and now subsequently the Safe C++ extensions) introduce compiler-intrinsic traits known as `send` and `sync`. These are marker traits that the type system and libraries uses to reason about the thread-safety of objects.
+
+The semantic meaning of `send` is that an instance of a type is safe to relocate across thread boundaries. For many types, such as those who uniquely own a resource, being `send` is almost trivial as all that's happening is a pointer is being passed to another thread, i.e. it's safe for `std2::string` to be sent to a new thread because all it does is deallocate a simple char array.
+
+`std2::arc` is another example of a type that's `send` because even though there can be multiple concurrent instances of the `arc`, it internally uses atomic referece counting which means it's safe to run the destructors on other threads. `std2::rc` is an example of a type that can never be soundly `send`, because there can be multiple copies of the same `rc` and the reference counting is not atomic which creates a data race.
+
+`sync` is a trait that denotes if an immutable reference to a type is safe to be shared among multiple threads. In the general case, a type is `sync` if `T const^` is `send`. Elaborating, this means that if it's safe to send a reference across thread boundaries, we can infer that the type is safe in a multi-threaded context. Again, `std2::arc` is `sync` because it's safe to send `std2::arc const^` across threads. A calling thread can freely copy the `arc` via its immutable reference without introducing a data race. Conversely, `std2::rc const^` cannot be `send` because if a calling thread copies the `rc`, then it non-atomically modifies the reference count which is a data race.
+
+It is worth noting that on a pedantic level, many of these types are conditionally `send` and `sync` based on the underlying `T` they're templated on. Consider the declaration of `std2::arc`:
+
+```cpp
+template<class T+>
+class [[unsafe::send(T~is_send && T~is_sync), unsafe::sync(T~is_send && T~is_sync)]] arc;
+```
+
+We see here that `arc` is only `send` and `sync` if the underlying `T` is both `sync` _and_ `sync`. This is because to be fully sound, the type must be able to have its destructor run on any thread (hence `send`) and because `arc`s support dereferencing, `T const^` is available to any and all threads.
+
+Authors of types are free to manually implement these traits as they see fit, so long as the author of the type understands they honor this at the penalty of breaking memory safety.
+
+By default, types with interior mutability are inherently not `send`/`sync`. The root of all interior mutability is `std2::unsafe_cell<T>` which is uncoditionally `[[unsafe::sync(false)]]`. If `T` is not `sync` then by definition we know that `T const^` is not `send` because it cannot be sent safely across thread boundaries so we only need to specify one market trait in its definition.
+
+Types that wrap `unsafe_cell` are able to manually implement the marker traits, provided the author ensures soundness. This is how `std2::mutex` is implemented:
+
+```cpp
+template<class T+>
+class [[unsafe::send(T~is_send), unsafe::sync(T~is_send)]] mutex;
+```
+
+Note for `mutex` that the `send` and `sync` bounds are defined based on the `send`-ability of the type. This is because the `mutex` is responsible for implementing the `sync` aspect but because the `mutex` enables mutable access to the underlying data, the wrapped object can be relocated out of and the destructor of the type can be run on a new thread.
+
+Creating the correct `send` and `sync` bounds is often a non-trivial task but we have prior art to base our code off of.
+
+
+
 
 One of the more compelling usages of interior mutability is making data accesses thread-safe. In C++, many production codebases will couple an `std::mutex` alongside the data it's guarding in a wrapper struct. This provides a strong and safe guarantee but is not offered by default and its use is not guaranteed.
 

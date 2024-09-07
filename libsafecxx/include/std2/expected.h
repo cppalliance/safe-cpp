@@ -18,8 +18,8 @@ choice expected {
 
   T unwrap(self) noexcept safe {
     return match(self) -> T {
-      .ok(t) => rel t;
-      .err(e) => panic("unwrapping an error-containing expected");
+      .ok(t)  => rel t;
+      .err(e) => panic("{} is err".format(expected~string));
     };
   }
 };
