@@ -1,5 +1,5 @@
 #feature on safety
-#include "std2.h"
+#include <std2.h>
 
 using namespace std2;
 

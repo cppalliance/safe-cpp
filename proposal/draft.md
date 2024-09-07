@@ -52,7 +52,7 @@ What are the properties we're trying to deliver with Safe C++?
 
 ## A safe program
 
-[**iterator.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/iterator.cxx)
+[**iterator.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/iterator.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/vneosEGrK)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -134,10 +134,10 @@ Borrow checking is an advanced form of live analysis. It keeps track of the _liv
 
 Borrow checking a function only has to consider the body of that function. It avoids whole-program analysis by instituting the _law of exclusivity_. Checked references (borrows) come in two flavors: mutable and shared, noted respectively as `T^` and `const T^`. There can be one live mutable reference to a place, or any number of shared references to a place, but not both at once. Upholding this principle makes it easier to reason about your program. Since the law of exclusivity prohibits mutable aliasing, if a function is passed a mutable reference and some shared references, you can be certain that the function won't have side effects that, through the mutable reference, cause the invalidation of those shared references.
 
-[**string_view.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/string_view.cxx)
+[**string_view.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/string_view.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/6YcGP8f4W)
 ```cpp
 #feature on safety
-#include "std2.h"
+#include <std2.h>
 
 using namespace std2;
 
@@ -206,7 +206,7 @@ We address the type safety problem by overhauling the object model. Safe C++ fea
 
 How do you move objects around in C++? Use `std::move` to select the move constructor. That moves data out of the old object, leaving it in a default state. For smart pointers, that's the null state. If `unique_ptr` didn't have a null state, it couldn't be moved in C++.
 
-[**box.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/box.cxx)
+[**box.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/box.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/aYvqoTv51)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -304,12 +304,11 @@ Segmentation fault (core dumped)
 
 C++'s sum type support is built on top of unions. Unions are unsafe. Naming a union field is like implicitly using `reintepret_cast` to convert the object's bits into the type of the field. The defects in `std::optional` and `std::expected` are of this nature: the libraries don't guard against access using an invalid type. C++ builds abstractions on top of unions, but they're not _safe_ abstractions.
 
-[**match.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/match.cxx)
+[**match.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/match.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/KbGhKz78v)
 ```cpp
 #feature on safety
 #include <std2.h>
 
-// A discriminated union that's impossible to misuse.
 choice Value {
   i32(int),
   f32(float),
@@ -321,10 +320,10 @@ void print(Value val) safe {
   match(val) {
     // Type safety bugs are impossible inside the pattern match.
     // The alternatives listed must be exhaustive.
-    .i32(i32) => println(i32);
-    .f32(f32) => println(f32);
-    .f64(f64) => println(f64);
-    .str(str) => println(str);
+    .i32(i32) => std2::println(i32);
+    .f32(f32) => std2::println(f32);
+    .f64(f64) => std2::println(f64);
+    .str(str) => std2::println(str);
   };
 }
 
@@ -612,7 +611,7 @@ Expressions carry noexcept and safe information which is outside of the type's e
 
 The answer is that template specialization works on types and it doesn't work on these other kinds of properties. A template argument with an unsafe qualifier instantiates a template with an unsafe qualifier on the corresponding template parameter. The unsafe qualifier drills through templates in a way that other language entities don't.
 
-[**unsafe2.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe2.cxx)
+[**unsafe2.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe2.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/1E9Y7rcbx)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -749,7 +748,7 @@ To be more accommodating when mixing unsafe with safe code, the unsafe qualifier
 
 There's one more prominent use of the `unsafe` token. It'll suppress runtime bounds checks during subscript operations on both builtin and user-defined types. For applications where nanoseconds matter, developers may want to forego runtime bounds checking. In Safe C++, this is exceptionally easy. Just write `; unsafe` in your array, slice or vector subscript.
 
-[**unsafe_bounds.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe_bounds.cxx)
+[**unsafe_bounds.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe_bounds.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/9xajqhrvc)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -1083,7 +1082,7 @@ Each statement provisions a 4-element `string_view` array as a backing store. An
 
 Safe C++ must provide safe alternatives to everything in the Standard Library.
 
-[**initlist1.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/initlist1.cxx)
+[**initlist1.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/initlist1.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/xxdTfdh1d)
 ```cxx
 #feature on safety
 #include <std2.h>
@@ -1280,6 +1279,7 @@ The borrow checker is concerned with invalidating actions on in-scope loans. The
 * **(A)** The action that invalidates the loan. That includes taking a mutable borrow on a place with a shared loan, or taking any borrow or writing to a place with a mutable borrow. These actions could lead to use-after-free bugs.
 * **(U)** A use that extends the liveness of the borrow past the point of the invalidating action.
 
+[**view.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/view.cxx) -- [(Compiler Explorer)]()
 ```cpp
 #feature on safety
 #include <std2.h>
