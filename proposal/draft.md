@@ -124,18 +124,71 @@ In ISO C++, soundness holes often occur because caller and callee don't agree on
 
 ## Categories of safety
 
-It's instructive to break the memory safety problem down into four categories. Each of these is addressed with a different strategy.
+It's instructive to break the memory safety problem down into four categories. Each of these is addressed with a different language technology.
 
 ### Lifetime safety
 
 How do we ensure that dangling references are never used? There are two mainstream lifetime safety technologies: garbage collection and borrow checking. Garbage collection is simple to implement and use, but moves object allocations to the heap, making it incompatible with manual memory manegement. It extends object lifetimes as long as there are live references to them, making it incompatible with C++'s RAII[@raii] object model.
 
-Borrow checking is an advanced form of live analysis. It keeps track of the _live references_ (meaning those that have a future use) at every point in the function, and errors when there's a _conflicting action_ on a place associated with a live reference. For example, writing to, moving or dropping an object with a live shared borrow will raise a borrow check error. Pushing to a vector with a live iterator will raise an iterator invalidation error. This system is compatible with manual memory management and RAII, making it a good fit for C++.
+Borrow checking is an advanced form of live analysis. It keeps track of the _live references_ at every point in the function, and errors when there's a _conflicting action_ on a place associated with a live reference. For example, writing to, moving or dropping an object with a live shared borrow will raise a borrow check error. Pushing to a vector with a live iterator will raise an iterator invalidation error. This system is compatible with manual memory management and RAII, making it a good fit for C++.
 
-Borrow checking a function only has to consider the body of that function. It avoids whole-program analysis by instituting the _law of exclusivity_. Checked references (borrows) come in two flavors: mutable and shared, noted respectively as `T^` and `const T^`. There can be one live mutable reference to a place, or any number of shared references to a place, but not both at once. Upholding this principle makes it much easier to reason about your program. Since the law of exclusivity prohibits mutable aliasing, if a function is passed a mutable reference and some shared references, you can be certain that the function won't have side effects that, through the mutable reference, cause the invalidation of those shared references.
+Borrow checking a function only has to consider the body of that function. It avoids whole-program analysis by instituting the _law of exclusivity_. Checked references (borrows) come in two flavors: mutable and shared, noted respectively as `T^` and `const T^`. There can be one live mutable reference to a place, or any number of shared references to a place, but not both at once. Upholding this principle makes it easier to reason about your program. Since the law of exclusivity prohibits mutable aliasing, if a function is passed a mutable reference and some shared references, you can be certain that the function won't have side effects that, through the mutable reference, cause the invalidation of those shared references.
 
+[**string_view.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/string_view.cxx)
+```cpp
+#feature on safety
+#include "std2.h"
 
+using namespace std2;
 
+int main() safe {
+  // Populate the vector with views with a nice mixture of lifetimes.
+  vector<string_view> views { };
+
+  // string_view with /static lifetime.
+  mut views.push_back("From a string literal");
+
+  // string_view with outer scope lifetime.
+  string s1 = "From string object 1";
+  mut views.push_back(s1);
+
+  {
+    // string_view with inner scope lifetime.
+    string s2 = "From string object 2";
+    mut views.push_back(s2);
+
+    // s2 goes out of scope. views now holds dangling pointers into
+    // out-of-scope data. It should be ill-formed to use s2.
+  }
+
+  // Print the strings. This raises a borrow checker error, because 
+  // views depends on an expired loan on s2.
+  println("Printing from the outer scope:");
+  for(string_view sv : views)
+    println(sv);
+}
+```
+```
+$ circle string_view.cxx -I ../libsafecxx/include/
+safety: during safety checking of int main() safe
+  borrow checking: string_view.cxx:30:24
+    for(string_view sv : views) 
+                         ^
+  use of views depends on expired loan
+  drop of s2 between its shared borrow and its use
+  s2 declared at string_view.cxx:19:12
+      string s2 = "From string object 2"; 
+             ^
+  loan created at string_view.cxx:20:25
+      mut views.push_back(s2); 
+                          ^
+```
+
+Borrow checker provides bullet-proof guarantees against lifetime safety defects when dealing with references or views into objects with different scopes. Take a vector of `std2::string_view`. This string view is special. It's defined with a lifetime parameter that establishes on the string into it refers: that string must be in scope for all uses of the view.
+
+We load the vector up with views into three different strings: a string constant which has `static` lifetime, a string in an outer scope and a string in an inner scope. Printing the contents of the vector from the outer scope raises a borrow checker error, because one of the function's lifetime constraints is violated: the vector depends on a loan on `s2`, which is out-of- scope at the point of use.
+
+Garbage collection solves this problem in a different way: `s1` and `s2` are stored on the GC-managed heap, and they're kept in scope as long as there are live references to them. That's an effective system, but it's not the right choice for C++, where deterministic destruction order is core to the language's design.
 
 ### Type safety
 
