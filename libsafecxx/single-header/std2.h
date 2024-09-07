@@ -7,6 +7,7 @@
 #include <shared_mutex>
 #include <new>
 #include <cstring>
+#include <atomic>
 
 namespace std2 {
 
