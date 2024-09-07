@@ -4,7 +4,7 @@
 
 #feature on safety
 
-#include <std2/thread.h>
+#include <std2.h>
 
 struct [[unsafe::send(false)]] not_send {
   int x_;

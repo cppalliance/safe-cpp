@@ -1,6 +1,6 @@
 #feature on safety
 
-#include <std2/string_view.h>
+#include <std2.h>
 
 int main()
 {

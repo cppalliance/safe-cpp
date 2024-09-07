@@ -4,7 +4,7 @@
 
 #feature on safety
 
-#include <std2/cell.h>
+#include <std2.h>
 
 struct not_copy
 {

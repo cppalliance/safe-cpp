@@ -4,7 +4,7 @@
 
 #feature on safety
 
-#include <std2/rc.h>
+#include <std2.h>
 
 int main()
 {

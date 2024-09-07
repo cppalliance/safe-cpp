@@ -4,7 +4,7 @@
 
 #feature on safety
 
-#include <std2/source_location.h>
+#include <std2.h>
 #include <cstdio>
 
 template<class T, class U>

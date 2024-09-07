@@ -4,7 +4,7 @@
 
 #feature on safety
 
-#include <std2/tuple.h>
+#include <std2.h>
 
 struct empty {};
 

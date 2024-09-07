@@ -4,7 +4,7 @@
 
 #feature on safety
 
-#include <std2/mutex.h>
+#include <std2.h>
 
 int main() safe
 {

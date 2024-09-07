@@ -16,7 +16,8 @@ include(GNUInstallDirs)
 file(
   GLOB_RECURSE safe_cxx_headers
   CONFIGURE_DEPENDS
-  "include/*.h"
+  "single-header/*.h"
+  # "include/*.h"
 )
 
 add_library(safe_cxx INTERFACE)
@@ -24,13 +25,13 @@ add_library(safe_cxx INTERFACE)
 target_include_directories(
   safe_cxx
   INTERFACE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/single-header>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 target_sources(
   safe_cxx
   INTERFACE FILE_SET HEADERS
-  BASE_DIRS include
+  BASE_DIRS single-header
   FILES ${safe_cxx_headers}
 )
 
