@@ -37,7 +37,7 @@ The foreignness of Rust for career C++ developers combined with the the friction
 
 ## Extend C++ for safety
 
-The goal of the authors is to define a superset of C++ with a _rigorously safe subset_. Begin a new project, or take an existing one, and start writing safe code in C++. Code in the safe context exhibits the same strong safety guarantees as safe code written in Rust.
+The goal of this proposal is to advance a superset of C++ with a _rigorously safe subset_. Begin a new project, or take an existing one, and start writing safe code in C++. Code in the safe context exhibits the same strong safety guarantees as code written in Rust.
 
 Rigorous safety is a carrot-and-stick approach. The stick comes first. The stick is what security researchers and regulators care about. Safe C++ developers are prohibited from writing operations that may result in lifetime safety, type safety or thread safety undefined behaviors. Sometimes these operations are prohibited by the compiler frontend, as is the case with pointer arithmetic. Sometimes the operations are prohibited by static analysis in the compiler's middle-end; that stops use of initialized variables and use-after-free bugs, and it's the technology enabling the _ownership and borrowing_ safety model. The remainder of issues, like out-of-bounds array subscripts, are averted with runtime panic and aborts.
 
@@ -251,58 +251,42 @@ We have to reimagine our standard library in the presence of relocation. Most ki
 
 The compiler can only relocate local variables. How do we move objects that live on the heap, or for which we only have a pointer or reference? We need to use optional types.
 
-```cpp
-template<typename T>
-choice optional {
-  default none,
-  some(T)
-};
+The C++ Standard Library has an optional type, but it's not safe to use. The optional API is full of undefined behaviors: using `operator*` or `operator->` while the value is disengaged raises undefined behavior. A similar class new to C++23, `std::expected`, exhibits the same undefined behaviors for out-of-contract uses of its `operator*`, `operator->` and `error` APIs.
 
-struct Data {
-  // May be engaged (some) or disengaged (none).
-  optional<std2::box<int>> value;
+If we were to wrap the safe `std2::box` in an `std::optional`, to represent a null state, that would be just as unsafe as using `std::unique_ptr`, since its `operator->` is equally unsafe. We need a new _sum type_ that doesn't exhibit the union-like defects of `std::optional` and `std::expected`.
+
+```cpp
+template<class T+>
+choice optional
+{
+  default none,
+  [[safety::unwrap]] some(T);
+
+  template<class E>
+  expected<T, E> ok_or(self, E e) noexcept safe {
+    return match(self) -> expected<T, E> {
+      .some(t) => .ok(rel t);
+      .none    => .err(rel e);
+    };
+  }
+
+  T expect(self, str msg) noexcept safe {
+    return match(self) -> T {
+      .some(t) => rel t;
+      .none    => panic(msg);
+    };
+  }
+
+  T unwrap(self) noexcept safe {
+    return match(self) -> T {
+      .some(t) => rel t;
+      .none    => panic("{} is none".format(optional~string));
+    };
+  }
 };
 ```
-
-We use an optional type to represent both aspects of our the smart pointer: disengaged (`none`) and engaged (`some`). If you want to move the pointer, detach it from the optional, which changes the state of the optional from `some` to `none`. The C++ Standard Library has an optional type, but it's not safe to use. The optional API is full of undefined behaviors: using `operator*` or `operator->` while the optional is disengaged, that's undefined behavior.
-
-A similar class, `std::expected`, which is new to C++23, also has the same set of undefined behaviors.
-
-If we were to wrap the safe `std2::box` in an `std::optional`, it would be just as unsafe as using `std::box`. Using `->` while the optional is disengaged would cause undefined behavior. We need a new _sum type_ that doesn't exhibit the union-like defects of `std::optional` and `std::expected`.
 
 The new `std2::optional` is a _choice type_, a first-class discriminated union, that can only be accessed with _pattern matching_. Pattern matching makes the union variety of type safety violations impossible: we can't access the wrong state of the sum type.
-
-[**union.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/union.cxx)
-```cpp
-#include <string>
-#include <iostream>
-
-union Value {
-  int i32;
-  float f32;
-  double f64;
-  const char* str;
-};
-
-void print(Value val) {
-  // C++ does not protect us from accessing bits with the wrong type.
-  // Catastrophe!
-  std::cout<< val.str<< "\n";
-}
-
-int main() {
-  Value value { };
-  value.i32 = 101;
-  print(value);
-}
-```
-```
-$ circle union.cxx
-$ ./union
-Segmentation fault (core dumped)
-```
-
-C++'s sum type support is built on top of unions. Unions are unsafe. Naming a union field is like implicitly using `reintepret_cast` to convert the object's bits into the type of the field. The defects in `std::optional` and `std::expected` are of this nature: the libraries don't guard against access using an invalid type. C++ builds abstractions on top of unions, but they're not _safe_ abstractions.
 
 [**match.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/match.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/KbGhKz78v)
 ```cpp
@@ -563,7 +547,11 @@ int func(const int* p) safe {
 }
 ```
 
-Unsafe blocks are supported in different forms in a couple places:
+Unsafe blocks are supported in different forms in a several places:
+
+* Before subobject _mem-initializer_.
+* Before _condition_ expressions.
+* Before _match-body_ in a _match-clause_.
 
 ```cpp
 #feature on safety
@@ -904,7 +892,7 @@ Unlike previous attempts at lifetime safety[@P1179R1], borrow checking is absolu
 
 Let's take a closer look at the iterator invalidation example.
 
-[**iterator.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/iterator.cxx)
+[**iterator.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/iterator.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/vneosEGrK)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -935,11 +923,14 @@ safety: during safety checking of int main() safe
 
 The _ranged-for_ creates an iterator on the vector. The iterator is initialized for the whole duration of the loop. This is a shared borrow, because the iterator provides read-only access to the container. Inside the loop, we mutate the container. The `mut` keyword enters the [mutable context](#the-mutable-context) which enables binding mutable borrows to lvalues in the standard conversion during overload resolution for the push_back call. Now there's a shared borrow that's live, for the iterator, and a mutable borrow that's live, for the push_back. That violates exclusivity and the borrow checker raises an error.
 
+To users, iterator invalidation looks like a different phenomenon than the use-after-free defect in the previous section. But to the compiler, and hopefully to library authors, they can be reasoned about similarly, as they're both borrow checker violations.
+
 > The static analysis based on the proposed lifetime annotations cannot catch all memory safety problems in C++ code. Specifically, it cannot catch all temporal memory safety bugs (for example, ones caused by iterator invalidation), and of course lifetime annotations don’t help with spatial memory safety (for example, indexing C-style arrays out of bounds). See the comparison with Rust below for a detailed discussion.
 >
 > -- <cite>[RFC] Lifetime annotations for C++ Clang Frontend</cite>[@clang-lifetime-annotations]
 
-To users, iterator invalidation looks like a different phenomenon than the use-after-free defect in the previous section. But to the compiler, and hopefully to library authors, they can be reasoned about similarly, as they're both borrow checker violations. Clang's lifetime annotations project doesn't implement borrow checking. For that project, iterator invalidation is out of scope, because it really is a different phenomenon than the lifetime tracking used to detect other use-after-free defects.
+Clang's lifetime annotations project doesn't implement borrow checking. For that project, iterator invalidation is out of scope, because it really is a different phenomenon than the lifetime tracking _heuristics_ employed in detecting other use-after-free defects. 
+
 
 ```cpp
 template<class T>
@@ -1080,8 +1071,6 @@ The defect is perplexing because the string objects `s` and `t` _are still in sc
 
 Each statement provisions a 4-element `string_view` array as a backing store. An initializer list object is simply a pointer into the array and a length. It's the pointer into the backing store that's copied into `initlist1` and `initlist2`. At the end of each full expression, those backing stores go out of scope, leaving dangling pointers in the initializer lists. When compiled with aggressive local storage optimizations, the stack space that hosted the backing store for `{ t, t, t, t }` gets reused for other objects. A new initialization overwrites the pointer and length fields of the string views in that reclaimed backing store. Printing from the initializer lists prints from the smashed pointers.
 
-Safe C++ must provide safe alternatives to everything in the Standard Library.
-
 [**initlist1.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/initlist1.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/xxdTfdh1d)
 ```cxx
 #feature on safety
@@ -1118,7 +1107,7 @@ safety: during safety checking of int main() safe
                ^
 ```
 
-Safe C++ includes a new `std2::initializer_list` which sits side-by-side with the legacy type. The compiler provisions a backing store to hold the data, and the new initializer list also keeps pointers into that. The backing store expires at the end of the assignment state. But borrow checking prevents the kind of use-after-free defect that troubles `std::initializer_list`. An error is filed where the initializer list constructs a vector: `use of initlist depends on expired loan`.
+Safe C++ includes a new `std2::initializer_list` which sits side-by-side with the legacy type. The compiler provisions a backing store to hold the data, and the new initializer list also keeps pointers into that. The backing store expires at the end of the assignment state. But borrow checking prevents the use-after-free defect that troubles `std::initializer_list`. An error is filed where the initializer list constructs a vector: `use of initlist depends on expired loan`.
 
 The Safe C++ replacement for initializer lists takes the _ownership and borrowing_ model to heart by doing both. It borrows the storage its elements are held in, but it also owns the elements and calls their destructors. We want to support relocation out of the initializer list. That means the backing store can't call the element destructors, because those elements may have been relocated out by the user. `std2::initializer_list` is more a vector, in that it destroys un-consumed objects when dropped, but also like a view, in that sees into another object's storage.
 
@@ -1549,6 +1538,7 @@ struct Vec {
 
 Declaring a `__phantom_data` member informs the compiler that the class may destroy objects of type `T` inside the user-defined destructor. The drop check expects user-defined destructors to be maximally permissive with its data members, and that it can use any of the class's lifetime parameters. In order to permit _dangling references_ in containers, destructors should opt into the `[[unsafe::drop_only(T)]]` attribute. This is available in Rust as the `#[may_dangle]` attribute.[@may-dangle]
 
+
 ```cpp
 #feature on safety
 
@@ -1719,15 +1709,29 @@ Because Rust doesn't support partial or explicit specialization of its generics,
 
 Deciding when to use the `typename T+` parameter kind on class templates will hopefully be straight-forward. If the class template is a container and the parameter represents a thing being contained, use the new syntax. If the class template exists for metaprogramming, like the classes found in `<type_traits>`, it's probably uninterested in bound lifetimes. Use the traditional `typename T` parameter kind.
 
-The Safe C++ design isn't complete yet. We're still deliberating on how to treat template parameters of other kinds of templates:
+The mechanism for generating template lifetime parameters feels right, but its presentation to the user is still in flux. An alternative treatment would optionally permit bound lifetimes in `typename T` template parameters, but require users to explicitly bind a placeholder lifetime argument `/_` if they want bound types:
 
-* Variable templates - Support partial and explicit specialization, so this will need to follow the class template convention.
-* Function templates
-* Alias templates
-* Concepts
-* Interface templates
+```cpp
+// Types are unbound
+static_assert(std::is_same_v<int^, int^> == true);
 
-See the [Unresolved or unimplemented design issues section](#unresolved-or-unimplemented-design-issues) for additional topics needing attention.
+// Template arguments have bound placeholder lifetimes. These get replaced
+// with template lifetime parameters, and the resulting types compare
+// differently.
+static_assert(std::is_same_v<int^/_, int^/_> == false);
+
+template<typename T>
+struct Obj {
+  // Ill-formed if T has bound lifetimes.
+  static_assert(std::is_same_v<T, int^>);    // #1
+
+  // /0 strips lifetime arguments from types.
+  static_assert(std::is_same_v<T/0, int^>);  // #2
+};
+
+Obj<int^/_> obj1;  // Ill-formed at #1. Well-formed at #2.
+Obj<int^>   obj2;  // Well-formed at #1 and #2.
+```
 
 ### Lifetime normalization
 
@@ -2546,11 +2550,13 @@ This code doesn't compile under Rust or Safe C++ because the operand of the relo
 
 In Rust, every function call is potentially throwing, including destructors. In some builds, panics are throwing, allowing array subscripts to exit a function on the cleanup path. In debug builds, integer arithmetic may panic to protect against overflow. There are many non-return paths out functions, and unlike C++, Rust lacks a _noexcept-specifier_ to disable cleanup. Matsakis suggests that relocating out of references is not implemented because its use would be limited by the many unwind paths out of a function, making it rather uneconomical to support.
 
-It's already possible to write C++ code that is less burdened by cleanup paths than Rust. If Safe C++ adopted the `throw()` specifier from the Static Exception Specification,[@P3166R0] we could statically verify that functions don't have internal cleanup paths. Reducing cleanup paths extends the supported interval between relocating out of a reference and restoring an object there, helping justify the cost of more complex initialization analysis.
+It's already possible to write C++ code that is less burdened by cleanup paths than Rust. If Safe C++ adopted the `throw()` specifier from the Static Exception Specification,[@P3166R0] we could statically verify that functions don't have internal cleanup paths. It may be worthwhile to give `noexcept` interfaces to `vector` and similar containers. Exceptions are a poor way to signal out-of-memory states. If containers panicked on out-of-memory, we'd enormously reduce the cleanup paths in most functions. Reducing cleanup paths extends the supported interval between relocating out of a reference and restoring an object there, helping justify the cost of more complex initialization analysis.
 
-This extended relocation feature is some of the best low-hanging fruit for improving the safety experience in Safe C++.
+This extended relocation feature is some of the ripest low-hanging fruit for improving the safety experience in Safe C++.
 
 ## A change of defaults
+
+
 
 
 
@@ -2586,15 +2592,16 @@ In addition to the core safety features, there are many new types that put a dem
 
 The US Government is telling industry to stop using C++ for reasons of national security. Academia is turning away in favor of languages like Rust and Swift that are built on modern technology. Tech executives are pushing their organizations to move to Rust.[@russinovich] All this dilutes the language's value to novices. That's trouble for companies which rely on a pipeline of new C++ developers to continue their operations.
 
-Instead of being received as a threat, the safety model developed by Rust can be viewed as a way through for C++. The Rust community has spent a decade generating _soundness knowledge_, which is the tactics and strategies (interior mutability, send/sync, borrow checking, and so on) for achieving memory safety without the overhead of garbage collection. That soundness knowledge directly informs this memory-safe overhaul of C++. The sensible thing to do is to adopt the safety technology that security professionals insist that we use by bringing it into C++.
+Instead of being received as a threat, we take the safety model developed by Rust as an opportunity to strengthen C++. The Rust community has spent a decade generating _soundness knowledge_, which is the tactics and strategies (interior mutability, send/sync, borrow checking, and so on) for achieving memory safety without the overhead of garbage collection. Their investment in soundness knowledge informs our design of Safe C++. Adopting the same _ownership and borrowing_ safety model that security professionals have been pointing to is the sensible and timely way to keep C++ viable for another generation.
+
+Safe C++ must provide safe alternatives to everything in today's Standard Library. Adoption will look daunting to teams that maintain large applications. However, users aren't compelled to switch everything over at once. If you need to stick with some legacy types, that's fine. The compiler can't enforce sound usage of that code, but that's always been the case. As developers incorporate more of the safe standard library, their safety coverage increases. This is not an all-or-nothing system. Some unsafe code doesn't mean that your whole project is unsafe. A project with 50% safe code should have half as many undetected soundness bugs as a project with no safe code. A project with 99% safe code, as many Rust applications have, should have 1% as many undetected soundness bugs. Rather than focusing on the long tail of difficult use cases, we encourage developers to think about the bulk of code that is amenable to the safety improvements that a mature Safe C++ toolchain will offer.
+
+We're co-designing the Safe C++ standard library along with the language extensions. Visit our repository to follow our work, or visit our Slack channel to get involved:
+
+> https://github.com/cppalliance/safe-cpp
+> https://cpplang.slack.com/archives/C07GH9NFK0F
 
 Everything in this proposal took about 18 months to design and implement in Circle. With participation from industry, we could resolve the remaining design questions and in another 18 months have a language and standard library robust enough for mainstream evaluation. While Safe C++ is a large extension to the language, the cost of building new tooling is not steep. If C++ continues to go forward without a memory safety strategy, that's because institutional users are choosing not to pursue it; it's not because memory-safe tooling is too expensive or difficult to build.
-
-
-
-[@slack]
-
-There is a Safe C++ standard library being developed[@safecpp-stdlib] in tandem with this proposal which aims to co-evolve alongside the Safe C++ extensions. It contains basic implementations of common types such as `std2::vector`, `std2::string` and `std2::thread`, and serves as a useful proof-of-concept.
 
 An earlier version of this work was presented to SG23 at the St Louis 2024 ISO meeting, with the closing poll "We should promise more committee time on borrow checking?" --- SF: 20, WF: 7, N: 1, WA: 0, SA: 0.
 
@@ -2830,14 +2837,4 @@ references:
     citation-label: russinovich
     title: It's time to start halting any new projects in C/C++ and use Rust
     URL: https://x.com/markrussinovich/status/1571995117233504257?lang=en
-
-  - id: safecpp-stdlib
-    citation-label: safecpp-stdlib
-    title: Safe C&plus;&plus; Standard Library
-    URL: https://github.com/cppalliance/safe-cpp
-
-  - id: slack
-    citation-label: slack
-    title: #safe-cpp Slack channel
-    URL: https://cpplang.slack.com/archives/C07GH9NFK0F
 ---
