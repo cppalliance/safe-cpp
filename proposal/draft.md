@@ -47,7 +47,7 @@ What are the properties we're trying to deliver with Safe C++?
 
 * A superset of C++ with a _safe subset_. Undefined behavior is prohibited from originating in the safe subset.
 * The safe and unsafe parts of the language are clearly delineated, and users must explicitly leave the safe context to use unsafe operations.
-* The safe subset must remain _useful_. If we get rid of a crucial unsafe technology, like unions or pointers, we should supply a safe alternative, like choice types or borrows. A perfectly safe language is not useful if it's so inexpressive you can't get your work done.
+* The safe subset must remain _useful_. If we get rid of a crucial unsafe technology, like unions and pointers, we should supply a safe alternative, like choice types and borrows. A safe toolchain is not useful if it's so inexpressive you can't get your work done.
 * The new system can't break existing code. If you point a Safe C++ compiler at existing C++ code, that code must compile normally. Users opt into the new safety mechanisms. Safe C++ is an extension of C++. It's not a new language.
 
 ## A safe program
@@ -93,7 +93,7 @@ Line 5: `std2::vector<int> vec { 11, 15, 20 };` - List initialization of a memor
 
 Line 7: `for(int x : vec)` - Ranged-for on the vector. The standard mechanism returns a pair of iterators, which are pointers wrapped in classes. C++ iterators are unsafe. They come in begin and end pairs, and don't share common lifetime parameters, making borrow checking them impractical. The Safe C++ version uses slice iterators, which resemble Rust's `Iterator`.[@rust-iterator] These safe types use lifetime parameters making them robust against iterator invalidation.
 
-Line 10: `mut vec.push_back(x);` - Push a value onto the vector. What's the `mut` doing there? That token establishes a _mutable context_, which permits enables standard conversions from lvalues to mutable borrows and references. When [safety] is enabled, _all mutations are explicit_. Explicit mutation lends precision when choosing between shared borrows and mutable borrows of an object. Rust doesn't feature function overloading, so it will implicitly borrow (mutably or shared) from the member function's object. C++ of course has function overloading, so we'll need to be explicit in order to get the overload we want.
+Line 10: `mut vec.push_back(x);` - Push a value onto the vector. What's the `mut` doing there? That token establishes a [_mutable context_](#the-mutable-context) which enables standard conversions from lvalues to mutable borrows and references. When `[safety]` is enabled, _all mutations are explicit_. Explicit mutation lends precision when choosing between shared borrows and mutable borrows of an object. Rust doesn't feature function overloading, so it will implicitly borrow (mutably or shared) from the member function's object. C++ of course has function overloading, so we'll need to be explicit in order to get the overload we want.
 
 If `main` checks out syntatically, its AST is lowered to MIR, where it is borrow checked. The hidden iterator that powers the ranged-for loop stays initialized during execution of the loop. The `push_back` _invalidates_ that iterator, by mutating a place (the vector) that the iterator has a constraint on. When the value `x` is next loaded out of the iterator, the borrow checker raises an error: `mutable borrow of vec between its shared borrow and its use`. The borrow checker prevents Safe C++ from compiling a program that may have exhibited undefined behavior. This is all done at compile time, with no impact on your program's size or speed.
 
@@ -101,11 +101,11 @@ This sample is only a few lines, but it introduces several new mechanisms and ty
 
 ## Memory safety as terms and conditions
 
-Memory-safe languages are predicated on a basic observation of human nature: people would rather try something, and only then ask for help if it doesn't work. For programming, this means developers try to use a library, and only then read the docs if they can't get it to work. This has proven very dangerous, since appearing to work is not the same as working.
+Memory-safe languages are predicated on a basic observation of programmer behavior: devs try to use a library and then only consult the docs if their first few attempts don't seem to work. This is dangerous to program correctness, since seeming to work is not the same as working.
 
-Many C++ functions have preconditions that are only known after careful of their perusal of their documentation. Preconditions can be anything; users don't come with expectations as to what safe usage should look like. Violating preconditions, which is possible with benign-looking usage, causes undefined behavior and opens your software to attack. **Software safety and security should not be predicated on programmers following documentation.**
+Many C++ functions have preconditions that are only known after careful perusal of their documentation. Violating preconditions, which is possible with benign-looking usage, causes undefined behavior and opens your software to attack. **Software safety and security should not be predicated on programmers following documentation.**
 
-Here's the value proposition: compiler and library vendors make an extra effort to provide a robust environment so that users _don't have to read the docs_. No matter how they use the language and library, their actions will not raise undefined behavior and open the software to safety-related exploits. No system can guard against all misuse, and hastily written code may have plenty of logic bugs. But those logic bugs won't lead to memory safety vulnerabilities.
+Here's the memory safety value proposition: compiler and library vendors make an extra effort to provide a robust environment so that users _don't have to read the docs_. No matter how they use the language and library, their actions will not raise undefined behavior and open the software to safety-related exploits. No system can guard against all misuse, and hastily written code may have plenty of logic bugs. But those logic bugs won't lead to memory safety vulnerabilities.
 
 Consider an old libc function, `std::isprint`,[@isprint] that exhibits unsafe design. This function takes an `int` parameter. _But it's not valid to call `std::isprint` for all int arguments_. The preconditions state the function be called only with arguments between -1 and 255:
 
@@ -184,9 +184,9 @@ safety: during safety checking of int main() safe
                           ^
 ```
 
-Borrow checker provides bullet-proof guarantees against lifetime safety defects when dealing with references or views into objects with different scopes. Take a vector of `std2::string_view`. This string view is special. It's defined with a lifetime parameter that establishes on the string into it refers: that string must be in scope for all uses of the view.
+Borrow checking provides bullet-proof guarantees against lifetime safety defects when dealing with references or views into objects with different scopes. Take a vector of `std2::string_view`. This string view is special. It's defined with a lifetime parameter that establishes on the string into it refers: that string must be in scope for all uses of the view.
 
-We load the vector up with views into three different strings: a string constant which has `static` lifetime, a string in an outer scope and a string in an inner scope. Printing the contents of the vector from the outer scope raises a borrow checker error, because one of the function's lifetime constraints is violated: the vector depends on a loan on `s2`, which is out-of- scope at the point of use.
+We load the vector up with views into three different strings: a string constant which has `static` lifetime, a string in an outer scope and a string in an inner scope. Printing the contents of the vector from the outer scope raises a borrow checker error, because one of the function's lifetime constraints is violated: the vector depends on a loan on `s2`, which is out-of-scope at the point of use.
 
 Garbage collection solves this problem in a different way: `s1` and `s2` are stored on the GC-managed heap, and they're kept in scope as long as there are live references to them. That's an effective system, but it's not the right choice for C++, where deterministic destruction order is core to the language's design.
 
@@ -1987,10 +1987,11 @@ Consider a function like `std::unique_ptr::reset`. It destructs the existing obj
 You've noticed the nonsense spellings for these keywords. Why not call them `move`, `copy` and `drop`? Alternative token spelling avoids shadowing these common identifiers and improves results when searching code or the web.
 
 
-### Tuples
+### Tuples, arrays and slices
 
-Using an uninitialized or potentially uninitialized object raises a compile time error. The compiler can only account for the state of local variables, and then only when they're indicated by name, and not by reference. All local objects and subobjects, which are declarations _owned by the function_, are assigned _place names_. The compiler provisions flags that hold the state for each place name. You can relocate and drop owned local objects by place name, because the compiler can locate their initialization flags. It's not possible for the compiler to chase through references and function calls to find initialization data for objects potentially owned by other functions.
+Using an uninitialized or potentially uninitialized object raises a compile-time error. But initialization analysis only accounts for the state of local variables that are directly named and not part of a dereference. Local objects and their subobjects are _owned places_. Initialization analysis allocates flags for owned places, so that it can track their initialization status and error when there's a use of a place that's _definitely initialized_. It's not possible for the compiler to chase through references and function calls to find initialization data for objects potentially owned by other functions.
 
+[**rel1.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/rel1.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/8nGo59E1v)
 ```cpp
 #feature on safety
 #include <tuple>
@@ -2041,14 +2042,16 @@ Pair g { 10, 20 };
      ^
 ```
 
-This example demonstrates that you can't relocate through the reference returned from `std::get`, you can't relocate through a dynamic subscript of an array and you can't relocate the subobject of a global variable. You can only relocate or drop _owned places_.
+This example demonstrates that you can't relocate through the reference returned from `std::get`. You can't relocate through a dynamic subscript of an array. You can't relocate the subobject of a global variable. You can only relocate or drop _owned places_.
 
-If we can't relocate through a reference, how do we relocate through elements of `std::tuple`, `std::array` or `std::variant`? Unless special compiler support for these containers is implemented, you can't. Those standard containers only provide access to their elements through accessor functions. But initialization analysis that enables relocation only considers the definition of the current function; it doesn't leap into other functions, because that's the slippery slope to whole-program analysis.
+If we can't relocate through a reference, how do we relocate through elements of `std::tuple`, `std::array` or `std::variant`? Unless those become magic types with special compiler support, you can't. Those standard containers only provide access to their elements through accessor functions. But initialization analysis only considers the definition of the current function; it doesn't leap into other functions, because that's on the slippery slope to whole-program analysis.
 
-We address the defects in C++'s algebraic types by including new first-class tuple, array and [choice](#choice-types) types. Safe C++ is still fully compatible with legacy types, but because of their non-local element access, relocation from their subobjects is not feasible. Relocation is important to type safety, because many types prohibit default states, making C++-style move semantics impossible. Either relocate your object, or put it in an `optional` from which it can be unwrapped.
+We address the defects in C++'s algebraic types by including new first-class tuple, array and [choice](#choice-types) types. Safe C++ is still compatible with legacy types, but due to their non-local element access, relocation from their subobjects is not feasible. Relocation is important to type safety, because many types prohibit default states, making C++-style move semantics impossible. Either relocate your object, or put it in an `optional` from which it can be unwrapped.
 
+[**tuple1.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/tuple1.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/4hq7Eb86x)
 ```cpp
 #feature on safety
+#include <std2.h>          // Pull in the definition of std2::tuple.
 
 using T0 = ();             // Zero-length tuple type.
 using T1 = (int, );        // One-length tuple type.
@@ -2065,7 +2068,7 @@ int main() {
   // One-length tuple expression.
   auto t1 = (4, );
   static_assert(T1 == decltype(t1));
-
+     
   // Longer tuple expression.
   auto t2 = (5, 3.14);
   static_assert(T2 == decltype(t2));
@@ -2079,7 +2082,8 @@ int main() {
   static_assert(double == decltype(x));
 }
 ```
-Types are noted with comma-separated lists of types inside parentheses. Expressions are noted with comma-separated lists of expressions inside parentheses. You can nest them. You can access elements of tuple expressions by chaining indices together with dots. Tuple fields are accessed with the customary special tuple syntax: just write the element index after a dot, eg `tup.0`.
+
+The new first-class tuple type is syntaxed with comma-separated lists of types inside parentheses. Tuple expressions are noted with comma-separated lists of expressions inside parentheses. You can nest them. You can access elements of tuple expressions by chaining indices together with dots. Tuple fields are accessed with the customary special tuple syntax: just write the element index after a dot, eg `tup.0`.
 
 Use `circle -print-mir` to dump the MIR of this program.
 
@@ -2092,11 +2096,17 @@ Use `circle -print-mir` to dump the MIR of this program.
    20  InstEnd _4
 ```
 
-The assignment `t3.0.0.1` lowers to `_4.0.0.1`. This is a place name of a local variable. It's an _owned place_. The compiler would be able to relocate out of this place, because it doesn't involve dereferences, chasing function calls or accessing global state.
+The assignment `t3.0.0.1` lowers to `_4.0.0.1`. This is a place name of a local variable. Importantly, it doesn't involve dereferences, unlike the result of an `std::get` call. It's an _owned place_ which the compiler is able to relocate out of.
 
-### Arrays and slices
+C++'s native array decays to pointers and doesn't support pass-by-value semantics. `std::array` encapsulates arrays to fix these problems and provides an `operator[]` API for consistent subscripting syntax. But `std::array` is broken for our purposes. Since `operator[]` returns a reference, the `std::array`'s elements are not _owned places_ and can't be relocated out of.
 
-New array type [T; N] won't decay to T* during argument deduction.
+Safe C++ introduces a first-class pass-by-value array type `[T; N]` and a first-class slice companion type `[T; dyn]`. Subobjects of both the old and new array types with constant indices are _owned places_ and support relocation. 
+
+Slices have dynamic length and are _incomplete types_. You may form borrows, references or pointers to slices and access through those. These are called _fat pointers_ and are 16 bytes on 64-bit platforms. The data pointer is accompanied by a length field.
+
+The new array type, the slice type and the legacy builtin array type panic on out-of-bounds subscripts. They exhibit bounds safety in the new object model. Use [unsafe subscripts](#unsafe-subscripts) to suppress the runtime bounds check.
+
+Making `std::pair`, `std::tuple` and `std::array` magic types with native support for relocation is on the short list of language improvements. In the meanwhile, their first-class replacements provide us with a convenient path forward for developing the safe standard library.
 
 ### `operator rel`
 
@@ -2478,15 +2488,15 @@ The C++ Standard does not specify parameter passing conventions. That's left to 
 
 In the Itanium C++ ABI, callers destruct function arguments after the callee has returned. This isn't compatible with Safe C++'s relocation object model. If you relocate from a function parameter into a local object, then the object would be destructed _twice_: once by the callee when the local object goes out of scope and once by the caller on the function parameter's address when the callee returns. Safe C++ specifies this aspect of parameter passing: the callee is responsible for destroying its own function parameters. If a function parameter is relocated out of, that parameter becomes uninitialized and drop elaboration elides its destructor call.
 
-Let's say all functions declared in the [safety] feature implement the _relocate calling convention_. Direct calls to them should be no problem. This includes virtual calls. Direct calls to the legacy ABI from the relocate ABI should be no problem. And calls going the other way--where the caller is in the legacy ABI and the callee implements the relocate ABI is not an issue either.
+Let's say all functions declared in the `[safety]` feature implement the _relocate calling convention_. Direct calls to them should be no problem. This includes virtual calls. Direct calls to the legacy ABI from the relocate ABI should be no problem. And calls going the other way--where the caller is in the legacy ABI and the callee implements the relocate ABI is not an issue either.
 
 The friction comes when forming function pointers or pointers-to-member functions for indirect calls. The pointer has to contain ABI information in its type, and a pointer to a relocate ABI function must have a different type than a pointer to the equivalent legacy ABI function. Ideally we'd have an undecorated function pointer type that can point to either legacy or relocate ABI functions, creating a unified type for indirect function calls.
 
 Consider these three new ABIs:
 
-* `__relocate` - Relocate CC. Callee destroys parameters. This is opt-in for both legacy and [safety] modes.
+* `__relocate` - Relocate CC. Callee destroys parameters. This is opt-in for both legacy and `[safety]` modes.
 * `__legacy` - Legacy CC. The system's default calling convention. For Itanium ABI, the caller destroys arguments.
-* `__unified` - A unified CC that holds function pointers of either the above types. The implementer can use the most significant bit to store a discriminator between CCs: set=`__relocate`, cleared=`__legacy`. This is the default for the [safety] mode.
+* `__unified` - A unified CC that holds function pointers of either the above types. The implementer can use the most significant bit to store a discriminator between CCs: set=`__relocate`, cleared=`__legacy`. This is the default for the `[safety]` mode.
 
 There's a standard conversion from both `__legacy` and `__relocate` function pointers to the `__unified` function pointer type. The latter is a trivial bit-cast. The former merely demands setting the most significant bit.
 
