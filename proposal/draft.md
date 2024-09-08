@@ -1,8 +1,13 @@
 ---
 title: "Safe C++"
 document: PXXXXR0
-date: 2024-09-15
+date: 2024-09-11
 audience: SG23
+author:
+  - name: Sean Baxter
+    email: <seanbax.circle@gmail.com>
+  - name: Christian Mazakas
+    email: <christian.mazakas@gmail.com>
 toc: true
 toc-depth: 2
 ---
@@ -327,7 +332,7 @@ Pattern matching and choice types aren't just a qualify-of-life improvement. The
 
 ### Thread safety
 
-A memory safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread may have access to it. C++ is not thread safe. Its synchronization objects, such as `std::mutex`, are opt-in. If a user reads shared mutable state from outside of a mutex, that's a potential data race. It's up to users to coordinate that the same synchronization objects are locked before accessing the same shared mutable state.
+A memory safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread may access it. C++ is not thread safe language. Its synchronization objects, such as `std::mutex`, are opt-in. If a user reads shared mutable state from outside of a mutex, that's a potential data race. It's up to users to coordinate that the same synchronization objects are locked before accessing the same shared mutable state.
 
 Due to their non-deterministic nature, data race defects are notoriously difficult to debug.
 Safe C++ prevents them from occurring in the first place. Programs with potential data race bugs in the safe context are ill-formed at compile time.
@@ -393,8 +398,6 @@ int main() safe {
 }
 ```
 ```
-$ circle thread_safety.cxx -I ../libsafecxx/include/ -pthread
-$ ./thread_safety 
 Hello world - 🔥
 Hello world - 🔥🔥
 Hello world - 🔥🔥🔥
@@ -452,9 +455,11 @@ safety: during safety checking of void entry_point(std2::arc<std2::mutex<std2::s
 
 The borrow checker stops compilation. We're dropping `data`, which is the thread's copy of the `arc`, between its shared borrow and its use. The expired borrow is created by `data->lock()`, which is our lock on the mutex: it creates a lifetime constraint on `data`. That borrow is kept live after the `drp data` by the lock guard's destructor, which unlocks the mutex in the `arc`. If we drop `data`, then the reference might go to zero, freeing the the mutex. The lock guard's destructor would access a mutex through a dangling pointer: a use-after-free defect.
 
-This is lifetime safety with an additional level of indirection compared to the previous borrow checker violation. The beauty of borrow checking is that, unlike lifetime safety based on heuristics, it's robust for any complex set of constraints and control flow. The thread safety it enables is plainly a superior concurrency technology than what Standard C++ provides.
+This is lifetime safety with an additional level of indirection compared to the previous borrow checker violation. The beauty of borrow checking is that, unlike lifetime safety based on heuristics, it's robust for any complex set of constraints and control flow. The thread safety it enables is superior concurrency technology than what Standard C++ provides.
 
 ### Runtime checks
+
+
 
 One of the most common vulnerabilities is out-of-bounds access. By default, all array-like accesses are checked in Safe C++. This includes both arrays and slices.
 
@@ -2444,22 +2449,40 @@ The _concise-match-expression_ is a form of pattern matching that applies a test
 
 ## Interior mutability
 
-Recall the law of exclusivity, the program-wide invariant that guarantees a resource isn't mutated while another user has access to it. How does this square with the use of shared pointers, which enables shared ownership of a mutable resource? How does it support threaded programs, where access to shared mutable state is gated by a mutex?
+Recall the law of exclusivity, the program-wide invariant that guarantees a resource isn't mutated while another user has access to it. How does this square with the use of shared pointers, which enables shared ownership of a mutable resource? How does it support threaded programs, where access to shared mutable state is permitted between threads? Shared mutable access exists in this safety model, but the way it's enabled involves some trickery.
 
-Shared mutable access exists in this safety model, but the way it's enabled involves some trickery. Rust has a blessed type, `UnsafeCell`,[@unsafe-cell] which encapsulates an object and provides mutable access to it, _through a shared reference_.
+[**cell.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/cell.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/M6df3jbhs)
+```cpp
+#feature on safety
+#include <std2.h>
 
-```rust
-pub const fn get(&self) -> *mut T
+using namespace std2;
+
+int main() {
+  // rc - Shared ownership within a thread.
+  // cell - Transactional access.
+  rc<cell<string>> s1(string("A string set from s1"));
+
+  // Copying the rc increments the reference counter on the control block.
+  rc<cell<string>> s2 = cpy s1;
+
+  // Read the data out from s2.
+  println(s2->get());
+
+  // The string data is now owned by three rcs. 
+  // cell's transactional access upholds the law of exclusivity.
+  s2->set("A string set from s2");
+
+  // Read out through s1.
+  println(s1->get());
+}
+```
+```
+A string set from s1
+A string set from s2
 ```
 
-This is an official way of stripping away const. While the function is safe, it returns a raw pointer, which is unsafe to dereference. Rust includes a number of library types which wrap `UnsafeCell` and implement their own deconfliction strategies to prevent violations of exclusivity.
-
-* `std::Cell<T>`[@cell] provides get and set methods to read out the current value and store new values into the protected resource. Since `Cell` can't be used across threads, there's no risk of violating exclusivity.
-* `std::RefCell<T>`[@ref-cell] is a single-threaded multiple-read, single-write lock. If the caller requests a mutable reference to the interior object, the implementation checks its counter, and if the object is not locked, it establishes a mutable lock and returns a mutable borrow. If the caller requests a shared reference to the interior object, the implementation checks that there is no live mutable borrow, and if there isn't, increments the counter. When users are done with the borrow, they have to release the lock, which decrements the reference count. If the user's request can't be serviced, the `RefCell` can either gracefully return with an error code, or it can panic and abort.
-* `std::Mutex<T>`[@mutex] provides mutable borrows to the interior data across threads. A mutex synchronization object deconflicts access, so there's only one live borrow at a time.
-* `std::RwLock<T>`[@rwlock] is the threaded multiple-read, single-write lock. The interface is similar to RefCell's, but it uses a mutex for deconfliction, so clients can sit on the lock until their request is serviced.
-
-Safe C++ provides `std2::unsafe_cell` in its standard library. It provides the same interior mutability strategy as Rust:
+`rc` is a non-atomic (intra-thread) referenced-counted pointer. It provides shared ownership. To avoid violating the law of exclusivity, its accessors `operator*` and `operator->` return const borrows to its inner type. That means it practices _shared immutable access_. In order to mutate the data it holds, the inner must exhibit _interior mutability_.
 
 ```cpp
 template<class T+>
@@ -2480,13 +2503,51 @@ public:
 };
 ```
 
-Forming a pointer to the mutable inner state through a shared borrow is _safe_, but dereferencing that pointer is unsafe. Safe C++ implements `std2::cell`, `std2::ref_cell`, `std2::mutex` and `std2::shared_mutex`, which provide safe member functions to access interior state through their deconfliction strategies.
+Types with interior mutability implement _deconfliction_ strategies to support shared mutation without the risk of data races. They encapsulate `std2::unsafe_cell`, which is based on Rust's `UnsafeCell`[@unsafe-cell] struct. `unsafe_cell::get` is a blessed way of stripping away const. While the function is safe, it returns a raw pointer, which is unsafe to dereference. Types encapsulating `unsafe_cell` must take care to only permit mutation through this mutable pointer one user at a time.
 
-Safe C++ and Rust and equate exclusive access with mutable types and shared access with const types. This is an economical choice, because one type qualifier, const, also determines exclusivity. This awkward cast-away-const model of interior mutability is the logical consequence. But it's not the only way. The Ante language[@ante] experiments with separate mutable (exclusive) and mutable (shared) type qualifiers. It uses `own mut` and `shared mut` as compound type qualifiers. That's really attractive, because the "all mutations are explicit" ideal can remain in effect--you're never mutating something through a const reference. This three-state system doesn't map onto C++'s existing type system as easily, but that doesn't mean the const/mutable borrow treatment, which does integrate elegantly, is the most expressive.
+* `std2::cell<T>`[@cell] provides get and set methods to read out the current value and store new values into the protected resource. Since `cell` can't be used across threads, there's no risk of violating exclusivity.
+* `std2::ref_cell<T>`[@ref-cell] is a single-threaded multiple-read, single-write lock. If the caller requests a mutable reference to the interior object, the implementation checks its counter, and if the object is not locked, it establishes a mutable lock and returns a mutable borrow. If the caller requests a shared reference to the interior object, the implementation checks that there is no live mutable borrow, and if there isn't, increments the counter. When users are done with the borrow, they have to release the lock, which decrements the reference count. If the user's request can't be serviced, the `ref_cell` can either gracefully return with an error code, or it can panic and abort.
+* `std2::mutex<T>`[@mutex] provides mutable borrows to the interior data across threads. A mutex synchronization object deconflicts access, so there's only one live borrow at a time.
+* `std2::shared_mutex<T>`[@rwlock] is the threaded multiple-read, single-write lock. The interface is similar to `ref_cell`'s, but it uses a mutex for deconfliction, so clients can sit on the lock until their request is serviced.
 
-< RC/CELL example >
+```cpp
+template<class T+>
+class [[unsafe::sync(false)]] cell
+{
+  unsafe_cell<T> t_;
 
+  public:
 
+  cell(T t) noexcept safe
+    : t_(rel t)
+  {
+  }
+
+  T get(self const^) safe {
+    // rely on implicit copy operator erroring out for types with non-trivial
+    // destructors or types that have user-defined copy constructors
+    unsafe { return cpy *self->t_.get(); }
+  }
+
+  void set(self const^, T t) safe {
+    unsafe { *self->t_.get() = rel t; }
+  }
+
+  T replace(self const^, T t) safe {
+    unsafe { auto old = __rel_read(self->t_.get()); }
+    unsafe { __rel_write(self->t_.get(), rel t); }
+    return old;
+  }
+};
+```
+
+The `cell` class provides `get`, `set` and `replace` member functions. These take shared borrow operands. Since `cell` doesn't expose references to its inner data to users, it's not violating the law of exclusivity. Mutating data through `set` and reading it through `get` is _transactional_. Even though it's internally casting away const, it's not violating exclusivity because its deconfliction strategy prevents concurrent mutable access.
+
+Safe C++ and Rust and conflate exclusive access with mutable borrows and shared access with const borrows. It's is an economical choice, because one type qualifier, `const` or `mut`, also determines exclusivity. But this cast-away-const model of interior mutability is its awkward consequence. This design is not the only way. The Ante language[@ante] experiments with separate mutable (exclusive) and mutable (shared) qualifiers. It uses `own mut` and `shared mut` as compound type qualifiers. That's really attractive, because the "all mutations are explicit" ideal can remain in effect--you're never mutating something through a const reference. This three-state system doesn't map onto C++'s existing type system as easily, but that doesn't mean the const/mutable borrow treatment, which does integrate elegantly, is the most expressive. A `shared` type qualifier merits investigation during the course of this project.
+
+* `T^` - Exclusive mutable access. Permits standard conversion to `shared T^` and `const T^`.
+* `shared T^` - Shared mutable access. Permits standard conversion to `const T^`. Only types that enforce interior mutability have overloads with shared mutable access.
+* `const T^` - Shared constant access.
 
 ## send and sync
 
