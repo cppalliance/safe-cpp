@@ -478,25 +478,13 @@ model<span></span></a></li>
 mutability<span></span></a></li>
 <li><a href="#send-and-sync" id="toc-send-and-sync"><span class="toc-section-number">2.7</span> Send and
 sync<span></span></a></li>
+<li><a href="#unresolved-or-unimplemented-design-issues" id="toc-unresolved-or-unimplemented-design-issues"><span class="toc-section-number">2.8</span> Unresolved or unimplemented design
+issues<span></span></a></li>
 </ul></li>
-<li><a href="#unresolved-or-unimplemented-design-issues" id="toc-unresolved-or-unimplemented-design-issues"><span class="toc-section-number">3</span> Unresolved or unimplemented design
-issues<span></span></a>
-<ul>
-<li><a href="#expression-outlives-constraint" id="toc-expression-outlives-constraint"><span class="toc-section-number">3.1</span>
-<em>expression-outlives-constraint</em><span></span></a></li>
-<li><a href="#function-parameter-ownership" id="toc-function-parameter-ownership"><span class="toc-section-number">3.2</span> Function parameter
-ownership<span></span></a></li>
-<li><a href="#non-static-member-functions-with-lifetimes" id="toc-non-static-member-functions-with-lifetimes"><span class="toc-section-number">3.3</span> Non-static member functions with
-lifetimes<span></span></a></li>
-<li><a href="#relocation-out-of-references" id="toc-relocation-out-of-references"><span class="toc-section-number">3.4</span> Relocation out of
-references<span></span></a></li>
-<li><a href="#a-change-of-defaults" id="toc-a-change-of-defaults"><span class="toc-section-number">3.5</span> A change of
-defaults<span></span></a></li>
-</ul></li>
-<li><a href="#implementation-guidance" id="toc-implementation-guidance"><span class="toc-section-number">4</span> Implementation
+<li><a href="#implementation-guidance" id="toc-implementation-guidance"><span class="toc-section-number">3</span> Implementation
 guidance<span></span></a></li>
-<li><a href="#conclusion" id="toc-conclusion"><span class="toc-section-number">5</span> Conclusion<span></span></a></li>
-<li><a href="#bibliography" id="toc-bibliography"><span class="toc-section-number">6</span> References<span></span></a></li>
+<li><a href="#conclusion" id="toc-conclusion"><span class="toc-section-number">4</span> Conclusion<span></span></a></li>
+<li><a href="#bibliography" id="toc-bibliography"><span class="toc-section-number">5</span> References<span></span></a></li>
 </ul>
 </div>
 <h1 data-number="1" id="introduction"><span class="header-section-number">1</span> Introduction<a href="#introduction" class="self-link"></a></h1>
@@ -2401,8 +2389,8 @@ located. Lastly, the creation of the loan is indicated.</p>
 lifetime constraints. It might not be the case that the invalidating
 action is obviously related to either the place of the loan or the use
 that extends the loan. More completely describing the chain of
-constraints could users diagnose borrow checker errors. But there’s a
-fine line between presenting an error like the one above, which is
+constraints could help users diagnose borrow checker errors. But there’s
+a fine line between presenting an error like the one above, which is
 already pretty wordy, and inundating programmers with too much
 information.</p>
 <h3 data-number="2.2.7" id="lifetime-constraints-on-called-functinos"><span class="header-section-number">2.2.7</span> Lifetime constraints on
@@ -4128,10 +4116,10 @@ requires a compiler primitive to make the
 valid. The library is manually upholding invariants around exlusivity
 via unsafe constructs but what results is a sound interface that is
 impossible to misuse.</p>
-<h1 data-number="3" id="unresolved-or-unimplemented-design-issues"><span class="header-section-number">3</span> Unresolved or unimplemented
-design issues<a href="#unresolved-or-unimplemented-design-issues" class="self-link"></a></h1>
-<h2 data-number="3.1" id="expression-outlives-constraint"><span class="header-section-number">3.1</span>
-<em>expression-outlives-constraint</em><a href="#expression-outlives-constraint" class="self-link"></a></h2>
+<h2 data-number="2.8" id="unresolved-or-unimplemented-design-issues"><span class="header-section-number">2.8</span> Unresolved or unimplemented
+design issues<a href="#unresolved-or-unimplemented-design-issues" class="self-link"></a></h2>
+<h3 data-number="2.8.1" id="expression-outlives-constraint"><span class="header-section-number">2.8.1</span>
+<em>expression-outlives-constraint</em><a href="#expression-outlives-constraint" class="self-link"></a></h3>
 <p>C++ variadics don’t convey lifetime constraints from the function’s
 return type to its parameters. Calls like
 <code class="sourceCode cpp">make_unique</code> and
@@ -4158,7 +4146,8 @@ constraints of the outlives expression, we have lower the expression to
 MIR, create new region variables for the locals, generate constraints,
 solve the constraint equation, and propagate region end points up to the
 function’s lifetime parameters.</p>
-<h2 data-number="3.2" id="function-parameter-ownership"><span class="header-section-number">3.2</span> Function parameter ownership<a href="#function-parameter-ownership" class="self-link"></a></h2>
+<h3 data-number="2.8.2" id="function-parameter-ownership"><span class="header-section-number">2.8.2</span> Function parameter
+ownership<a href="#function-parameter-ownership" class="self-link"></a></h3>
 <p>The C++ Standard does not specify parameter passing conventions.
 That’s left to implementers. Unfortunately, different implementers
 settled on different conventions.</p>
@@ -4223,8 +4212,8 @@ standard conversions from <code class="sourceCode cpp">__unified</code>
 function references to <code class="sourceCode cpp">__legacy</code> and
 <code class="sourceCode cpp">__relocate</code> references are not
 supported, because references may not hold nullptr.</p>
-<h2 data-number="3.3" id="non-static-member-functions-with-lifetimes"><span class="header-section-number">3.3</span> Non-static member functions
-with lifetimes<a href="#non-static-member-functions-with-lifetimes" class="self-link"></a></h2>
+<h3 data-number="2.8.3" id="non-static-member-functions-with-lifetimes"><span class="header-section-number">2.8.3</span> Non-static member functions
+with lifetimes<a href="#non-static-member-functions-with-lifetimes" class="self-link"></a></h3>
 <p>At this point in development, lifetime parameters are not supported
 for non-static member functions where the enclosing class has lifetime
 parameters, including including template lifetime parameters. Use the
@@ -4264,7 +4253,8 @@ rather than
 <code class="sourceCode cpp"><span class="kw">this</span></code>,
 because <code class="sourceCode cpp"><span class="kw">this</span></code>
 produces pointers and it’s unsafe dereferencing pointers.</p>
-<h2 data-number="3.4" id="relocation-out-of-references"><span class="header-section-number">3.4</span> Relocation out of references<a href="#relocation-out-of-references" class="self-link"></a></h2>
+<h3 data-number="2.8.4" id="relocation-out-of-references"><span class="header-section-number">2.8.4</span> Relocation out of
+references<a href="#relocation-out-of-references" class="self-link"></a></h3>
 <p>You can only relocate out of <em>owned places</em>, and owned places
 are subobjects of local variables. Dereferences of borrows are not owned
 places, so you can’t relocate out of them. Niko Matsakis writes about a
@@ -4316,8 +4306,8 @@ there, helping justify the cost of more complex initialization
 analysis.</p>
 <p>This extended relocation feature is some of the ripest low-hanging
 fruit for improving the safety experience in Safe C++.</p>
-<h2 data-number="3.5" id="a-change-of-defaults"><span class="header-section-number">3.5</span> A change of defaults<a href="#a-change-of-defaults" class="self-link"></a></h2>
-<h1 data-number="4" id="implementation-guidance"><span class="header-section-number">4</span> Implementation guidance<a href="#implementation-guidance" class="self-link"></a></h1>
+<h3 data-number="2.8.5" id="a-change-of-defaults"><span class="header-section-number">2.8.5</span> A change of defaults<a href="#a-change-of-defaults" class="self-link"></a></h3>
+<h1 data-number="3" id="implementation-guidance"><span class="header-section-number">3</span> Implementation guidance<a href="#implementation-guidance" class="self-link"></a></h1>
 <p>The intelligence behind the <em>ownership and borrowing</em> safety
 model resides in the compiler’s middle-end, in its <em>MIR analysis</em>
 passes. The first thing compiler engineers should focus on when pursuing
@@ -4452,7 +4442,7 @@ provides customization points to C++, making it much easier to author
 libraries that are called directly by the language. Examples in Safe C++
 are the iterator support for ranged-for statements, send/sync for thread
 safety and fmt interfaces for f-strings.</p>
-<h1 data-number="5" id="conclusion"><span class="header-section-number">5</span> Conclusion<a href="#conclusion" class="self-link"></a></h1>
+<h1 data-number="4" id="conclusion"><span class="header-section-number">4</span> Conclusion<a href="#conclusion" class="self-link"></a></h1>
 <p>The US Government is telling industry to stop using C++ for reasons
 of national security. Academia is turning away in favor of languages
 like Rust and Swift that are built on modern technology. Tech executives
@@ -4504,7 +4494,7 @@ difficult to build.</p>
 2024 ISO meeting, with the closing poll “We should promise more
 committee time on borrow checking?” — SF: 20, WF: 7, N: 1, WA: 0, SA:
 0.</p>
-<h1 data-number="6" id="bibliography"><span class="header-section-number">6</span> References<a href="#bibliography" class="self-link"></a></h1>
+<h1 data-number="5" id="bibliography"><span class="header-section-number">5</span> References<a href="#bibliography" class="self-link"></a></h1>
 <div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="1" role="doc-bibliography">
 <div id="ref-ante" class="csl-entry" role="doc-biblioentry">
 [ante] Ante Shared Interior Mutability. <a href="https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability"><div class="csl-block">https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability</div></a>
