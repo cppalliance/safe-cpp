@@ -800,7 +800,6 @@ class [[unsafe::sync(false)]] cell
 
   public:
 
-  explicit
   cell(T t) noexcept safe
     : t_(rel t)
   {
@@ -809,7 +808,7 @@ class [[unsafe::sync(false)]] cell
   T get(self const^) safe {
     // rely on implicit copy operator erroring out for types with non-trivial
     // destructors or types that have user-defined copy constructors
-    unsafe { return *self->t_.get(); }
+    unsafe { return cpy *self->t_.get(); }
   }
 
   void set(self const^, T t) safe {
@@ -1322,7 +1321,6 @@ class ref_cell
     }
   };
 
-  explicit
   ref_cell(T t) noexcept safe
     : t_(rel t)
     , borrow_count_{0}
