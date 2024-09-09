@@ -921,8 +921,9 @@ Garbage collection requires storing objects on the _heap_. But C++ is about _man
 
 ### Use-after-free
 
-`std::string_view` was added to C++ as a safer alternatives to passing character pointers around. Unfortunately, its rvalue reference constructorn is so dangerously designed that its reported to _encourage_ use-after-free bugs.[@string-view-use-after-free]
+`std::string_view` was added to C++17 as a safer alternative to passing character pointers around. Unfortunately, its rvalue-reference constructor is so dangerously designed that its reported to _encourage_ use-after-free bugs.[@string-view-use-after-free]
 
+[**string_view0.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/string_view0.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/e3TG6W5Me)
 ```cpp
 #include <iostream>
 #include <string>
@@ -935,42 +936,42 @@ int main() {
 }
 ```
 ```txt
-$ circle string_view.cxx
+$ circle string_view0.cxx
 $ ./string_view
-@.ooo World
+ ��:��  �ooo World
 ```
 
-`s` is initialized with a long string, which makes it use storage on the heap. The `string::operator+` returns a temporary `std::string` object, also with the data stored on the heap. `sv` is initialized by calling the `string::operator string_view()` conversion function on the temporary. The temporary string goes out of scope at the end of that statement, its storage is returned to the heap, and the user prints a string view with dangling pointers.
+`s` is initialized with a long string, bypassing the short-string optimization and storing it on the heap. The `string::operator+` returns a temporary `std::string` object, also with its data on the heap. `sv` is initialized by calling the `string::operator string_view()` conversion function on the temporary. The temporary string goes out of scope at the end of that statement, its storage is returned to the heap, and the user prints a string view with dangling pointers!
 
-This design is full of sharp edges. It should not have made the ISO Standard. But C++ didn't have great alternatives, since it lacks borrow checking, which is the technology that flags these problems.
+This design is full of sharp edges. It should not have made the ISO Standard, but C++ as a language doesn't provide great alternatives. Borrow checking is the technology that flags these problems. Safe C++ provides a lifetime-aware `string_view` that ends the risk of dangling views.
 
-Safe C++ allows us to author lifetime-aware `string_view` types that provide memory safety. The compiler prohibits uses of dangling views.
-
+[**string_view1.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/string_view1.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/1M6hMv43M)
 ```cpp
 #feature on safety
 #include <std2.h>
 
 int main() safe {
-  std2::string s = "Hellooooooooooooooo ";
+  std2::string s("Hellooooooooooooooo ");
   std2::string_view sv = s + "World\n";
   println(sv);
 }
 ```
 ```txt
-$ circle str0.cxx
-safety: str0.cxx:7:11
-  println(sv);
-          ^
-use of sv depends on expired loan
-drop of temporary std2::basic_string<char, std2::allocator<char>> between its shared borrow and its use
-loan created at str0.cxx:6:28
-  std2::string_view sv = s + "World\n";
-                           ^
+$ circle string_view1.cxx -I ../libsafecxx/single-header/
+safety: during safety checking of int main() safe
+  borrow checking: string_view1.cxx:7:11
+    println(sv); 
+            ^
+  use of sv depends on expired loan
+  drop of temporary object std2::string between its shared borrow and its use
+  loan created at string_view1.cxx:6:28
+    std2::string_view sv = s + "World\n"; 
+                             ^
 ```
 
-The compiler flags the use of the dangling view, `println(sv)`. It marks the invalidating action, the drop of the temporary string. And it indicates where the loan was created, which is the conversion to `string_view` right after the string concatenation. See the [error reporting](#lifetime-error-reporting) section for details on lifetime diagnostics.
+The compiler flags the use of the dangling view: `println(sv)`. It marks the invalidating action: the drop of the temporary string. And it indicates where the loan was created: the conversion to `string_view` right after the string concatenation. See the [error reporting](#lifetime-error-reporting) section for details on lifetime diagnostics.
 
-The borrow checking mechanics is visible by examining the declaration of the conversion function on `std2::string` which produces a `std2::string_view`. This is gets called during sv's initialization.
+The lifetime mechanics are evident from the declaration of the conversion function on `std2::string` which produces a `std2::string_view`. This is gets called during `sv`'s initialization.
 
 ```cpp
 class basic_string_view/(a) {
@@ -993,13 +994,13 @@ public:
 };
 ```
 
-String concatenation forms a temporary string. The temporary string doesn't have any lifetime parameters. It owns its data and has _value semantics_. We form a `string_view` using the temporary string. `basic_string_view` declares a named lifetime parameter, `a`, which models the lifetime of of the view. The view has _reference semantics_, and it needs a lifetime for the purpose of live analysis. The lifetime of this view will originate with a loan on a string, which owns the data, and is kept live when using the view. Mutating or dropping the string while there's a live loan on it makes the program ill-formed. This is how borrow checking protects against use-after-free errors.
+String concatenation forms a temporary string. The temporary string doesn't have any lifetime parameters. It owns its data and has _value semantics_. We form a `std2::string_view` from the temporary string. `basic_string_view` declares a named lifetime parameter, `/a`, which models the lifetime of of the view. The view has _reference semantics_, and it needs a lifetime for the purpose of live analysis. The lifetime of this view will originate with a loan on a string, which owns the data, and is kept live when using the view. Mutating or dropping the string while there's a live loan on it makes the program ill-formed. This is how borrow checking protects against use-after-free errors. Keep in mind that the lifetime parameter is part of the _view_, not part of the data it refers to.
 
-Initializing `sv` invokes the conversion function on that temporary. The conversion function _borrows_ self, meaning there's a loan on the object of the call (that is, the temporary object). The lifetime argument written out in the conversion functions' declaration; rather, it's assigned during lifetime elision, which is part of [normalization](#lifetime-normalization). The return type of the conversion function is a string_view. Since string_view has a lifetime parameter, `a`, lifetime elision invents a lifetime argument for the return type and constrains the lifetime of the `self` reference to outlive it. This is all established in the declaration. Callers don't look inside function definitions during borrow checking. Both the caller and callee agree on the lifetime contracts. This creates a chain of constraints that relate all uses of a reference to its original loan.
+Initializing `sv` invokes the conversion function on that temporary. The conversion function _borrows_ self, creating a _loan_ the temporary. The lifetime argument isn't spelled out in the conversion function's declaration; rather, it's assigned during lifetime elision, which is part of [normalization](#lifetime-normalization). The return type of the conversion function is a `string_view`. Since `string_view` is a lifetime binder, elision invents a lifetime argument for the return type and constrains the lifetime of the `self` reference to outlive it. This is all established in the declaration. Callers don't look inside function definitions during borrow checking. Both the caller and callee agree on the function's lifetime contracts, entirely from information in the function declaration. This establishes a chain of constraints that relate all uses of a reference back to its original loan.
 
-The `str` accessor provides the implementation. It constructs a `basic_string_view` and bypasses the runtime UTF-8 check by passing a `no_utf_check` argument. As with Rust, Safe C++ strings guarantee their contents are well-formed UNICODE code points.
+The `str` accessor provides the implementation. It constructs a `basic_string_view` and bypasses the runtime UTF-8 check by passing a `no_utf_check` argument. Like Rust, Safe C++ strings guarantee their contents are well-formed UNICODE code points.
 
-When we print the view the compiler raises this use-after-free error. The call to `println` _uses_ the lifetime arguments associated with the function argument `sv`. The middle-end solves the [constraint equation](#systems-of-constraints), and puts the original loan on the string temporary object _in scope_ at all program points between the string concatenation and the `println` call. The borrow checker pass looks for invalidating actions on places that overloap in-scope loans. There's a drop of the temporary string at the end of the full expression containing the string concatenation. This isn't anything special to Safe C++, this is ordinary RAII cleanup of objects as they fall out of lexical scope. The drop is a kind of write, and it invalidates the shared borrow taken on the temporary when its conversion operator to `string_view` was called.
+When we go to print the view, the compiler raises a use-after-free error. The call to `println` _uses_ the lifetime arguments associated with the function argument `sv`. Middle-end analysis solves the [constraint equation](#systems-of-constraints), and puts the original loan on the string temporary object _in scope_ at all program points between the string concatenation and the `println` call. The borrow checker pass looks for invalidating actions on places that overloap in-scope loans. There's a drop of the temporary string at the end of the full expression containing the string concatenation. This isn't anything special to Safe C++, this is ordinary RAII cleanup of objects as they fall out of lexical scope. The drop is a kind of _shallow write_, and it invalidates the shared borrow taken on the temporary when its conversion operator to `string_view` was called.
 
 Unlike previous attempts at lifetime safety[@P1179R1], borrow checking is absolutely robust. It does not rely on heuristics that can fail. It allows for any distance between the use of a borrow and an invalidating action on an originating loan, with any amount of complex control flow between. MIR analysis will solve the constraint equation, run the borrow checker, and issue a diagnostic.
 
