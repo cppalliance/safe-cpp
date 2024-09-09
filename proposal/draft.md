@@ -465,8 +465,7 @@ Safe operations that can't be checked for soundness with static analysis must be
 * Integer division panics when the divisor is zero.
 * Integer division panics when INT_MIN is divided by -1. 
 * `std2::vector` panics on out-of-bounds subscripts.
-* `std2::ref_cell` panics when requesting a mutable borrow and the inner object is already borrowed.
-* `std2::ref_cell` panics when requesting a shared borrow and the inner object is already mutably borrowed.
+* `std2::ref_cell` panics when requesting a mutable borrow and the inner object is borrowed or when requesting a shared borrow and the inner object is mutably borrowed.
 
 [**subscript_array.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/subscript_array.cxx)
 ```cpp
@@ -474,7 +473,7 @@ Safe operations that can't be checked for soundness with static analysis must be
 #include <cstdint>
 
 int main() safe {
-  int array[4] { };
+  int array[4] { 1, 2, 3, 4 };
   size_t index = 10;
 
   // Panic on out-of-bounds array subscript.
@@ -498,7 +497,7 @@ The compiler emits panics for out-of-bounds subscripts on builtin arrays and sli
 #include <std2.h>
 
 int main() safe {
-  std2::vector<int> vec { };
+  std2::vector<int> vec { 1, 2, 3, 4 };
   size_t index = 10;
 
   // Panic on out-of-bounds vector subscript.
@@ -514,7 +513,7 @@ vector subscript is out-of-bounds
 Aborted (core dumped)
 ```
 
-Out-of-contract use of user-defined types should panic with a similar message. Unlike Standard C++, our containers always perform bounds checking. If you want to disable runtime checks, either use a 
+Out-of-contract use of user-defined types should panic with a similar message. Unlike Standard C++, our containers always perform bounds checking. As with builtin types, the runtime check can be elided with [unsafe subscripts](#unsafe-subscripts) or disabled for the entire translation unit with the `-no-panic` compiler switch. This is a drastic measure and is intending for profiling the effects of runtime checks.
 
 ```cpp
 template<typename T+>
@@ -541,7 +540,7 @@ Operations in the safe context are guaranteed not to cause undefined behavior. S
 * Pointer difference. Taking the difference of pointers into different allocations is undefined behavior.
 * Pointer relational operators <, <=, > and >=. Comparing pointers into different allocations is undefined behavior.
 * Accessing fields of unions. Legacy unions present a potential type safety hazard. Prefer using choice types.
-* Accessing non-const objects with static storage duration. This is a data race hazard, as different users may be writing to and reading from the same memory simultaneously. This is even a hazard with thread_local storage, as the law of exclusivity cannot be guaranteed within a single thread.
+* Accessing non-const objects with global or `thread_local` storage duration. This is a data race hazard, as different users may be writing to and reading from the same memory simultaneously. This is even a hazard with thread_local storage, as the law of exclusivity cannot be guaranteed within a single thread.
 * Inline ASM. The compiler generally isn't equipped to determine if inline ASM is safe, so its usage in the safe context is banned.
 * Calling unsafe functions. This is banned because the unsafe function may involve any of the above operations.
 
@@ -1620,8 +1619,6 @@ The _where-clause_ establishes the relationship that `/a` outlives `/b`. Does th
 
 Lifetime parameters and _where-clauses_ are a facility for instructing the borrow checker. The obvious mental model is that the lifetimes of references are connected to the scope of the objects they point to. But this is not accurate. Think about lifetimes as defining rules that can't be violated, with the borrow checker looking for contradictions of these rules.
 
-### Free regions
-
 ### Destructors and phantom data
 
 Safe C++ includes an operator to call the destructor on local objects.
@@ -2565,102 +2562,87 @@ class [[unsafe::sync(false)]] cell
 
 The `cell` class provides `get`, `set` and `replace` member functions. These take shared borrow operands. Since `cell` doesn't expose references to its inner data to users, it's not violating the law of exclusivity. Mutating data through `set` and reading it through `get` is _transactional_. Even though it's internally casting away const, it's not violating exclusivity because its deconfliction strategy prevents concurrent mutable access.
 
-Safe C++ and Rust and conflate exclusive access with mutable borrows and shared access with const borrows. It's is an economical choice, because one type qualifier, `const` or `mut`, also determines exclusivity. But this cast-away-const model of interior mutability is its awkward consequence. This design is not the only way. The Ante language[@ante] experiments with separate mutable (exclusive) and mutable (shared) qualifiers. It uses `own mut` and `shared mut` as compound type qualifiers. That's really attractive, because the "all mutations are explicit" ideal can remain in effect--you're never mutating something through a const reference. This three-state system doesn't map onto C++'s existing type system as easily, but that doesn't mean the const/mutable borrow treatment, which does integrate elegantly, is the most expressive. A `shared` type qualifier merits investigation during the course of this project.
+Safe C++ and Rust and conflate exclusive access with mutable borrows and shared access with const borrows. It's is an economical choice, because one type qualifier, `const` or `mut`, also determines exclusivity. But the cast-away-const model of interior mutability is an awkward consequence. But this design is not the only way: The Ante language[@ante] experiments with separate `own mut` and `shared mut` qualifiers. That's really attractive, because you're never mutating something through a const reference. This three-state system doesn't map onto C++'s existing type system as easily, but that doesn't mean the const/mutable borrow treatment, which does integrate elegantly, is the most expressive. A `shared` type qualifier merits investigation during the course of this project.
 
 * `T^` - Exclusive mutable access. Permits standard conversion to `shared T^` and `const T^`.
 * `shared T^` - Shared mutable access. Permits standard conversion to `const T^`. Only types that enforce interior mutability have overloads with shared mutable access.
 * `const T^` - Shared constant access.
 
-## send and sync
+## `send` and `sync`
 
+Thread safety is perhaps the most remarkable guarantee made by Rust's memory safety model. Central to its implementation are the `send` and `sync` traits:
 
+> Some types allow you to have multiple aliases of a location in memory while mutating it. Unless these types use synchronization to manage this access, they are absolutely not thread-safe. Rust captures this through the Send and Sync traits.
+> 
+> * A type is Send if it is safe to send it to another thread.\
+> * A type is Sync if it is safe to share between threads (T is Sync if and only if &T is Send).
+>
+> -- Rustnomicon[@send-sync]
 
-Rust provides thread safety using a novel extension of the type system.
-
-To this end, Rust (and now subsequently the Safe C++ extensions) introduce compiler-intrinsic traits known as `send` and `sync`. These are marker traits that the type system and libraries uses to reason about the thread-safety of objects.
-
-The semantic meaning of `send` is that an instance of a type is safe to relocate across thread boundaries. For many types, such as those who uniquely own a resource, being `send` is almost trivial as all that's happening is a pointer is being passed to another thread, i.e. it's safe for `std2::string` to be sent to a new thread because all it does is deallocate a simple char array.
-
-`std2::arc` is another example of a type that's `send` because even though there can be multiple concurrent instances of the `arc`, it internally uses atomic referece counting which means it's safe to run the destructors on other threads. `std2::rc` is an example of a type that can never be soundly `send`, because there can be multiple copies of the same `rc` and the reference counting is not atomic which creates a data race.
-
-`sync` is a trait that denotes if an immutable reference to a type is safe to be shared among multiple threads. In the general case, a type is `sync` if `T const^` is `send`. Elaborating, this means that if it's safe to send a reference across thread boundaries, we can infer that the type is safe in a multi-threaded context. Again, `std2::arc` is `sync` because it's safe to send `std2::arc const^` across threads. A calling thread can freely copy the `arc` via its immutable reference without introducing a data race. Conversely, `std2::rc const^` cannot be `send` because if a calling thread copies the `rc`, then it non-atomically modifies the reference count which is a data race.
-
-It is worth noting that on a pedantic level, many of these types are conditionally `send` and `sync` based on the underlying `T` they're templated on. Consider the declaration of `std2::arc`:
+Safe C++ follows this model and implements `std2::send` and `std2::sync` as interfaces. Specify the interface values for a type using the `[[unsafe::send]]` and `[[unsafe::sync]]` attributes. Query the interface values with the `T~is_send` and `T~is_sync` member traits.
 
 ```cpp
 template<class T+>
-class [[unsafe::send(T~is_send && T~is_sync), unsafe::sync(T~is_send && T~is_sync)]] arc;
+class [[unsafe::send(false)]] rc;
+
+template<class T+>
+class [[
+  unsafe::send(T~is_send && T~is_sync), 
+  unsafe::sync(T~is_send && T~is_sync)
+]] arc;
 ```
 
-We see here that `arc` is only `send` and `sync` if the underlying `T` is both `sync` _and_ `sync`. This is because to be fully sound, the type must be able to have its destructor run on any thread (hence `send`) and because `arc`s support dereferencing, `T const^` is available to any and all threads.
+`std2::rc` is the non-atomic reference-counted pointer. It permits shared ownership but only within a single thread. Its declaration marks it `send(false)`. It can't be copied to other threads, since the non-atomic reference counter would cause data races.
 
-Authors of types are free to manually implement these traits as they see fit, so long as the author of the type understands they honor this at the penalty of breaking memory safety.
+`std2::arc` is the atomic reference-counted pointer. If its inner type is both `send` and `sync`, then the `arc` specialization is also `send` and `sync`. Most types with _value semantics_, including builtin types, are `send` and `sync`. By the rules of _inherited mutability_, so are aggregate types built from `send` and `sync` subobjects. `std2::arc<int>` is `send`, permitting copy to other threads.
 
-By default, types with interior mutability are inherently not `send`/`sync`. The root of all interior mutability is `std2::unsafe_cell<T>` which is uncoditionally `[[unsafe::sync(false)]]`. If `T` is not `sync` then by definition we know that `T const^` is not `send` because it cannot be sent safely across thread boundaries so we only need to specify one market trait in its definition.
-
-Types that wrap `unsafe_cell` are able to manually implement the marker traits, provided the author ensures soundness. This is how `std2::mutex` is implemented:
+But that's not an interesting case. `arc`'s interface only produces const borrows to the inner type: you can't have a data race if you're only reading from something. `sync` characterizes the thread safety of deconfliction mechanisms of types with [_interior mutability_](#interior-mutability). Is that deconfliction mechanism _single threaded_ or _multi-threaded_? 
 
 ```cpp
 template<class T+>
-class [[unsafe::send(T~is_send), unsafe::sync(T~is_send)]] mutex;
+class [[unsafe::sync(false)]] cell;
 ```
 
-Note for `mutex` that the `send` and `sync` bounds are defined based on the `send`-ability of the type. This is because the `mutex` is responsible for implementing the `sync` aspect but because the `mutex` enables mutable access to the underlying data, the wrapped object can be relocated out of and the destructor of the type can be run on a new thread.
-
-Creating the correct `send` and `sync` bounds is often a non-trivial task but we have prior art to base our code off of.
-
-
-
-
-One of the more compelling usages of interior mutability is making data accesses thread-safe. In C++, many production codebases will couple an `std::mutex` alongside the data it's guarding in a wrapper struct. This provides a strong and safe guarantee but is not offered by default and its use is not guaranteed.
-
-In Safe C++, the stdlib offers a safe abstraction for users and eschewing it requires an explicit opt-in via `unsafe` constructs. `std2::mutex` internally uses an `std2::unsafe_cell`.
-
-The idiomatic usage of `std2::mutex` is via `std2::arc` as `static` objects with non-trivial destructors are unsafe. `std2::arc` is safe to copy across thread boundaries which means that at any given point in time, we must assume that multiple threads are attempting to access the data at the same time. Because of this, there's no infallible API that permits access via a direct mutable reference to the data the `arc` is wrapping.
-
-However, it's always safe to treat a const reference as thread-safe. This means the user must access the inner mutex of `arc<mutex<T>>` via const references. To this end, we can leverage interior mutability to guarantee a lock is acquired before handing out a mutable reference. Consider the following code:
+ `std2::cell` implements interior mutability, making it a candidate for use with `std2::arc`. It uses _transactions_ for deconfliction: callers may only `set` or `get` the interior value. This system is robust within a thread, but unsound across threads: thread 1 could `set` a value while thread 2 `get`s it, producing a data race. `std2::cell` is marked `sync(false)` at its declaration: it's unsafe to share borrows to a `cell` across threads due to risk of data race.
 
 ```cpp
-void add(std2::arc<std2::mutex<int>> mtx, int x, int y) safe
-{
-  auto z = x + y;
-  int^ r; // unbound mutable reference
-  {
-    // acquire a RAII handle that's constrained on mtx's lifetime
-    // note that `mtx` access is const here, as there's no mutable context
-    // here we invoke: `T const^ arc::operator->(self const^) noexcept safe;`
-    // which in turn lets us invoke: `lock_guard lock(self const^) safe;` on the
-    // mutex object
-    auto guard = mtx->lock();
-
-    // locally, use a mutable borrow of the `guard` object to invoke the
-    // similarly named `borrow(self^)` member function, which acquires
-    // exclusive access of the mutex via a `.lock()` call on a `std::mutex`.
-    // the local exclusive borrow of the `guard` object prevents potential
-    // misuse like double-locking and other lifetime-related issues
-    r = mut guard.borrow();
-
-    // now assign the result of the operation through the mutable reference
-    *r = z;
-  }
-}
-
-// spawn the thread, copying the `mtx` object
-std2::arc<std2::mutex<int>> mtx{std2::mutex(1234)};
-std2::thread t(add, cpy mtx, 1, 2);
-
-// perform a safe-guarded load, similar to what's done above
-int r = *mtx->lock();
-
-// this condition never fails
-if (r != 1234) assert_eq(r, 1 + 2);
-
-// joining the thread object consumes it, making it unusable in further
-// operations
-t rel.join();
+template<class T+>
+class [[
+  unsafe::send(T~is_send), 
+  unsafe::sync(T~is_send)
+]] mutex;
 ```
 
-Making sound thread-safe code necessitates interior mutability, which requires a compiler primitive to make the `const_cast` valid. The library is manually upholding invariants around exlusivity via unsafe constructs but what results is a sound interface that is impossible to misuse.
+`std2::mutex` is another candidate for use with `std2::arc`. This one is thread safe. As shown in the [thread safety](#thread-safety) example, it provides threads with exclusive access to its interior data using a synchronization object. The borrow checker prevents the reference to the inner data from being used outside of the mutex lock. Therefore, `std2::mutex` is `sync` if its inner type is `send`. Why make it conditional on `send` when the mutex is already providing threads with exclusive access to the inner value? It's protection for the rare type with thread affinity. A type is `send` if it can be copied to a different thread _and used_ by a different thread.
+
+`std2::arc<std2::mutex<T>>` is `send` if `std2::mutex<T>` is `send` and `sync`. `std2::mutex<T>` is `send` and `sync` if `T` is `send`. Since most types are `send` by construction, we can safely mutate shared state over multiple threads as long as its wrapped in a `std2::mutex` and that's owned by an `std2::arc`. 
+
+```cpp
+class thread {
+public:
+  template<class F+, class ...Args+>
+  thread/(where F: static, Args...: static)(F f, Args... args) safe
+  requires(
+    F~is_send &&
+    (Args~is_send && ...) &&
+    safe(mut f(rel args...)))
+    : unsafe t_()
+  { ... }
+  ...
+};
+```
+
+The `send` property is enforced by `std2::thread`'s constructor. If all the thread arguments are `send`, the _requires-clause_ evaluates true and the constructor may be called. If any argument is `send`=false, the program is ill-formed. Thread safety is enforced by this constraint on the thread constructor at compile time.
+
+The `is_send` constraint on `thread`'s constructor demonstrates again the safety model's [theme of responsibility](#memory-safety-as-terms-and-conditions): a `safe` function must be sound for all arguments. Before entering an _unsafe-block_ and calling unsafe system-level thread function, `thread`'s constructor must confirm that it's enforcing the safety guarantees of its contract. Only types that are `send` may be used across threads.
+
+Can we fool `thread` into producing a data race? 
+
+**Pass a borrow to a value on the stack.** There's no guarantee that the thread will join before the stack object is destroyed. Is that a potential use-after-free? No, because the thread has an _outlives-constraint_ which checks that all function arguments outlive `/static`. An `std2::arc` doesn't have lifetime arguments (unless its inner type is a lifetime binder), so that checks out. But a shared or borrow does have a lifetime argument, and if it refers to an object on the stack, it's not `/static`.
+
+**Pass a borrow to a global variable.** If the global's variable type is not `sync`, then a borrow to it is not `send`, and that's a constraint violation. If the global variable is mutable, that could cause a data race. Fortunately it's ill-formed to name mutable global objects in a [safe context](#the-safe-context). Otherwise, it's safe to share const global objects between threads.
+
+It's the responsibility of a safe library to think through all possible scenarios of use and prevent execution that could result in soundness defects. After all, the library author is a specialist in that domain. This is a friendlier system than Standard C++, where all of the responsibility for writing thread safe code weighs on the shoulders of users.
 
 ## Unresolved or unimplemented design issues
 
@@ -2803,8 +2785,8 @@ Safe C++ must provide safe alternatives to everything in today's Standard Librar
 
 We're co-designing the Safe C++ standard library along with the language extensions. Visit our repository to follow our work. You can access all the examples included in this document. Or visit our Slack channel to get involved in the effort:
 
-> https://github.com/cppalliance/safe-cpp
-> https://cpplang.slack.com/archives/C07GH9NFK0F
+> github: [https://github.com/cppalliance/safe-cpp](https://github.com/cppalliance/safe-cpp)\
+> slack: [https://cpplang.slack.com/archives/C07GH9NFK0F](https://cpplang.slack.com/archives/C07GH9NFK0F)
 
 Everything in this proposal took about 18 months to design and implement in Circle. With participation from industry, we could resolve the remaining design questions and in another 18 months have a language and standard library robust enough for mainstream evaluation. While Safe C++ is a large extension to the language, the cost of building new tooling is not steep. If C++ continues to go forward without a memory safety strategy, that's because institutional users are choosing not to pursue it; it's not because memory safe tooling is too expensive or difficult to build.
 
@@ -2992,6 +2974,11 @@ references:
     citation-label: ante
     title: Ante Shared Interior Mutability
     URL: https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability
+
+  - id: send-sync
+    citation-label: send-sync
+    title: Rustnomicon -- Send and Sync
+    URL: https://doc.rust-lang.org/nomicon/send-and-sync.html
 
   - id: itanium-abi
     citation-label: itanium-abi
