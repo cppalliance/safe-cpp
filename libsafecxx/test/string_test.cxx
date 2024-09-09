@@ -17,7 +17,7 @@ void string_constructor() safe
   }
 
   {
-    std2::string s = "hello, world!";
+    std2::string s("hello, world!");
     assert_eq(s.size(), 13u);
     assert_eq(s.capacity(), 13u);
     assert_true(s == std2::string_view("hello, world!"));
@@ -53,7 +53,7 @@ void string_constructor() safe
 
   {
     std2::string_view sv = "hello, world!";
-    std2::string s = sv;
+    std2::string s(sv);
     assert_eq(s.size(), 13u);
     assert_eq(s.capacity(), 13u);
     assert_true(s == sv);
@@ -67,7 +67,7 @@ void string_append() safe
     std2::string_view sv1 = "if I only had the heart";
     std2::string_view sv2 = " to find out exactly who you are";
 
-    std2::string s = sv1;
+    std2::string s(sv1);
     mut s.append(sv2);
 
     assert_eq(s.size(), sv1.size() + sv2.size());
@@ -80,10 +80,10 @@ void string_append() safe
     std2::string_view sv1 = "if I only had the heart";
     std2::string_view sv2 = " to find out exactly who you are";
 
-    std2::string s1 = sv1;
-    std2::string s2 = sv2;
+    std2::string s1(sv1);
+    std2::string s2(sv2);
 
-    std2::string s = s1 + s2;
+    std2::string s(s1 + s2);
 
     assert_eq(s.size(), sv1.size() + sv2.size());
     assert_eq(s.capacity(), s.size());

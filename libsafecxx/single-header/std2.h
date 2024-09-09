@@ -707,6 +707,10 @@ public:
     new(p_) arc_inner(rel t);
   }
 
+  template<typename T2>
+  explicit arc(T2 t) safe :
+    arc(T(rel t)) { }
+
   arc(arc const^ rhs) safe
     : p_(rhs->p_)
   {
@@ -942,11 +946,15 @@ basic_string
   {
   }
 
+  // Make expensive converting ctors explicit.
+  // The user should know they're doing a heap allocation.
+  explicit 
   basic_string(string_constant<value_type> sc) safe
     : basic_string(basic_string_view<value_type>(sc))
   {
   }
 
+  explicit 
   basic_string(basic_string_view<value_type> sv) safe
     : basic_string()
   {

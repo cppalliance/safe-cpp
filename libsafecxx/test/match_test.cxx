@@ -105,7 +105,7 @@ void use_cow() safe
   }
 
   {
-    std2::string base = "rawr";
+    std2::string base("rawr");
     cow<std2::string> str = .borrowed(^const base);
     assert_true(str.is_borrowed());
     assert_true(!str.is_owned());
