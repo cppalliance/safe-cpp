@@ -16,7 +16,7 @@ add_library(safe_cxx INTERFACE)
 target_sources(
   safe_cxx
   INTERFACE FILE_SET HEADERS
-  BASE_DIRS ../libsafecxx/single-header
+  BASE_DIRS "${CMAKE_CURRENT_LIST_DIR}/../libsafecxx/single-header"
   FILES std2.h
 )
 
