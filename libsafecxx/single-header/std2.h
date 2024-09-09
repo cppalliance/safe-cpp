@@ -1283,6 +1283,7 @@ class [[unsafe::send(false)]] rc
   }
 
   T const^ operator->(self const^) noexcept safe {
+    println("T const^ rc<T>::operator->(self const^) noexcept safe");
     return *self->p_->data_.get();
   }
 
@@ -1315,16 +1316,28 @@ class ref_cell
       , borrow_(borrow)
     {
       borrow_.set(borrow_.get() + 1);
+      println("ref(T* value, cell<int> const^/a borrow) noexcept safe");
+      println(borrow_.get());
     }
 
     public:
 
+    ref(ref const^ rhs) safe
+      : ref(rhs.value_, rhs.borrow_)
+    {
+      println("do I see this???");
+    }
+
     ~ref() safe {
       auto b = borrow_.get();
       borrow_.set(b - 1);
+      println("~ref() safe");
+      println(borrow_.get());
     }
 
     T const^ operator*(self const^) noexcept safe {
+      println("T const^ operator*(self const^) noexcept safe");
+      println(self->borrow_.get());
       unsafe { return *self->value_; }
     }
   };
@@ -1360,11 +1373,14 @@ class ref_cell
     }
   };
 
-  explicit ref_cell(T t) noexcept safe
+  explicit
+  ref_cell(T t) noexcept safe
     : t_(rel t)
     , borrow_count_{0}
   {
   }
+
+  ref_cell(ref_cell const^) = delete;
 
   optional<ref> try_borrow(self const^) noexcept safe
   {
