@@ -10,12 +10,8 @@ int main() safe {
   // Pass by relocation (unsafe)
   mut vec.push_back("Hello unsafe type qualifier!");
 
-  // Pass const char*
-  // Construct inside emplace_back (unsafe)
-  mut vec.push_back("I integrate with legacy types");
-
   // Append Bar to the end of Foo (unsafe)
-  mut vec[0] += vec[1];
+  mut vec[0] += "Another unsafe string";
 
   std2::println(vec[0]);
 }

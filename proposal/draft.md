@@ -718,7 +718,7 @@ Expressions carry `noexcept` and `safe` states, which is how _noexcept-operator_
 
 The answer is that template specialization works on types and it doesn't work on these other states of an expression. A template argument with an unsafe type qualifier instantiates a template with an unsafe type qualifier on the corresponding template parameter. The unsafe qualifier drills through templates in a way that other language entities don't.
 
-[**unsafe2.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe2.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/1E9Y7rcbx)
+[**unsafe2.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe2.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/7qEnb4s44)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -732,20 +732,16 @@ int main() safe {
   // Pass by relocation (unsafe)
   mut vec.push_back("Hello unsafe type qualifier!");
 
-  // Pass const char*
-  // Construct inside emplace_back (unsafe)
-  mut vec.push_back("I integrate with legacy types");
-
   // Append Bar to the end of Foo (unsafe)
-  mut vec[0] += vec[1];
+  mut vec[0] += "Another unsafe string";
 
   std2::println(vec[0]);
 }
 ```
 
-We want to use the new memory safe vector with the legacy string type. The new vector is borrow checked, eliminating use-after-free and iterator invalidation defects. It presents a safe interface. But the old string is pre-safety. All its member functions are unsafe. If we want to specialize the new vector on the old string, we need to mark it `unsafe`.
+We want to use the new memory safe vector with the legacy string type. The new vector is borrow checked, eliminating use-after-free and iterator invalidation defects. It presents a safe interface. But the old string is pre-safety. All its member functions are unsafe. We want to specialize the new vector on the old string, so we mark it `unsafe`.
 
-The unsafe type qualifier propagates through the instantiated vector. The expressions returned through the `operator[]` accessor are unsafe qualified, so we can call unsafe member functions on the string, even in main's safe context.
+The unsafe type qualifier propagates through the instantiated vector. The expressions returned from the `operator[]` accessor are unsafe qualified, allowing us to call unsafe member functions on the string, even in main's safe context.
 
 Let's simplify the example above and study it in detail.
 
@@ -774,11 +770,11 @@ int main() safe {
 }
 ```
 
-In this example, the unsafe String constructor is called in the safe main function. That's permitted because substitution of `unsafe String` into Vec's template parameter creates a push_back specialization with an `unsafe String` function parameter. Safe C++ allows unsafe constructors to initialize unsafe types in an unsafe context.
+In this example, the unsafe `String` constructor is called in the safe `main` function. That's permitted because substitution of `unsafe String` into Vec's template parameter creates a `push_back` specialization with an `unsafe String` function parameter. Safe C++ allows unsafe constructors to initialize unsafe-qualified types in an safe context.
 
-Permitting unsafe operations with unsafe specialization is far preferable to using conditional _unsafe-specifiers_ on the class template's member functions. We want the vector to keep its safe interface so that it can be used by safe callers. This device allows member functions to remain safe without resorting to _unsafe-blocks_ in the implementations. There's a single use of the `unsafe` token, which makes for simple audits during code review.
+Permitting unsafe operations with unsafe qualifier specialization is less noisy and exposes less of the implementation than using conditional _unsafe-specifiers_ on the class template's member functions. More importantly, we want to keep the new vector's interface safe, even when it's specialized with unsafe types. This device allows member functions to remain safe without resorting to _unsafe-blocks_ in the implementations. There's a single use of the `unsafe` token, which makes for simple audits during code review.
 
-Placing the unsafe token on the _template-argument-list_, where the class template gets used, is also far safer than enclosing operations on the template parameter type in _unsafe-blocks_ inside the template. In the former case, the user of the container can read its preconditions and swear that the precondidions are met. In the latter case, the template isn't able to make any statements about properly using the template type, because it doesn't know what that type is. The `unsafe` token should go with the caller, not the callee.
+Placing the unsafe token on the _template-argument-list_, where the class template gets used, is far preferable to enclosing operations on the template parameter type in _unsafe-blocks_ inside the template. In the former case, the user of the container can read its preconditions and swear that the precondidions are met. In the latter case, the template isn't able to make any statements about properly using the template type, because it doesn't know what that type is. The `unsafe` token should go with the caller, not the callee.
 
 [**unsafe4.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe4.cxx)
 ```cpp
@@ -813,7 +809,7 @@ cannot call unsafe constructor String::String(const char*) in safe context
 see declaration at unsafe4.cxx:10:3
 ```
 
-This code is ill-formed. We've established that it's permitted to copy initialize into the push_back call, since its function parameter is `unsafe String`, but direct initialization of `String` is not allowed. The constructor chosen for direct initialization is unsafe, but the type it's initializing is not. The compiler is right to reject this program because the user is plainly calling an unsafe constructor in a safe context, without a mitigating _unsafe-block_ or unsafe qualifier.
+This code is ill-formed. It's permissible to invoke an unsafe constructor when copy-initializing into the `push_back` call, since its function parameter is `unsafe String`. Dut direct initialization of `String` is not allowed. The constructor chosen for direct initialization is unsafe, but the type it's initializing is not. The type is just `String`. The compiler is right to reject this program because the user is plainly calling an unsafe constructor in a safe context, without a mitigating _unsafe-block_ or unsafe qualifier.
 
 [**unsafe5.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe5.cxx)
 ```cpp
@@ -845,15 +841,15 @@ int main() safe {
 }
 ```
 
-This program is well-formed. As with the previous example, there's a direct initialization of a String object using its unsafe constructor. But this time it's allowed, because the type being initialized is `T`, which is substituted with `unsafe String`: unsafe constructors are permitted to initialize unsafe types.
+This program is well-formed. As with the previous example, there's a direct initialization of a String object using its unsafe constructor. This time it's allowed, because the type being initialized is `T`, which is substituted with `unsafe String`: unsafe constructors are permitted to initialize unsafe types.
 
-The [unsafe type qualifier](#the-unsafe-type-qualifier) is a powerful mechanism for incorporating legacy code into new, safe templates. But propagating the qualifier through all template parameters may be too permissive. C++ templates won't be expecting the `unsafe` qualifier, and it may break dependencies. Functions that are explicitly instantiated won't have `unsafe` instantiations, and that would cause link errors. It may be prudent to get some usage experience, and limit this type qualifier to being deduced only by type template parameters with a certain token, eg `typename T?`. That way, `typename T+?` would become a common incantation for containers: create template lifetime parameters for this template parameter _and_ deduce the unsafe qualifier for it.
+The [unsafe type qualifier](#the-unsafe-type-qualifier) is a powerful mechanism for incorporating legacy code into new, safe templates. But propagating the qualifier through all template parameters may be too permissive. C++ templates won't be expecting the `unsafe` qualifier, and it may break dependencies. Functions that are explicitly instantiated won't have `unsafe` instantiations, and that would cause link errors. It may be prudent to get some usage experience, and limit this type qualifier to being deduced only by type template parameters with a certain token, eg `typename T?`. That way, `typename T+?` would become a common incantation for containers: create template lifetime parameters for this template parameter _and_ deduce the `unsafe` qualifier for it.
 
-To be more accommodating when mixing unsafe with safe code, the unsafe qualifier has very liberal transitive properties. A function invoked with an unsafe-qualified object or argument, or a constructor that initializes an unsafe type, are _exempted calls_. When performing overload resolution for exempted calls, function parameters of candidates become unsafe type qualified. This permits copy initialization of function arguments into parameter types when any argument is unsafe qualified. The intent is to make deployment of the `unsafe` token more strategic: use it less often but make it more impactful. It's not helpful to dilute its potency with many trivial _unsafe-block_ operations.
+To be more accommodating when mixing unsafe with safe code, the `unsafe` qualifier has very liberal transitive properties. A function invoked with an unsafe-qualified object or argument, or a constructor that initializes an unsafe type, are _exempted calls_. When performing overload resolution for exempted calls, function parameters of candidates become unsafe qualified. This permits copy initialization of function arguments into parameter types when any argument is unsafe qualified. The intent is to make deployment of the `unsafe` token more strategic: use it less often but make it more impactful. It's not helpful to dilute its potency with many trivial _unsafe-block_ operations.
 
 ### unsafe subscripts
 
-There's one more prominent use of the `unsafe` token. It'll suppress runtime bounds checks during subscript operations on both builtin and user-defined types. For applications where nanoseconds matter, developers may want to forego runtime bounds checking. In Safe C++, this is exceptionally easy. Just write `; unsafe` in your array, slice or vector subscript.
+There's one more prominent use of the `unsafe` token: it suppresses runtime bounds checks in subscript operations on both builtin and user-defined types. For applications where nanoseconds matter, developers may want to forego runtime bounds checking. In Safe C++, this is straight forward. Just write `; unsafe` in your array, slice or vector subscript.
 
 [**unsafe_bounds.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe_bounds.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/9xajqhrvc)
 ```cpp
@@ -873,7 +869,7 @@ void subscript_vector(std2::vector<int> vec, size_t i, size_t j) safe {
 }
 ```
 
-The unsafe subscript cleary indicates that runtime bounds checks is relaxed, while keeping a consistent syntax with ordinary checked subscripts. It doesn't expose any other operations, including preparation of the subscript index, to an unsafe context. The use of the `unsafe` token is the programmer's way of taking responsibility for correct behavior. If something goes wrong, you know who to blame.
+The unsafe subscript indicates that runtime bounds checks is relaxed, while keeping a consistent syntax with ordinary checked subscripts. It doesn't expose any operations to an unsafe context. The use of the `unsafe` token is the programmer's way of taking responsibility for correct behavior.
 
 [**unsafe_bounds.rs**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe_bounds.rs)
 ```rust
@@ -890,7 +886,7 @@ fn subscript_vector(mut vec: Vec<i32>, i: usize, j: usize) {
 }
 ```
 
-Rust's unchecked subscript story is not elegant. You have to use the separately named functions `get_unchecked` and `get_unchecked_mut` which are associated with arrays, slices and vectors using traits. These are unsafe functions, so your calls have to be wrapped in _unsafe-blocks_. That exposes other operations to the unsafe context. Since we're invoking functions directly, as opposed to using the `[]` operator, we don't get automatic dereference of the returned borrows.
+Rust's unchecked subscript story is not elegant. You have to use the separately named functions `get_unchecked` and `get_unchecked_mut`. These are unsafe functions, so your calls have to be wrapped in _unsafe-blocks_. That exposes other operations to the unsafe context. Since we're invoking functions directly, as opposed to using the `[]` operator, we don't get automatic dereference of the returned borrows.
 
 ```cpp
 template<class T+>
@@ -915,7 +911,7 @@ class vector
 };
 ```
 
-The unsafe subscript works with user-defined types by introducing a new library type `std2::no_runtime_check`. Use this as last parameter in a user-defined `operator[]` call, including multi-dimensional subscript operators, to enable unsafe subscript binding. The compiler default-initializes a no_runtime_check and attempts to pass that during overload resolution. `no_runtime_check` overloads are _unsafe functions_, as they aren't sound for all valid inputs. However, when invoked as part of an unsafe subscript, they can still be used in safe contexts. That's because the user wrote out the `unsafe` at the point of use, exempting this function call from the unsafe check.
+The unsafe subscript works with user-defined types by introducing a new library type `std2::no_runtime_check`. Append this as the last parameter in a user-defined `operator[]` declaration, including multi-dimensional subscript operators, to enable unsafe subscript binding. The compiler default-initializes a `no_runtime_check` argument and attempts to pass that during overload resolution. `operator[]`s with `no_runtime_check` parameters are _unsafe functions_, since they aren't sound for all valid inputs. However, when invoked as part of an unsafe subscript, they can still be used in safe contexts. That's because the user wrote the `unsafe` token at the point of use, exempting this function call from the unsafe check.
 
 ## Borrow checking
 
