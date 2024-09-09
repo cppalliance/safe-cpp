@@ -113,9 +113,28 @@ void ref_cell_constructor() safe
   assert_eq(*p, 1337);
 }
 
+void borrowing() safe
+{
+  {
+    std2::ref_cell<int> rc{1234};
+
+    (void) *rc.borrow();
+    (void) *rc.borrow_mut();
+  }
+
+  {
+    std2::ref_cell<int> rc{1234};
+
+    (void) *rc.borrow_mut();
+    (void) *rc.borrow_mut();
+  }
+
+}
+
 int main() safe
 {
   cell_constructor();
   cell_mutate();
   ref_cell_constructor();
+  borrowing();
 }

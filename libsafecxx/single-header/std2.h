@@ -1283,7 +1283,6 @@ class [[unsafe::send(false)]] rc
   }
 
   T const^ operator->(self const^) noexcept safe {
-    println("T const^ rc<T>::operator->(self const^) noexcept safe");
     return *self->p_->data_.get();
   }
 
@@ -1316,8 +1315,6 @@ class ref_cell
       , borrow_(borrow)
     {
       borrow_.set(borrow_.get() + 1);
-      println("ref(T* value, cell<int> const^/a borrow) noexcept safe");
-      println(borrow_.get());
     }
 
     public:
@@ -1325,19 +1322,14 @@ class ref_cell
     ref(ref const^ rhs) safe
       : ref(rhs.value_, rhs.borrow_)
     {
-      println("do I see this???");
     }
 
     ~ref() safe {
       auto b = borrow_.get();
       borrow_.set(b - 1);
-      println("~ref() safe");
-      println(borrow_.get());
     }
 
     T const^ operator*(self const^) noexcept safe {
-      println("T const^ operator*(self const^) noexcept safe");
-      println(self->borrow_.get());
       unsafe { return *self->value_; }
     }
   };
@@ -1391,7 +1383,7 @@ class ref_cell
 
   ref borrow(self const^) noexcept safe {
     auto opt = self.try_borrow();
-    return match(opt) {
+    return match(rel opt) {
       .some(b) => rel b;
       .none => panic("ref_cell failed to acquire const borrow");
     };
@@ -1407,7 +1399,7 @@ class ref_cell
 
   ref_mut borrow_mut(self const^) noexcept safe {
     auto opt = self.try_borrow_mut();
-    return match(opt) {
+    return match(rel opt) {
       .some(b) => rel b;
       .none => panic("ref_cell failed to acquire const borrow");
     };
