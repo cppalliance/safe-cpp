@@ -382,27 +382,27 @@ namespace literals
 namespace string_literals
 {
 
-auto operator""sv(char const* p, std::size_t len) noexcept safe -> string_view/static
+auto operator""sv2(char const* p, std::size_t len) noexcept safe -> string_view/static
 {
   unsafe { return string_view(slice_from_raw_parts(p, len)); }
 }
 
-auto operator""sv(char8_t const* p, std::size_t len) noexcept safe -> u8string_view/static
+auto operator""sv2(char8_t const* p, std::size_t len) noexcept safe -> u8string_view/static
 {
   unsafe { return u8string_view(slice_from_raw_parts(p, len)); }
 }
 
-auto operator""sv(char16_t const* p, std::size_t len) noexcept safe -> u16string_view/static
+auto operator""sv2(char16_t const* p, std::size_t len) noexcept safe -> u16string_view/static
 {
   unsafe { return u16string_view(slice_from_raw_parts(p, len)); }
 }
 
-auto operator""sv(char32_t const* p, std::size_t len) noexcept safe -> u32string_view/static
+auto operator""sv2(char32_t const* p, std::size_t len) noexcept safe -> u32string_view/static
 {
   unsafe { return u32string_view(slice_from_raw_parts(p, len)); }
 }
 
-auto operator""sv(wchar_t const* p, std::size_t len) noexcept safe -> wstring_view/static
+auto operator""sv2(wchar_t const* p, std::size_t len) noexcept safe -> wstring_view/static
 {
   unsafe { return wstring_view(slice_from_raw_parts(p, len)); }
 }
@@ -1040,27 +1040,27 @@ namespace literals
 namespace string_literals
 {
 
-auto operator""s(char const* p, std::size_t len) noexcept safe -> string
+auto operator""s2(char const* p, std::size_t len) noexcept safe -> string
 {
   unsafe { return string(slice_from_raw_parts(p, len)); }
 }
 
-auto operator""s(char8_t const* p, std::size_t len) noexcept safe -> u8string
+auto operator""s2(char8_t const* p, std::size_t len) noexcept safe -> u8string
 {
   unsafe { return u8string(slice_from_raw_parts(p, len)); }
 }
 
-auto operator""s(char16_t const* p, std::size_t len) noexcept safe -> u16string
+auto operator""s2(char16_t const* p, std::size_t len) noexcept safe -> u16string
 {
   unsafe { return u16string(slice_from_raw_parts(p, len)); }
 }
 
-auto operator""s(char32_t const* p, std::size_t len) noexcept safe -> u32string
+auto operator""s2(char32_t const* p, std::size_t len) noexcept safe -> u32string
 {
   unsafe { return u32string(slice_from_raw_parts(p, len)); }
 }
 
-auto operator""s(wchar_t const* p, std::size_t len) noexcept safe -> wstring
+auto operator""s2(wchar_t const* p, std::size_t len) noexcept safe -> wstring
 {
   unsafe { return wstring(slice_from_raw_parts(p, len)); }
 }

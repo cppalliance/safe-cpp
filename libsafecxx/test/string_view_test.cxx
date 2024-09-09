@@ -510,27 +510,27 @@ void literal_test() safe
   using namespace std2::literals::string_literals;
 
   {
-    std2::string_view sv = "hello, world!"sv;
+    std2::string_view sv = "hello, world!"sv2;
     assert_true(sv == std2::string_view("hello, world!"));
   }
 
   {
-    std2::u8string_view sv = u8"hello, world!"sv;
+    std2::u8string_view sv = u8"hello, world!"sv2;
     assert_true(sv == std2::u8string_view(u8"hello, world!"));
   }
 
   {
-    std2::u16string_view sv = u"hello, world!"sv;
+    std2::u16string_view sv = u"hello, world!"sv2;
     assert_true(sv == std2::u16string_view(u"hello, world!"));
   }
 
   {
-    std2::u32string_view sv = U"hello, world!"sv;
+    std2::u32string_view sv = U"hello, world!"sv2;
     assert_true(sv == std2::u32string_view(U"hello, world!"));
   }
 
   {
-    std2::wstring_view sv = L"hello, world!"sv;
+    std2::wstring_view sv = L"hello, world!"sv2;
     assert_true(sv == std2::wstring_view(L"hello, world!"));
   }
 }
