@@ -154,20 +154,21 @@ int main() safe {
   mut views.push_back("From a string literal");
 
   // string_view with outer scope lifetime.
-  string s1 = "From string object 1";
+  string s1{"From string object 1"};
   mut views.push_back(s1);
 
   {
     // string_view with inner scope lifetime.
-    string s2 = "From string object 2";
+    string s2{"From string object 2"};
     mut views.push_back(s2);
 
     // s2 goes out of scope. views now holds dangling pointers into
-    // out-of-scope data. It should be ill-formed to use s2.
+    // out-of-scope data.
   }
 
-  // Print the strings. This raises a borrow checker error, because 
-  // views depends on an expired loan on s2.
+  // Print the strings. s2 already fell out of scope, so this should
+  // be a borrowck violation. `views` now contains objects that hold
+  // dangling pointers.
   println("Printing from the outer scope:");
   for(string_view sv : views)
     println(sv);
@@ -177,15 +178,15 @@ int main() safe {
 $ circle string_view.cxx -I ../libsafecxx/single-header/
 safety: during safety checking of int main() safe
   borrow checking: string_view.cxx:30:24
-    for(string_view sv : views) 
+    for(string_view sv : views)
                          ^
   use of views depends on expired loan
   drop of s2 between its shared borrow and its use
   s2 declared at string_view.cxx:19:12
-      string s2 = "From string object 2"; 
+      string s2 = "From string object 2";
              ^
   loan created at string_view.cxx:20:25
-      mut views.push_back(s2); 
+      mut views.push_back(s2);
                           ^
 ```
 
@@ -337,7 +338,7 @@ A memory safe language should be robust against data races to shared mutable sta
 Due to their non-deterministic nature, data race defects are notoriously difficult to debug.
 Safe C++ prevents them from occurring in the first place. Programs with potential data race bugs in the safe context are ill-formed at compile time.
 
-The thread safety model uses [send and sync](#send-and-sync) interfaces, [interior mutability](#interior-mutability) and [borrow checking](#borrow-checking) to establish a system of constraints guaranteeing that shared mutable state is only accessed through synchronization primitives like `std2::mutex`. 
+The thread safety model uses [send and sync](#send-and-sync) interfaces, [interior mutability](#interior-mutability) and [borrow checking](#borrow-checking) to establish a system of constraints guaranteeing that shared mutable state is only accessed through synchronization primitives like `std2::mutex`.
 
 [**thread_safety**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/thread_safety.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/es9nx5sqd)
 ```cpp
@@ -348,12 +349,12 @@ The thread safety model uses [send and sync](#send-and-sync) interfaces, [interi
 using namespace std2;
 
 // mutex is sync, so arc<mutex<string>> is send.
-void entry_point(arc<mutex<string>> data, int thread_id) safe { 
+void entry_point(arc<mutex<string>> data, int thread_id) safe {
   // Lock the data through the mutex.
   // When lock_guard goes out of scope, the mutex is released.
   auto lock_guard = data->lock();
 
-  // Get a mutable borrow to the string data. When lock_guard goes out of 
+  // Get a mutable borrow to the string data. When lock_guard goes out of
   // scope, this becomes a dangling pointer. The borrow checker prevents
   // us from accessing through dangling pointers.
   string^ s = mut lock_guard.borrow();
@@ -367,8 +368,8 @@ void entry_point(arc<mutex<string>> data, int thread_id) safe {
   // attempts to access shared state outside of the lock.
   // drp lock_guard;
 
-  // Drop the data before printing shared state. This decrements arc's 
-  // reference count and could potentially free the string data. It 
+  // Drop the data before printing shared state. This decrements arc's
+  // reference count and could potentially free the string data. It
   // raises a borrowck error on `println(*s)` because the borrow on `data`
   // from `data->lock()` is kept live by the use of `println(*s)` via the
   // borrow `mut lock_guard.borrow()`.
@@ -390,7 +391,7 @@ int main() safe {
   vector<thread> threads { };
   for(int i : 10)
     mut threads.push_back(thread(entry_point, cpy shared_data, i));
-  
+
   // The consuming into_iterator produced by `rel threads` lets us relocate
   // elements out of the vector for the consuming thread::join call.
   for(thread t : rel threads)
@@ -423,15 +424,15 @@ Let's sabotage our own design. Uncomment the `drp lock_guard` line. The lock gua
 ```
 safety: during safety checking of void entry_point(std2::arc<std2::mutex<std2::string>>, int) safe
   borrow checking: thread_safety.cxx:35:12
-    println(*s); 
+    println(*s);
              ^
   use of s depends on expired loan
   drop of lock_guard between its mutable borrow and its use
   invalidating operation at thread_safety.cxx:25:3
-    drp lock_guard; 
+    drp lock_guard;
     ^
   loan created at thread_safety.cxx:16:19
-    string^ s = mut lock_guard.borrow(); 
+    string^ s = mut lock_guard.borrow();
                     ^
 ```
 
@@ -442,14 +443,14 @@ This time uncomment `drp data` to destroy the thread's copy of the `arc` object.
 ```
 safety: during safety checking of void entry_point(std2::arc<std2::mutex<std2::string>>, int) safe
   borrow checking: thread_safety.cxx:32:3
-    drp data; 
+    drp data;
     ^
   drop of data between its shared borrow and its use
   borrow kept live by drop of lock_guard declared at thread_safety.cxx:11:8
-    auto lock_guard = data->lock(); 
+    auto lock_guard = data->lock();
          ^
   loan created at thread_safety.cxx:11:21
-    auto lock_guard = data->lock(); 
+    auto lock_guard = data->lock();
                       ^
 ```
 
@@ -463,7 +464,7 @@ Safe operations that can't be checked for soundness with static analysis must be
 
 * Builtin arrays and slices panic on out-of-bounds subscripts.
 * Integer division panics when the divisor is zero.
-* Integer division panics when INT_MIN is divided by -1. 
+* Integer division panics when INT_MIN is divided by -1.
 * `std2::vector` panics on out-of-bounds subscripts.
 * `std2::ref_cell` panics when requesting a mutable borrow and the inner object is borrowed or when requesting a shared borrow and the inner object is mutably borrowed.
 
@@ -482,7 +483,7 @@ int main() safe {
 ```
 ```
 $ circle subscript_array.cxx
-$ ./subscript_array 
+$ ./subscript_array
 subscript_array.cxx:9:17
 int main() safe
 subscript is out-of-range of type int[4]
@@ -506,7 +507,7 @@ int main() safe {
 ```
 ```
 $ circle subscript_vector.cxx -I ../libsafecxx/single-header/
-$ ./subscript_vector 
+$ ./subscript_vector
 ../libsafecxx/single-header/std2.h:1684:39
 std2::vector<int>::operator[]
 vector subscript is out-of-bounds
@@ -1073,7 +1074,7 @@ To users, iterator invalidation looks like a different phenomenon than the use-a
 >
 > -- <cite>[RFC] Lifetime annotations for C++ Clang Frontend</cite>[@clang-lifetime-annotations]
 
-Clang's lifetime annotations project doesn't implement borrow checking. For that project, iterator invalidation is out of scope, because it really is a different phenomenon than the lifetime tracking _heuristics_ employed in detecting other use-after-free defects. 
+Clang's lifetime annotations project doesn't implement borrow checking. For that project, iterator invalidation is out of scope, because it really is a different phenomenon than the lifetime tracking _heuristics_ employed in detecting other use-after-free defects.
 
 
 ```cpp
@@ -1225,8 +1226,8 @@ using namespace std2;
 int main() safe {
   initializer_list<string_view> initlist;
 
-  string s = "Hello";
-  string t = "World";
+  string s{"Hello"};
+  string t{"World"};
 
   // initializer lists holds dangling pointers into backing array.
   initlist = { s, t, s, t };
@@ -1418,16 +1419,16 @@ The borrow checker is concerned with invalidating actions on in-scope loans. The
 #include <std2.h>
 
 int main() safe {
-  std2::string s = "Hello safety";
+  std2::string s{"Hello safety"};
 
   // (B) - borrow occurs here.
   std2::string_view view = s;
 
   // (A) - invalidating action
-  s = "A different string";
+  s = std2::string{"A different string"};
 
   // (U) - use that extends borrow
-  println(view);
+  std2::println(view);
 }
 ```
 ```txt
@@ -2210,7 +2211,7 @@ int main() {
   // One-length tuple expression.
   auto t1 = (4, );
   static_assert(T1 == decltype(t1));
-     
+
   // Longer tuple expression.
   auto t2 = (5, 3.14);
   static_assert(T2 == decltype(t2));
@@ -2242,7 +2243,7 @@ The assignment `t3.0.0.1` lowers to `_4.0.0.1`. This is a place name of a local 
 
 C++'s native array decays to pointers and doesn't support pass-by-value semantics. `std::array` encapsulates arrays to fix these problems and provides an `operator[]` API for consistent subscripting syntax. But `std::array` is broken for our purposes. Since `operator[]` returns a reference, the `std::array`'s elements are not _owned places_ and can't be relocated out of.
 
-Safe C++ introduces a first-class pass-by-value array type `[T; N]` and a first-class slice companion type `[T; dyn]`. Subobjects of both the old and new array types with constant indices are _owned places_ and support relocation. 
+Safe C++ introduces a first-class pass-by-value array type `[T; N]` and a first-class slice companion type `[T; dyn]`. Subobjects of both the old and new array types with constant indices are _owned places_ and support relocation.
 
 Slices have dynamic length and are _incomplete types_. You may form borrows, references or pointers to slices and access through those. These are called _fat pointers_ and are 16 bytes on 64-bit platforms. The data pointer is accompanied by a length field.
 
@@ -2393,12 +2394,12 @@ int test(Primitive obj) noexcept safe {
     // Match 100 to 200 inclusive. ..= is closed interval.
     .i32(100..=200)                 => 3;
 
-    // variant-style access. Match all alternatives with 
+    // variant-style access. Match all alternatives with
     // a `int64_t` type. In this case, i64, i64_2 or i64_3
     // matches the pattern.
     {int64_t}(500 | 1000..2000)     => 4;
 
-    // Match a 2-tuple/aggregate. Bind declarations x and y to 
+    // Match a 2-tuple/aggregate. Bind declarations x and y to
     // the tuple elements. The match-guard passes when x > y.
     .pair([x, y]) if (x > y)        => 5;
 
@@ -2421,9 +2422,9 @@ A match is rich in the kind of patterns it supports:
 * **rest pattern** - `..` Matches any number of elements. Use inside structured patterns to produce patterns on the beginning or end elements. Also used to supports patterns on slice operands.
 * **binding declaration** _binding-mode_ `decl` - Bind a declaration to the pattern's operand. There are six binding modes: _default_, `cpy`, `rel`, `^` for mutable borrows, `^const` for shared borrows and `&` for lvalue references.
 * **test pattern** - Name a constant literal or constant expression inside parentheses. These can be formed into range expressions with an operand on either or both sides of `..` or `..=`. The current operand of the match must match the test pattern to go to the body.
-* **disjunction pattern** `p1 | p2` - Separate patterns with the disjunction operator `|`. 
+* **disjunction pattern** `p1 | p2` - Separate patterns with the disjunction operator `|`.
 
-This example uses choice, test, variant, binding, disjunction and wildcard patterns. The wildcard pattern at the end proves exhaustiveness. 
+This example uses choice, test, variant, binding, disjunction and wildcard patterns. The wildcard pattern at the end proves exhaustiveness.
 
 [**match2.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/match2.cxx)
 ```cpp
@@ -2471,7 +2472,7 @@ The _concise-match-expression_ is a form of pattern matching that applies a test
 Recall the law of exclusivity, the program-wide invariant that guarantees a resource isn't mutated while another user has access to it. How does this square with the use of shared pointers, which enables shared ownership of a mutable resource? How does it support threaded programs, where access to shared mutable state is permitted between threads? Shared mutable access exists in this safety model, but the way it's enabled involves some trickery.
 
 
-** NOW A BROKEN TEST DUE TO CHANGE IN CELL ** 
+** NOW A BROKEN TEST DUE TO CHANGE IN CELL **
 ** REPLACE WITH SOMETHING ELSE **
 
 [**cell.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/cell.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/M6df3jbhs)
@@ -2483,21 +2484,21 @@ using namespace std2;
 
 int main() {
   // rc - Shared ownership within a thread.
-  // cell - Transactional access.
-  rc<cell<string>> s1(string("A string set from s1"));
+  // ref_cell - Shared mutable access checked at runtime.
+  rc<ref_cell<string>> s1(ref_cell<string>(string{"A string set from s1"}));
 
   // Copying the rc increments the reference counter on the control block.
-  rc<cell<string>> s2 = cpy s1;
+  rc<ref_cell<string>> s2 = cpy s1;
 
   // Read the data out from s2.
-  println(s2->get());
+  println(*s2->borrow());
 
-  // The string data is now owned by three rcs. 
+  // The string data is now owned by three rcs.
   // cell's transactional access upholds the law of exclusivity.
-  s2->set("A string set from s2");
+  mut *s2->borrow_mut() =  string{"A string set from s2"};
 
   // Read out through s1.
-  println(s1->get());
+  println(*s1->borrow());
 }
 ```
 ```
@@ -2578,7 +2579,7 @@ Safe C++ and Rust and conflate exclusive access with mutable borrows and shared 
 Thread safety is perhaps the most remarkable guarantee made by Rust's memory safety model. Central to its implementation are the `send` and `sync` traits:
 
 > Some types allow you to have multiple aliases of a location in memory while mutating it. Unless these types use synchronization to manage this access, they are absolutely not thread-safe. Rust captures this through the Send and Sync traits.
-> 
+>
 > * A type is Send if it is safe to send it to another thread.\
 > * A type is Sync if it is safe to share between threads (T is Sync if and only if &T is Send).
 >
@@ -2592,7 +2593,7 @@ class [[unsafe::send(false)]] rc;
 
 template<class T+>
 class [[
-  unsafe::send(T~is_send && T~is_sync), 
+  unsafe::send(T~is_send && T~is_sync),
   unsafe::sync(T~is_send && T~is_sync)
 ]] arc;
 ```
@@ -2601,7 +2602,7 @@ class [[
 
 `std2::arc` is the atomic reference-counted pointer. If its inner type is both `send` and `sync`, then the `arc` specialization is also `send` and `sync`. Most types with _value semantics_, including builtin types, are `send` and `sync`. By the rules of _inherited mutability_, so are aggregate types built from `send` and `sync` subobjects. `std2::arc<int>` is `send`, permitting copy to other threads.
 
-But that's not an interesting case. `arc`'s interface only produces const borrows to the inner type: you can't have a data race if you're only reading from something. `sync` characterizes the thread safety of deconfliction mechanisms of types with [_interior mutability_](#interior-mutability). Is that deconfliction mechanism _single threaded_ or _multi-threaded_? 
+But that's not an interesting case. `arc`'s interface only produces const borrows to the inner type: you can't have a data race if you're only reading from something. `sync` characterizes the thread safety of deconfliction mechanisms of types with [_interior mutability_](#interior-mutability). Is that deconfliction mechanism _single threaded_ or _multi-threaded_?
 
 ```cpp
 template<class T+>
@@ -2613,14 +2614,14 @@ class [[unsafe::sync(false)]] cell;
 ```cpp
 template<class T+>
 class [[
-  unsafe::send(T~is_send), 
+  unsafe::send(T~is_send),
   unsafe::sync(T~is_send)
 ]] mutex;
 ```
 
 `std2::mutex` is another candidate for use with `std2::arc`. This one is thread safe. As shown in the [thread safety](#thread-safety) example, it provides threads with exclusive access to its interior data using a synchronization object. The borrow checker prevents the reference to the inner data from being used outside of the mutex lock. Therefore, `std2::mutex` is `sync` if its inner type is `send`. Why make it conditional on `send` when the mutex is already providing threads with exclusive access to the inner value? It's protection for the rare type with thread affinity. A type is `send` if it can be copied to a different thread _and used_ by a different thread.
 
-`std2::arc<std2::mutex<T>>` is `send` if `std2::mutex<T>` is `send` and `sync`. `std2::mutex<T>` is `send` and `sync` if `T` is `send`. Since most types are `send` by construction, we can safely mutate shared state over multiple threads as long as its wrapped in a `std2::mutex` and that's owned by an `std2::arc`. 
+`std2::arc<std2::mutex<T>>` is `send` if `std2::mutex<T>` is `send` and `sync`. `std2::mutex<T>` is `send` and `sync` if `T` is `send`. Since most types are `send` by construction, we can safely mutate shared state over multiple threads as long as its wrapped in a `std2::mutex` and that's owned by an `std2::arc`.
 
 ```cpp
 class thread {
@@ -2641,7 +2642,7 @@ The `send` property is enforced by `std2::thread`'s constructor. If all the thre
 
 The `is_send` constraint on `thread`'s constructor demonstrates again the safety model's [theme of responsibility](#memory-safety-as-terms-and-conditions): a `safe` function must be sound for all arguments. Before entering an _unsafe-block_ and calling unsafe system-level thread function, `thread`'s constructor must confirm that it's enforcing the safety guarantees of its contract. Only types that are `send` may be used across threads.
 
-Can we fool `thread` into producing a data race? 
+Can we fool `thread` into producing a data race?
 
 **Pass a borrow to a value on the stack.** There's no guarantee that the thread will join before the stack object is destroyed. Is that a potential use-after-free? No, because the thread has an _outlives-constraint_ which checks that all function arguments outlive `/static`. An `std2::arc` doesn't have lifetime arguments (unless its inner type is a lifetime binder), so that checks out. But a shared or borrow does have a lifetime argument, and if it refers to an object on the stack, it's not `/static`.
 
