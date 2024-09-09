@@ -8,6 +8,7 @@
 #include <new>
 #include <cstring>
 #include <atomic>
+#include <string>
 
 namespace std2 {
 
@@ -167,12 +168,19 @@ private:
   {
   #if !defined(LIBSAFECXX_PANIC_THROWS)
     const [char; dyn]^ text = msg.text();
-    unsafe { __assert_fail(
-      std::string((*text)~as_pointer, (*text)~length).c_str(),
-      loc.file_name(),
-      loc.line(),
-      loc.function_name()
-    ); }
+
+    unsafe {
+      fprintf(stderr,
+        "%s:%d:%d\n%s\n%.*s\n",
+        loc.file_name(),
+        loc.line(),
+        loc.column(),
+        loc.function_name(),
+        (*text)~length,
+        (*text)~as_pointer);
+      fflush(stderr);
+      abort();
+    }
   #else
     throw "malformed utf";
   #endif
