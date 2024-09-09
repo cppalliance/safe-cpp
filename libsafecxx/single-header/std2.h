@@ -382,26 +382,31 @@ namespace literals
 namespace string_literals
 {
 
+inline
 auto operator""sv2(char const* p, std::size_t len) noexcept safe -> string_view/static
 {
   unsafe { return string_view(slice_from_raw_parts(p, len)); }
 }
 
+inline
 auto operator""sv2(char8_t const* p, std::size_t len) noexcept safe -> u8string_view/static
 {
   unsafe { return u8string_view(slice_from_raw_parts(p, len)); }
 }
 
+inline
 auto operator""sv2(char16_t const* p, std::size_t len) noexcept safe -> u16string_view/static
 {
   unsafe { return u16string_view(slice_from_raw_parts(p, len)); }
 }
 
+inline
 auto operator""sv2(char32_t const* p, std::size_t len) noexcept safe -> u32string_view/static
 {
   unsafe { return u32string_view(slice_from_raw_parts(p, len)); }
 }
 
+inline
 auto operator""sv2(wchar_t const* p, std::size_t len) noexcept safe -> wstring_view/static
 {
   unsafe { return wstring_view(slice_from_raw_parts(p, len)); }
@@ -422,15 +427,15 @@ auto operator""sv2(wchar_t const* p, std::size_t len) noexcept safe -> wstring_v
 inline void panic(
   str msg, source_location loc = source_location::current()) noexcept safe
 {
-  unsafe { 
-    fprintf(stderr, 
-      "%s:%d:%d\n%s\n%.*s\n", 
-      loc.file_name(), 
+  unsafe {
+    fprintf(stderr,
+      "%s:%d:%d\n%s\n%.*s\n",
+      loc.file_name(),
       loc.line(),
-      loc.column(), 
-      loc.function_name(), 
-      msg.size(), 
-      msg.data()); 
+      loc.column(),
+      loc.function_name(),
+      msg.size(),
+      msg.data());
     fflush(stderr);
     abort();
   }
@@ -440,15 +445,15 @@ inline void panic(
 inline void panic_bounds(
   str msg, source_location loc = source_location::current()) noexcept safe
 {
-  unsafe { 
-    fprintf(stderr, 
-      "%s:%d:%d\n%s\n%.*s\n", 
-      loc.file_name(), 
+  unsafe {
+    fprintf(stderr,
+      "%s:%d:%d\n%s\n%.*s\n",
+      loc.file_name(),
       loc.line(),
-      loc.column(), 
-      loc.function_name(), 
-      msg.size(), 
-      msg.data()); 
+      loc.column(),
+      loc.function_name(),
+      msg.size(),
+      msg.data());
     fflush(stderr);
     abort();
   }
@@ -818,13 +823,13 @@ using unique_ptr = optional<box<T>>;
 // cell.h
 
 template<class T+>
-class [[unsafe::sync(false)]] cell 
+class [[unsafe::sync(false)]] cell
 {
   unsafe_cell<T> t_;
 
   public:
 
-  explicit cell(T t) noexcept safe 
+  explicit cell(T t) noexcept safe
     requires(T~is_trivially_copyable && T~is_trivially_destructible)
     : t_(rel t)
   {
@@ -872,7 +877,7 @@ public:
 
   ~initializer_list() safe requires(T~is_trivially_destructible) = default;
 
-  [[unsafe::drop_only(T)]] 
+  [[unsafe::drop_only(T)]]
   ~initializer_list() safe requires(!T~is_trivially_destructible) {
     std::destroy_n(_cur, _end - _cur);
   }
@@ -948,13 +953,13 @@ basic_string
 
   // Make expensive converting ctors explicit.
   // The user should know they're doing a heap allocation.
-  explicit 
+  explicit
   basic_string(string_constant<value_type> sc) safe
     : basic_string(basic_string_view<value_type>(sc))
   {
   }
 
-  explicit 
+  explicit
   basic_string(basic_string_view<value_type> sv) safe
     : basic_string()
   {
@@ -1040,26 +1045,31 @@ namespace literals
 namespace string_literals
 {
 
+inline
 auto operator""s2(char const* p, std::size_t len) noexcept safe -> string
 {
   unsafe { return string(slice_from_raw_parts(p, len)); }
 }
 
+inline
 auto operator""s2(char8_t const* p, std::size_t len) noexcept safe -> u8string
 {
   unsafe { return u8string(slice_from_raw_parts(p, len)); }
 }
 
+inline
 auto operator""s2(char16_t const* p, std::size_t len) noexcept safe -> u16string
 {
   unsafe { return u16string(slice_from_raw_parts(p, len)); }
 }
 
+inline
 auto operator""s2(char32_t const* p, std::size_t len) noexcept safe -> u32string
 {
   unsafe { return u32string(slice_from_raw_parts(p, len)); }
 }
 
+inline
 auto operator""s2(wchar_t const* p, std::size_t len) noexcept safe -> wstring
 {
   unsafe { return wstring(slice_from_raw_parts(p, len)); }
@@ -1238,8 +1248,8 @@ class [[unsafe::send(false)]] rc
     rc_inner(T data) noexcept safe
       : data_(rel data)
       , strong_(1)
-      , weak_(1) 
-    { 
+      , weak_(1)
+    {
     }
   };
 
