@@ -53,7 +53,7 @@ What are the properties we're trying to deliver with Safe C++?
 * A superset of C++ with a _safe subset_. Undefined behavior is prohibited from originating in the safe subset.
 * The safe and unsafe parts of the language are clearly delineated, and users must explicitly leave the safe context to use unsafe operations.
 * The safe subset must remain _useful_. If we get rid of a crucial unsafe technology, like unions and pointers, we should supply a safe alternative, like choice types and borrows. A safe toolchain is not useful if it's so inexpressive you can't get your work done.
-* The new system can't break existing code. If you point a Safe C++ compiler at existing C++ code, that code must compile normally. Users opt into the new safety mechanisms. Safe C++ is an extension of C++. It's not a new language.
+* The new system can't break existing code. If you point a Safe C++ compiler at existing C++ code, that code must compile normally. Users opt into the new safety mechanisms. Safe C++ is an extension of C++. _It's not a new language_.
 
 ## A safe program
 
@@ -75,7 +75,7 @@ int main() safe {
 }
 ```
 ```txt
-$ circle iterator.cxx -I ../libsafecxx/include/
+$ circle iterator.cxx -I ../libsafecxx/single-header/
 safety: during safety checking of int main() safe
   borrow checking: iterator.cxx:10:11
         mut vec.push_back(x);
@@ -174,7 +174,7 @@ int main() safe {
 }
 ```
 ```
-$ circle string_view.cxx -I ../libsafecxx/include/
+$ circle string_view.cxx -I ../libsafecxx/single-header/
 safety: during safety checking of int main() safe
   borrow checking: string_view.cxx:30:24
     for(string_view sv : views) 
@@ -237,7 +237,7 @@ int main() safe {
 }
 ```
 ```
-$ circle box.cxx -I ../libsafecxx/include/
+$ circle box.cxx -I ../libsafecxx/single-header/
 safety: during safety checking of int main() safe
   initialization analysis: box.cxx:9:12
     println(*p);
@@ -414,11 +414,11 @@ We spawn ten threads which append a fire emoji to a shared string. The string is
 
 `arc`'s accessor `operator->` returns const qualified borrows to the owned data. You can't mutate through most const qualified types. You can only mutate through const qualified types that encapsulate `unsafe_cell`, such as `cell`, `ref_cell`, `mutex` and `shared_mutex`. This is how [interior mutability](#interior-mutability) implements shared mutable access. Of the interior mutability types, Safe C++ provides `mutex` and `shared_mutex` which satisfy the [`send` and `sync`](#send-and-sync) interfaces, permitting the `arc` to be copied across threads. Only types satisfying `std2::send` may be copied through the `std2::thread` constructor.
 
-Inside the worker thread, we `lock` the mutex to initialize a lock guard object. The lock guard is an RAII type: on creation it locks the mutex and on destruction it unlocks the mutex. We call `borrow` on the lock guard to gain a mutable borrow to the string it contains. Now we have exclusive access to the string inside the mutex append the emoji  without risk of a data race.
+Inside the worker thread, we `lock` the mutex to initialize a lock guard object. The lock guard is an RAII type: at its creation the mutex is locked and on destruction the mutex is unlocked. We call `borrow` on the lock guard to gain a mutable borrow to the string it contains. Now we have exclusive access to the string inside the mutex and append the fire emoji without risking a data race.
 
-But the thread safety isn't yet demonstrated: the claim isn't that we _can_ write thread software, the claim is that it's _ill-formed_ to write thread unsafe software.
+But the thread safety isn't yet demonstrated: the claim isn't that we _can_ write thread safe software, the claim is that it's _ill-formed_ to write thread unsafe software.
 
-Let us sabotage our own design. Uncomment the `drp lock_guard` line. The lock guard is destroyed and unlocks the mutex. The next statement prints the string outside of the mutex, which is a data race, because one of the other nine threads may at that instant be appending to the string.
+Let's sabotage our own design. Uncomment the `drp lock_guard` line. The lock guard is destroyed and unlocks the mutex. The next statement prints the string outside of the mutex, which is a data race, because one of the other nine threads may at that instant be appending to the string.
 
 ```
 safety: during safety checking of void entry_point(std2::arc<std2::mutex<std2::string>>, int) safe
@@ -459,12 +459,20 @@ This is lifetime safety with an additional level of indirection compared to the 
 
 ### Runtime checks
 
+Safe operations that can't be checked for soundness with static analysis must be checked at runtime. An operation may return an error code, throw an exception or panic and abort. Panics terminate the program, which is far preferable from a security standpoint than entering undefined behavior.
 
-
-One of the most common vulnerabilities is out-of-bounds access. By default, all array-like accesses are checked in Safe C++. This includes both arrays and slices.
+* Builtin arrays and slices panic on out-of-bounds subscripts.
+* Integer division panics when the divisor is zero.
+* Integer division panics when INT_MIN is divided by -1. 
+* `std2::vector` panics on out-of-bounds subscripts.
+* `std2::ref_cell` panics when requesting a mutable borrow and the inner object is already borrowed.
+* `std2::ref_cell` panics when requesting a shared borrow and the inner object is already mutably borrowed.
 
 [**subscript_array.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/subscript_array.cxx)
 ```cpp
+#feature on safety
+#include <cstdint>
+
 int main() safe {
   int array[4] { };
   size_t index = 10;
@@ -473,40 +481,54 @@ int main() safe {
   int x = array[index];
 }
 ```
+```
+$ circle subscript_array.cxx
+$ ./subscript_array 
+subscript_array.cxx:9:17
+int main() safe
+subscript is out-of-range of type int[4]
+Aborted (core dumped)
+```
 
-and:
+The compiler emits panics for out-of-bounds subscripts on builtin arrays and slice types. The runtime can be elided with [unsafe subscripts](#unsafe-subscripts).
 
-[**subscript_slice.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/subscript_slice.cxx)
+[**subscript_vector.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/subscript_vector.cxx)
 ```cpp
+#feature on safety
+#include <std2.h>
+
 int main() safe {
-  int array[4] { };
-
-  // Stardard conversion from array borrow to slice borrow.
-  [int; dyn]^ slice = ^array;
-
-  // The slice borrow is the size of 2 pointers. It contains:
-  // 1. A pointer to the data.
-  // 2. A size_t of the elements after the pointer.
-  static_assert(2 * sizeof(void*) == sizeof slice);
-
-  // Panic on out-of-bounds slice subscript.
+  std2::vector<int> vec { };
   size_t index = 10;
-  int x = slice[index];
+
+  // Panic on out-of-bounds vector subscript.
+  int x = vec[index];
 }
 ```
+```
+$ circle subscript_vector.cxx -I ../libsafecxx/single-header/
+$ ./subscript_vector 
+../libsafecxx/single-header/std2.h:1684:39
+std2::vector<int>::operator[]
+vector subscript is out-of-bounds
+Aborted (core dumped)
+```
 
-Arithmetic is also checked and will result in panics on overflow or underflow.
+Out-of-contract use of user-defined types should panic with a similar message. Unlike Standard C++, our containers always perform bounds checking. If you want to disable runtime checks, either use a 
 
-[**divide_overflow.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/divide_overflow.cxx)
 ```cpp
-int main() safe {
-  // Panic to prevent undefined behavior with int overflow.
-  // This occurs regardless of safe context.
-  int x = INT_MIN;
-  int y = -1;
-  int z = x / y;
-}
+template<typename T+>
+class vector {
+public:
+  const value_type^ operator[](const self^, size_type i) noexcept safe {
+    if (i >= self.size()) panic_bounds("vector subscript is out-of-bounds");
+    unsafe { return ^self.data()[i]; }
+  }
+  ...
+};
 ```
+
+The [safety model](#memory-safety-as-terms-and-conditions) makes it clear where library code must insert panic calls. If a function is marked safe but is internally unsound for some values of its arguments, it should check those arguments and panic before executing the unsafe operation. Unsafe functions generally don't panic because its incumbent on their callers to follow the preconditions of the function.
 
 # Design overview
 
@@ -1033,7 +1055,7 @@ int main() safe {
 }
 ```
 ```txt
-$ circle iterator.cxx -I ../libsafecxx/include/
+$ circle iterator.cxx -I ../libsafecxx/single-header/
 safety: during safety checking of int main() safe
   borrow checking: iterator.cxx:10:11
         mut vec.push_back(x);
@@ -1107,7 +1129,7 @@ public:
 
 The compiler drains the iterator by calling `next` until the optional it returns is `.none`. Each invocation of `slice_iterator:next` forms a borrow to the current element and advances the current pointer. Because we chose the const iterator, the template parameter is deduced as `T=const int`. Lifetime elision invents a lifetime parameter and attaches it to both the mutable self borrow and the shared borrow inside the optional. Again, the lifetime on the self parameter _outlives_ the lifetime on the result object. These lifetime constraints feed the [constraint equation](#systems-of-constraints) to enable inter-procedural live analysis.
 
-It's the periodic call into `next` that keeps the original borrow on `vec` live. Even though the use of next is lexically before the push_back (it's at the top of the loop, rather than inside the loop), control flow analysis shows that it's also _downstream_ of the push_back. MIR analysis follows the backedge from the end of the body of the loop back to its start. That establishes the liveness of the shared borrow on vec.
+It's the periodic call into `next` that keeps the original borrow on `vec` live. Even though the use of next is lexically before the push_back (it's at the top of the loop, rather than inside the loop), control flow analysis shows that it's also _downstream_ of the push_back. MIR analysis follows the backedge from the end of the body of the loop back to its start. That establishes the liveness of the shared borrow on `vec`.
 
 ```cpp
 template<class T+>
@@ -1122,7 +1144,7 @@ class vector {
 };
 ```
 
-The user enters the mutable context with the `mut` token and calls push_back. This enables binding a mutable borrow to vec in a standard conversion during overload resolution to push_back. Since the shared borrow that was taken to produce slice_iterator is still in scope, the new mutable borrow violates exclusivity and the program is ill-formed.
+The user enters the mutable context with the `mut` token and calls `push_back`. This enables binding a mutable borrow to `vec` in a standard conversion during overload resolution to `push_back`. Since the shared borrow that was taken to produce slice_iterator is still in scope, the new mutable borrow violates exclusivity and the program is ill-formed.
 
 Borrow checking is attractive because it's a unified treatment for enforcing dependencies. Compiler engineers aren't asked to develop heuristics for use-after-free, different ones for iterator invalidation, and still more clever ones for thread safety. Developers simply employ the borrow types and the compiler will enforce the attendant constraints.
 
@@ -1217,7 +1239,7 @@ int main() safe {
 }
 ```
 ```
-$ circle initlist1.cxx -I ../libsafecxx/include/
+$ circle initlist1.cxx -I ../libsafecxx/single-header/
 safety: during safety checking of int main() safe
   borrow checking: initlist1.cxx:16:31
     vector<string_view> vec(rel initlist);
@@ -2482,7 +2504,7 @@ A string set from s1
 A string set from s2
 ```
 
-`rc` is a non-atomic (intra-thread) referenced-counted pointer. It provides shared ownership. To avoid violating the law of exclusivity, its accessors `operator*` and `operator->` return const borrows to its inner type. That means it practices _shared immutable access_. In order to mutate the data it holds, the inner must exhibit _interior mutability_.
+`rc` is a non-atomic (intra-thread) reference-counted pointer. It provides shared ownership to a resource. To avoid violating the law of exclusivity, its accessors `operator*` and `operator->` return _const_ borrows to its inner type. That means it practices _shared immutable access_. In order to mutate the data it holds, the inner type must exhibit _interior mutability_.
 
 ```cpp
 template<class T+>
@@ -2503,7 +2525,7 @@ public:
 };
 ```
 
-Types with interior mutability implement _deconfliction_ strategies to support shared mutation without the risk of data races. They encapsulate `std2::unsafe_cell`, which is based on Rust's `UnsafeCell`[@unsafe-cell] struct. `unsafe_cell::get` is a blessed way of stripping away const. While the function is safe, it returns a raw pointer, which is unsafe to dereference. Types encapsulating `unsafe_cell` must take care to only permit mutation through this mutable pointer one user at a time.
+Types with interior mutability implement _deconfliction_ strategies to support shared mutation without the risk of data races. They encapsulate `std2::unsafe_cell`, which is based on Rust's `UnsafeCell`[@unsafe-cell] struct. `unsafe_cell::get` is a blessed way of stripping away const. While the function is safe, it returns a raw pointer, which is unsafe to dereference. Types encapsulating `unsafe_cell` must take care to only permit mutation through this const-stripped pointer one user at a time.
 
 * `std2::cell<T>`[@cell] provides get and set methods to read out the current value and store new values into the protected resource. Since `cell` can't be used across threads, there's no risk of violating exclusivity.
 * `std2::ref_cell<T>`[@ref-cell] is a single-threaded multiple-read, single-write lock. If the caller requests a mutable reference to the interior object, the implementation checks its counter, and if the object is not locked, it establishes a mutable lock and returns a mutable borrow. If the caller requests a shared reference to the interior object, the implementation checks that there is no live mutable borrow, and if there isn't, increments the counter. When users are done with the borrow, they have to release the lock, which decrements the reference count. If the user's request can't be serviced, the `ref_cell` can either gracefully return with an error code, or it can panic and abort.
