@@ -422,16 +422,36 @@ auto operator""sv(wchar_t const* p, std::size_t len) noexcept safe -> wstring_vi
 inline void panic(
   str msg, source_location loc = source_location::current()) noexcept safe
 {
-  unsafe { fprintf(stderr, "function \"%s\" panicked at %s:%d\n%.*s\n", loc.function_name(), loc.file_name(), loc.line(), msg.size(), msg.data()); }
-  unsafe { abort(); }
+  unsafe { 
+    fprintf(stderr, 
+      "%s:%d:%d\n%s\n%.*s\n", 
+      loc.file_name(), 
+      loc.line(),
+      loc.column(), 
+      loc.function_name(), 
+      msg.size(), 
+      msg.data()); 
+    fflush(stderr);
+    abort();
+  }
 }
 
 [[noreturn, safety::panic(panic_code::bounds)]]
 inline void panic_bounds(
   str msg, source_location loc = source_location::current()) noexcept safe
 {
-  unsafe { fprintf(stderr, "out-of-bounds access in \"%s\", at %s:%d\n%.*s\n", loc.function_name(), loc.file_name(), loc.line(), msg.size(), msg.data()); }
-  unsafe { abort(); }
+  unsafe { 
+    fprintf(stderr, 
+      "%s:%d:%d\n%s\n%.*s\n", 
+      loc.file_name(), 
+      loc.line(),
+      loc.column(), 
+      loc.function_name(), 
+      msg.size(), 
+      msg.data()); 
+    fflush(stderr);
+    abort();
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
