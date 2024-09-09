@@ -138,26 +138,31 @@ namespace literals
 namespace string_literals
 {
 
+inline
 auto operator""s(char const* p, std::size_t len) noexcept safe -> string
 {
   unsafe { return string(slice_from_raw_parts(p, len)); }
 }
 
+inline
 auto operator""s(char8_t const* p, std::size_t len) noexcept safe -> u8string
 {
   unsafe { return u8string(slice_from_raw_parts(p, len)); }
 }
 
+inline
 auto operator""s(char16_t const* p, std::size_t len) noexcept safe -> u16string
 {
   unsafe { return u16string(slice_from_raw_parts(p, len)); }
 }
 
+inline
 auto operator""s(char32_t const* p, std::size_t len) noexcept safe -> u32string
 {
   unsafe { return u32string(slice_from_raw_parts(p, len)); }
 }
 
+inline
 auto operator""s(wchar_t const* p, std::size_t len) noexcept safe -> wstring
 {
   unsafe { return wstring(slice_from_raw_parts(p, len)); }
