@@ -1037,7 +1037,7 @@ safety: during safety checking of int main() safe
                 ^
 ```
 
-The _ranged-for_ creates an iterator on the vector. The iterator is initialized for the whole duration of the loop. This is a shared borrow, because the iterator provides read-only access to the container. Inside the loop, we mutate the container. The `mut` keyword enters the [mutable context](#the-mutable-context) which enables binding mutable borrows to lvalues in the standard conversion during overload resolution for the push_back call. Now there's a shared borrow that's live, for the iterator, and a mutable borrow that's live, for the push_back. That violates exclusivity and the borrow checker raises an error.
+The _ranged-for_ creates an iterator on the vector. The iterator stays initialized for the whole duration of the loop. This puts a shared borrow on `vec`, because the iterator provides read-only access to that container. Inside the loop, we mutate the container. The `mut` keyword enters the [mutable context](#the-mutable-context) which enables binding mutable borrows to lvalues in the standard conversion during overload resolution for the `push_back` call. Now there's a shared borrow that's live, for the iterator, and a mutable borrow that's live, for the `push_back`. That violates exclusivity and the borrow checker raises an error.
 
 To users, iterator invalidation looks like a different phenomenon than the use-after-free defect in the previous section. But to the compiler, and hopefully to library authors, they can be reasoned about similarly, as they're both borrow checker violations.
 
@@ -1047,8 +1047,22 @@ To users, iterator invalidation looks like a different phenomenon than the use-a
 
 Clang's lifetime annotations project doesn't implement borrow checking. For that project, iterator invalidation is out of scope, because it really is a different phenomenon than the lifetime tracking _heuristics_ employed in detecting other use-after-free defects.
 
-
 ```cpp
+interface iterator {
+  typename item_type;
+  optional<item_type> next(self^) safe;
+};
+
+interface make_iter {
+  typename iter_type;
+  typename iter_mut_type;
+  typename into_iter_type;
+
+  iter_type      iter(const self^) safe;
+  iter_mut_type  iter(self^) safe;
+  into_iter_type iter(self) safe;
+};
+
 template<class T>
 class slice_iterator/(a);
 
@@ -1075,9 +1089,9 @@ impl vector<T> : make_iter {
 };
 ```
 
-To opt into ranged-for iteration, containers implement the `std2::make_iter` interface. They can provide const iterators, mutable iterators or _consuming iterators_ which take ownership of of the operand's data and destroy that container in the process.
+To opt into safe ranged-for iteration, containers implement the `std2::make_iter` interface. They can provide const iterators, mutable iterators or _consuming iterators_ which take ownership of the operand's data and destroy its container in the process.
 
-Because the _range-initializer_ of the loop is an lvalue of vector that's outside of the mutable context, the const iterator overload of `make_iter::iter` is chosen. That returns an `std2::slice_iterator` into the vector's contents. Here's the first borrow: lifetime elision invents a lifetime parameter for the `self const^` parameter, which is also used for the named lifetime argument `a` of the `slice_iterator` return type. As with the use-after-free example, the `make_iter::iter` function declaration establishes an _outlives-constraint_: the self operand must outlive the result object.
+Because the _range-initializer_ of the loop is an lvalue of `vector` that's outside the mutable context, the const iterator overload of `vector<T>::iter` gets chosen. That returns an `std2::slice_iterator<T const>` into the vector's contents. Here's the first borrow: lifetime elision invents a lifetime parameter for the `self const^` parameter, which is also used for the named lifetime argument `/a` of the `slice_iterator` return type. As with the use-after-free example, the `vector<T>::iter` function declaration establishes an _outlives-constraint_: the lifetime on the `self const^` operand must outlive the lifetime on the result object.
 
 ```cpp
 template<class T>
@@ -1098,9 +1112,9 @@ public:
 };
 ```
 
-The compiler drains the iterator by calling `next` until the optional it returns is `.none`. Each invocation of `slice_iterator:next` forms a borrow to the current element and advances the current pointer. Because we chose the const iterator, the template parameter is deduced as `T=const int`. Lifetime elision invents a lifetime parameter and attaches it to both the mutable self borrow and the shared borrow inside the optional. Again, the lifetime on the self parameter _outlives_ the lifetime on the result object. These lifetime constraints feed the [constraint equation](#systems-of-constraints) to enable inter-procedural live analysis.
+The compiler drains the iterator by calling `next` until the `std2::optional` it returns is `.none`. Each in-range invocation of `slice_iterator::next` forms a borrow to the current element and advances `p_` to the next element. `next`'s object parameter is written `self^`, an abbreviated form of `slice_iterator/a^ self`. The borrow returned in `optional<T^/a>` is outlived by the implied lifetime of the `self` parameter. This transitively means that the underlying `vector` must outlive the reference in the `optional` returned from `slice_iterator::next`. All these lifetime constraints feed the [constraint equation](#systems-of-constraints) to enable inter-procedural live analysis.
 
-It's the periodic call into `next` that keeps the original borrow on `vec` live. Even though the use of next is lexically before the push_back (it's at the top of the loop, rather than inside the loop), control flow analysis shows that it's also _downstream_ of the push_back. MIR analysis follows the backedge from the end of the body of the loop back to its start. That establishes the liveness of the shared borrow on `vec`.
+It's the periodic call into `next` that keeps the original borrow on `vec` live. Even though the use of `next` is lexically before the `push_back` (it's at the top of the loop, rather than inside the loop), control flow analysis shows that it's also _downstream_ of the push_back. MIR analysis follows the backedge from the end of the body of the loop back to its start. That establishes the liveness of the shared borrow on `vec`.
 
 ```cpp
 template<class T+>
@@ -1115,9 +1129,9 @@ class vector {
 };
 ```
 
-The user enters the mutable context with the `mut` token and calls `push_back`. This enables binding a mutable borrow to `vec` in a standard conversion during overload resolution to `push_back`. Since the shared borrow that was taken to produce slice_iterator is still in scope, the new mutable borrow violates exclusivity and the program is ill-formed.
+The user enters the mutable context with the `mut` token and calls `push_back`. This enables binding a mutable borrow to `vec` in a standard conversion during overload resolution to `push_back`. Since the shared borrow that was taken to produce `slice_iterator` is still in scope, the new mutable borrow violates exclusivity and the program is ill-formed.
 
-Borrow checking is attractive because it's a unified treatment for enforcing dependencies. Compiler engineers aren't asked to develop heuristics for use-after-free, different ones for iterator invalidation, and still more clever ones for thread safety. Developers simply employ the borrow types and the compiler will enforce the attendant constraints.
+Borrow checking is attractive because it's a unified treatment for enforcing dependencies. Compiler engineers aren't asked to develop some heuristics for use-after-free, different ones for iterator invalidation, and still more clever ones for thread safety. Developers simply use the borrow types and the compiler enforces the attendant constraints.
 
 ### Initializer lists
 
