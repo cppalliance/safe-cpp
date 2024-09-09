@@ -814,13 +814,14 @@ using unique_ptr = optional<box<T>>;
 // cell.h
 
 template<class T+>
-class [[unsafe::sync(false)]] cell
+class [[unsafe::sync(false)]] cell 
 {
   unsafe_cell<T> t_;
 
   public:
 
-  cell(T t) noexcept safe
+  explicit cell(T t) noexcept safe 
+    requires(T~is_trivially_copyable && T~is_trivially_destructible)
     : t_(rel t)
   {
   }
@@ -1194,7 +1195,7 @@ public:
     }
   };
 
-  mutex(T data) noexcept safe
+  explicit mutex(T data) noexcept safe
     : data_(rel data)
     , unsafe mtx_(init_mtx())
   {
@@ -1341,7 +1342,7 @@ class ref_cell
     }
   };
 
-  ref_cell(T t) noexcept safe
+  explicit ref_cell(T t) noexcept safe
     : t_(rel t)
     , borrow_count_{0}
   {
@@ -1467,7 +1468,7 @@ public:
     }
   };
 
-  shared_mutex(T data) noexcept safe
+  explicit shared_mutex(T data) noexcept safe
     : data_(rel data)
     , unsafe mtx_(init_mtx())
   {

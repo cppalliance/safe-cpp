@@ -2470,6 +2470,10 @@ The _concise-match-expression_ is a form of pattern matching that applies a test
 
 Recall the law of exclusivity, the program-wide invariant that guarantees a resource isn't mutated while another user has access to it. How does this square with the use of shared pointers, which enables shared ownership of a mutable resource? How does it support threaded programs, where access to shared mutable state is permitted between threads? Shared mutable access exists in this safety model, but the way it's enabled involves some trickery.
 
+
+** NOW A BROKEN TEST DUE TO CHANGE IN CELL ** 
+** REPLACE WITH SOMETHING ELSE **
+
 [**cell.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/cell.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/M6df3jbhs)
 ```cpp
 #feature on safety
@@ -2539,6 +2543,7 @@ class [[unsafe::sync(false)]] cell
 
   cell(T t) noexcept safe
     : t_(rel t)
+    requires(T~is_trivially_copyable && T~is_trivially_destructible)
   {
   }
 
