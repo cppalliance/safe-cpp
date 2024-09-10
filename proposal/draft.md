@@ -1899,11 +1899,11 @@ During normalization of this function specialization, the _outlives-constraint_ 
 
 ## Explicit mutation
 
-Reference binding convention is important in the context of borrow checking. Const and non-const borrows differ by more than just constness. By the law of exclusivity, users are allowed multiple live shared borrows, but only one live mutable borrow. C++'s convention of always preferring non-const references would tie the borrow checker into knots, as mutable borrows don't permit aliasing. This is one reason why there's no way to borrow check existing C++ code: the standard conversion contributes to mutable aliasing.
+Reference binding convention is important in the context of borrow checking. Const and non-const borrows differ by more than just constness. By the law of exclusivity, users are allowed multiple live shared borrows, but only one live mutable borrow. C++'s convention of always preferring non-const references would tie the borrow checker into knots, as mutable borrows don't permit aliasing. This is one reason why there's no way to borrow check existing C++ code: standard conversions are too permissive and contribute to mutable aliasing.
 
-Unlike in Standard C++, expressions can have reference types. Naming a reference object yields an lvalue expression with reference type, rather than implicitly dereferencing the reference and giving you an lvalue to the pointed-at thing. Since dereferencing legacy references is unsafe, if references were implicitly dereferenced, you'd never be able to use them in safe contexts. In Safe C++, references are more like pointers, and passed around in safe contexts, but not dereferenced.
+Unlike in Standard C++, expressions in this object model can have reference types. Naming a reference object yields an lvalue expression with reference type, rather than implicitly dereferencing the reference and giving you an lvalue to the pointed-at thing. Dereferencing legacy references is unsafe. If references were implicitly dereferenced, you'd never be able to use them in safe contexts. In Safe C++, references are more like pointers, and may be passed around in safe contexts, but not dereferenced.
 
-Rather than binding the mutable overload of functions by default, Safe C++ prefers binding const overloads. Shared borrows are less likely to bring borrow checker errors. To improve reference binding precision, the relocation object model takes a new approach to references. The standard conversion will bind const borrows and const lvalue references to lvalues of the same type. But standard conversions won't bind mutable borrows and mutable lvalue references. Those require an opt-in.
+Rather than binding the mutable overload of functions by default, Safe C++ prefers binding const overloads. It prefers binding shared borrows to mutable borrows. Shared borrows are less likely to bring borrow checker errors. To improve reference binding precision, the relocation object model takes a new approach to references. Standard conversions bind const borrows and const lvalue references to lvalues of the same type, as they always have. But standard conversions won't bind mutable borrows and mutable lvalue references. Those require an opt-in.
 
 ```cpp
 struct Obj {
@@ -1923,9 +1923,9 @@ void func(Obj obj) {
 }
 ```
 
-In Safe C++, the standard conversion will not bind a mutable borrow or mutable lvarue reference. During overload resolution for `obj.func()`, candidate #2 fails, because the compiler can't bind the object parameter type `Obj&` to the object expression `lvalue Obj`. But candidate #1 is viable, because the standard conversion can still bind the object parameter type `const Obj&` to the object expression `lvalue Obj`.
+In Safe C++, the standard conversion will not bind a mutable borrow or mutable lvalue reference. During overload resolution for `obj.func()`, candidate #2 fails, because the compiler can't bind the object parameter type `Obj&` to the object expression `lvalue Obj`. But candidate #1 is viable, because the standard conversion can still bind the object parameter type `const Obj&` to the object expression `lvalue Obj`.
 
-The subsequent statements call candidate #1 by explicitly requesting mutation. `&obj` is syntax for creating a `prvalue Obj&` from the `lvalue Obj` operand. We can call the func member function on that reference. `obj&.func()` uses a special postfix syntax that alleviates the need for parentheses. Finally, the `mut` keyword puts the remaining operators of the _cast-expression_ into the [_mutable context_](#the-mutable-context). In the mutable context, standard conversions to mutable borrows and mutable lvalue references are enabled. Overload resolution finds both candidates #1 and #2 viable, and chooses #2 because the mutable lvalue reference ranks higher than the const reference.
+The subsequent statements call candidate #1 by explicitly requesting mutation. `&obj` is syntax for creating a `prvalue Obj&` from the `lvalue Obj` operand. We can call the `func` member function on that reference. `obj&.func()` uses a special postfix syntax that alleviates the need for parentheses. Finally, the `mut` keyword puts the remaining operators of the _cast-expression_ into the [_mutable context_](#the-mutable-context). In the mutable context, standard conversions to mutable borrows and mutable lvalue references are enabled. Overload resolution finds both candidates #1 and #2 viable, and chooses #2 because the mutable reference outranks the const reference.
 
 Here's a list of _unary-operators_ for taking borrows, lvalue and rvalue references, and pointers to lvalues.
 
@@ -1937,7 +1937,7 @@ Here's a list of _unary-operators_ for taking borrows, lvalue and rvalue referen
 * `addr x` - pointer to `x`
 * `addr const x` - const pointer to `x`
 
-While the motivation of this design is to pacify the borrow checker, the consequence is that **all mutations are explicit**. You don't have to wonder about side-effects. If you're passing arguments to a function, and you don't see `mut`, `^`, `&` or `&&` before it, you know the argument won't be modified by that function.
+While the motivation of this design is to pacify the borrow checker by preferring shared reference binding, a desirable side effect is that **all mutations are explicit**. You don't have to wonder about side-effects. If you're passing arguments to a function, and you don't see `mut`, `^`, `&` or `&&` before it, you know the argument won't be modified by that function.
 
 ```cpp
 #feature on safety
@@ -1995,12 +1995,13 @@ f(x);         // Pass by const lvalue ref.
 f(&const x);  // Extra verbose -- call attention to it.
 ```
 
-The availability of relocation forces another choice on users: to load an lvalue into a prvalue, do you want to copy, or do you want to relocate? If the expression's type is trivially copyable and trivially destructible, it'll copy. Otherwise, the compiler will prompt for a `rel` or `cpy` token to resolve how to resolve the copy initialization. You're not going to accidentally hit the slow path or the mutable path. Opt into mutation. Opt into no-trivial copies.
+The availability of relocation forces another choice on users: to load an lvalue into a prvalue, do you want to copy, or do you want to relocate? If the expression's type is trivially copyable and trivially destructible, it'll copy. Otherwise, the compiler will prompt for a `rel` or `cpy` token to resolve how to resolve the copy initialization. You're not going to accidentally hit the slow path or the mutable path. Opt into mutation. Opt into non-trivial copies.
 
 ### The mutable context
 
-The mutable context is the preferred way to express mutation. In a sense it returns Safe C++ to legacy C++'s default binding behavior. Use it at the start of a _cast-expression_, and the mutable context lasts for all subsequent higher-precedence operations. In the mutable context, standard conversion may bind mutable borrows and mutable lvalue references to lvalue operands.
+The mutable context is the preferred way to express mutation. In a sense it returns Safe C++ to legacy C++'s default binding behavior. Use it at the start of a _cast-expression_ and the mutable context lasts for all subsequent higher-precedence operations. In the mutable context, standard conversion may bind mutable borrows and mutable lvalue references to lvalue operands.
 
+[**mut.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/mut.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/7YPoc4d8b)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -2017,19 +2018,18 @@ int main() safe {
   // No borrow checking error.
   mut A[0] += B[0];
 
-  // Mutable context allows standard conversion binding of mut references.
-  size_t^ a = mut A[0];
-
   // Keep b live.
   size_t x = *b;
 }
 ```
 
-Write the `mut` token before the _cast-expression_ you want to mutate. _cast-expressions_ are high-precedence unary expressions. Lower-precedence binary expressions aren't in the scope of the mutable context. In this example, the mutable context applies only to the left-hand side of the assignment. `A[0]` chooses the mutable overload of `vector::operator[]`, and `B[0]` chooses the const overload of `vector::operator[]`. This confirmed by the lack of borrow checker error: if the `B[0]` expression chose the mutable overload, that would create a mutable borrow when the shared borrow `b` is still in scope, which violates exclusivity. In the following statement, `int^ a = mut A[0]` calls the mutable overload of the subscript operator, returning an `lvalue int` expression. We're still in the mutable context, because we haven't run into any operators of lower precedence. That means copy initialization into `int^` succeeds, because the standard conversion can bind mutable borrows to lvalues.
+Write the `mut` token before the _cast-expression_ you want to mutate. _cast-expressions_ include high-precedence unary expressions. Lower-precedence binary expressions aren't in the scope of the mutable context. In this example, the mutable context applies only to the left-hand side of the assignment. `A[0]` chooses the mutable overload of `vector::operator[]` and `B[0]` chooses the const overload of `vector::operator[]`. The example takes a shared borrow on `B` and uses it at the end of `main` in order to trap a mutable borrow to `B` at the statement with the compound assignment. 
 
+`mut A[0] += B[0]` mutable binds `A` to get the mutable overload of `operator[]`. `B` is on the right-hand side of the assignment, which is outside the scope of the mutable context.
+
+[**mut2.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/mut2.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/db35zexYP)
 ```cpp
 #feature on safety
-
 #include <std2.h>
 
 int main() safe {
@@ -2049,9 +2049,9 @@ int main() safe {
 }
 ```
 
-The mutable context is entered at the start of a _cast-expression_ with the `mut` token. It exists for subsequent high-precedence _unary-expression_, _postfix-expression_ and _primary-expression_ operations. But it's transitive into subexpressions of these. The index operand of the subscript operator matches the _expression-list_ production, which is lower precedence than _cast-expression_, so it's not entered with the mutable context.
+The mutable context is entered at the start of a _cast-expression_ with the `mut` token. It exists for subsequent high-precedence _unary-expression_, _postfix-expression_ and _primary-expression_ operations. But it doesn't transer into subexpressions of these. The index operand of the subscript operator matches the _expression-list_ production, which is lower precedence than _cast-expression_, so it's not entered with the mutable context. `B[0]` is bound with a shared borrow. One would have to write `mut A[mut B[0]] += 1;` to bind a mutable borrow on both objects.
 
-The mutable context marks points of mutation while letting standand conversion worry about the details. Its intent is to reduce cognitive load on developers compared with using the reference  operators.
+The mutable context explicitly marks points of mutation while letting standard conversions worry about the details. Its intent is to reduce cognitive load on developers compared with using the reference operators.
 
 ## Relocation object model
 
