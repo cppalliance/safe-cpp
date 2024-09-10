@@ -2777,7 +2777,7 @@ Safe C++ must provide safe alternatives to everything in today's Standard Librar
 We're co-designing the Safe C++ standard library along with the language extensions. Visit our repository to follow our work. You can access all the examples included in this document. Or visit our Slack channel to get involved in the effort:
 
 > github: [https://github.com/cppalliance/safe-cpp](https://github.com/cppalliance/safe-cpp)\
-> slack: [https://cpplang.slack.com/archives/C07GH9NFK0F](https://cpplang.slack.com/archives/C07GH9NFK0F)
+> slack: [https://cpplang.slack.com/archives/C07GH9NFK0F](https://cpplang.slack.com/archives/C07GH9NFK0F)\
 > Circle download: [https://www.circle-lang.org/](https://www.circle-lang.org/)
 
 Everything in this proposal took about 18 months to design and implement in Circle. With participation from industry, we could resolve the remaining design questions and in another 18 months have a language and standard library robust enough for mainstream evaluation. While Safe C++ is a large extension to the language, the cost of building new tooling is not steep. If C++ continues to go forward without a memory safety strategy, that's because institutional users are choosing not to pursue it; it's not because memory safe tooling is too expensive or difficult to build.
