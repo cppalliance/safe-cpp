@@ -1744,9 +1744,9 @@ The point of this mechanism is to make drop order less important by permitting t
 
 When `DropOnly` is true, the destructor overload with the `[[unsafe::drop_only]]` attribute is instantiated. The _drp-expression_ in `test` doesn't automatically use the lifetimes of its operand. Instead, the drop check considers lifetime parameters of the operand that are drop used. Due to the `[[unsafe::drop_only(T)]]` attribute, the data member is only a _drop use_ rather than a normal use. And the drop use of a borrow is nothing: it's a trivial destructor. We can don't care about lifetimes of borrows when dropping them, because we're doing operations that can cause soundness problems. The _drp-expression_ destroys the `Vec` without a borrow checker violation. The programmer is making an unsafe promise not to do anything with `T`'s template lifetime parameters inside `~Vec` other than use it to drop `T`.
 
-When `DropOnly` is false, the destructor overload without the attribute is instantiated. In this case, the user-defined destructor is assumed to use all of the class's lifetime parameters outside of the drop check. If the Vec held a borrow to out-of-scope data, as it does in this example, loading that data through the borrow would be a use-after-free defect. To prevent this unsound behavior, the compiler uses all the class's lifetime parameters when its user-defined destructor is called. This raises the borrow checker error, indicating that the _drp-expression_ depends on an expired loan on `x`.
+When `DropOnly` is false, the destructor overload without the attribute is instantiated. In this case, the user-defined destructor is assumed to use all of the class's lifetime parameters outside. If the `Vec` held a borrow to out-of-scope data, as it does in this example, loading that data through the borrow would be a use-after-free defect. To prevent this unsound behavior, the compiler uses all the class's lifetime parameters when its user-defined destructor is called. This raises the borrow checker error, indicating that the _drp-expression_ depends on an expired loan on `x`.
 
-The `drop_only` attribute is currently unsafe because it's incumbent on the programmer implementing a destructor that doesn't use associated lifetime parameters outside of invoking their destructors. We plan to make this attribute safe. The compiler should be able to monitor the user-defined destructor for use of lifetimes associated with T outside of drops and raise borrow checker errors. However, that may require extending `drop_only` to all functions, not just destructors. `std::destruct_at` involves a non-drop use of the parameter type. But a `drop_only`-attributed `std2::destruct_at` would only permit and qualify as a drop use.
+The `drop_only` attribute is currently `unsafe` because it depends on the programmer following through with a promising not to do anything with the operand other than to destruct it. We plan to make this attribute safe. The compiler should be able to monitor the user-defined destructor for use of lifetimes associated with `T` outside of drops and raise borrow checker errors. However, that may require extending `drop_only` to all functions, not just destructors. `std::destruct_at` involves a non-drop use of the parameter type. But a `drop_only`-attributed `std2::destruct_at` would only permit and qualify as a drop use.
 
 ### Lifetime canonicalization
 
@@ -1773,20 +1773,19 @@ static_assert(F4 == F5);
 static_assert(F2 != F4);
 ```
 
-Lifetime parameterizations are part of the function's type. But different textual parameterizations may still result in the same type! `F1` and `F2` have different parameterizations and are different types. But `F2` and `F3` have different parameterizations yet are the same type. Likewise, `F4` and `F5` are the same type, even though `F4` has two lifetime parameters and two outlives constraints.
+Lifetime parameterizations are part of the function's type. But different textual parameterizations may still result in the same type! `F1` and `F2` have different parameterizations and are different types. `F2` and `F3` have different parameterizations yet are the same type. Likewise, `F4` and `F5` are the same type, even though `F4` has two lifetime parameters and two outlives constraints.
 
-The compiler maps all non-dependent types to canonical types. When comparing types for equality, it compares the pointers to their canonical types. This is necessary to support typedefs and alias templates that appear in functions--we need to strip away those inessential details and get to the canonical types within. The lifetime parameterizations the user writes also map to canonical pameterizations.
+The compiler maps all non-dependent types to canonical types. When comparing types for equality, it compares the pointers to their canonical types. This is necessary to support typedefs and alias templates that appear in functions--we need to strip away those inessential details and get to the canonical types within. Lifetime parameterizations the user declares also map to canonical pameterizations.
 
-Think about lifetime parameterizations as a directed graph. Lifetime parameters are the nodes and outlives constraints define the edges. The compiler finds the strongly connected components[@scc] of this graph. That is, it identifies all cycles and reduces them into SCC nodes. In `F4`, the `/a` and `/b` lifetime parameters constrain one another, and there are collapsed into a strongly connected component. The canonical function type is encoded using SCCs as lifetime parameters. Both `F4` and `F5` map to the same canonical type, and therefore compare the same.
+Think about lifetime parameterizations as a directed graph. Lifetime parameters are the nodes and outlives constraints define the edges. The compiler finds the strongly connected components[@scc] of this graph. That is, it identifies all cycles and reduces them into SCC nodes. In `F4`, the `/a` and `/b` lifetime parameters constrain one another and are collapsed into the same strongly connected component. The canonical function type is encoded using SCCs as lifetime parameters. After lifetime canonicalization both `F4` and `F5` map to the same canonical type and therefore compare the same.
 
-During the type relation pass that generates lifetime constraints for function calls in the MIR, arguments and result object regions are constrained to regions of the canonical type's SCCs, rather than the lifetime parameters of the declared type. This reduces the number of regions the borrow checker solves for. But the big reason for this process is to permit writing compatible functions even in the face lifetime normalization.
-
+During the type relation pass that generates lifetime constraints for function calls in the MIR, arguments and result object regions are constrained to regions of the canonical type's SCCs, rather than the lifetime parameters of the declared type. This reduces the number of regions the borrow checker solves for. But the big reason for this process is to permit writing compatible functions when dealing with the quirks of [lifetime normalization](#lifetime-normalization).
 
 ### Lifetimes and templates
 
 Templates are specially adapted to handle types with lifetime binders. It's important to understand how template lifetime parameters are invented in order to understand how borrow checking fits with C++'s late-checked generics.
 
-Class templates feature a variation on the type template parameter: `typename T+` is a lifetime binder parameter. The class template invents an implicit _template lifetime parameter_ for each lifetime binder of the argument's type.
+In the current implementation, class templates feature a variation on the type template parameter: `typename T+` is a lifetime binder parameter. The class template invents an implicit _template lifetime parameter_ for each lifetime binder of the argument's type.
 
 ```cpp
 template<typename T0+, typename T1+>
@@ -1798,7 +1797,7 @@ struct Pair {
 class string_view/(a);
 ```
 
-The `Pair` class template doesn't have any named lifetime parameters. `string_view` has one named lifetime parameter, which constrains the pointed-at string to outlive the view. The specialization `Pair<string_view, string_view>` invents a template lifetime parameter for each view's named lifetime parameters. Call them `T0.0.0` and `T1.0.0`. `T0.0` is for the 0th parameter pack element of the template parameter pack. `T0.0.0` is for the 0th lifetime binder in that type. If `string_view` had a second named parameter, the compiler would invent two more template lifetime parameters: `T0.0.1` and `T1.0.1.
+The `Pair` class template doesn't have any named lifetime parameters. `string_view` has one named lifetime parameter, which constrains the pointed-at string to outlive the view. The specialization `Pair<string_view, string_view>` invents a template lifetime parameter for each view's named lifetime parameters. Call them `T0.0.0` and `T1.0.0`. `T0.0` is for the 0th parameter pack element of the template parameter  `T0`. `T0.0.0` is for the 0th lifetime binder in that type. If `string_view` had a second named parameter, the compiler would invent two more template lifetime parameters: `T0.0.1` and `T1.0.1`.
 
 Consider the transformation when instantiating the definition of `Pair<string_view/a, string_view/b>`:
 
@@ -1812,9 +1811,9 @@ struct Pair/(T0.0.0, T1.0.0)<string_view/T0.0.0, string_view/T1.0.0> {
 
 The compiler ignores the lifetime arguments `/a` and `/b` and replaces them with the template lifetime parameters `T0.0.0` and `T1.0.0`. This transformation deduplicates template instantiations. We don't want to instantiate class templates for every lifetime argument on a template argument type. That would be an incredible waste of compute and result in enormous code bloat. Those lifetime arguments don't carry data in the same way as integer or string types do. Instead, lifetime arguments define constraints on region variables between different function parameters and result objects. Those constraints are an external concern to the class template being specialized.
 
-Since we replaced the named lifetime arguments with template lifetime parameters during specialization of Pair, you have to wonder, what happened to `/a` and `/b`? They get stuck on the outside of the class template specialization: `Pair<string_view, string_view>/a/b`. Since this specialized Pair has two lifetime binders (its two template lifetime parameters), it needs to bind two lifetime arguments. Safe C++ replaces lifetime arguments on template arguments with invented template lifetime parameters and reattaches the lifetime arguments on the specialization.
+Since we replaced the named lifetime arguments with template lifetime parameters during specialization of `Pair`, you have to wonder, what happened to `/a` and `/b`? They're factored out and stuck to the outside of the class template specialization: `Pair<string_view, string_view>/a/b`. Since this specialized `Pair` has two lifetime binders (those two template lifetime parameters), it needs to bind two lifetime arguments. Safe C++ replaces lifetime arguments on template arguments with invented template lifetime parameters and reattaches the lifetime arguments to the specialization.
 
-A class template's instantiation doesn't depend on the lifetimes of its users. `std2::vector<string_view/a>` is transformed to `std2::vector<string_view/T0.0.0>/a`. `T0.0.0` is the implicitly declared lifetime parameter, which becomes the lifetime argument on the template argument, and `/a` is the user's lifetime argument that was hoisted out of the _template-argument-list_ and put in the corresponding position in the specialization's _lifetime-argument-list_.
+A class template's instantiation doesn't depend on the lifetimes of its users. `std2::vector<string_view/a>` is transformed to `std2::vector<string_view/T0.0.0>/a`. `T0.0.0` is the implicitly declared lifetime parameter, which becomes the lifetime argument on the template argument, and `/a` is the user's lifetime argument that was hoisted out of the _template-argument-list_ and appended to the class specialization.
 
 In the current safety model, this transformation only occurs for bound lifetime template parameters with the `typename T+` syntax. It's not done for all template parameters, because that would interfere with C++'s partial and explicit specialization facilities.
 
@@ -1831,9 +1830,9 @@ struct is_same<T, T> {
 
 Should `std::is_same<string_view, string_view>::value` be true or false? Of course it should be true. But if we invent template lifetime parameters for each lifetime binder in the _template-argument-list_, we'd get something like `std::is_same<string_view/T0.0.0, string_view/T1.0.0>::value`. Those arguments are different types, and they wouldn't match the partial specialization.
 
-When specializing a `typename T` template parameter, lifetimes are stripped from the template argument types. They become unbound types. When specializing a `typename T+` parameter, the compiler creates fully-bound types by implicitly adding placeholder arguments `/_` whenever needed. When a template specialization is matched, the lifetime arguments are replaced with the specialization's invented template lifetime parameters and he original lifetime arguments are hoisted onto the specialization.
+When specializing a `typename T` template parameter, lifetimes are stripped from the template argument types. They become unbound types. When specializing a `typename T+` parameter, the compiler creates fully-bound types by implicitly adding placeholder arguments `/_` whenever needed. When a template specialization is matched, the lifetime arguments are replaced with the specialization's invented template lifetime parameters and the original lifetime arguments are hoisted onto the specialization.
 
-You might want to think of this process as extending an electrical circuit. The lifetime parameters outside of the class template are the source, and the usage on the template arguments are the return. When we specialize, the invented template lifetime parameters become a new source, and their use as lifetime arguments in the data members of the specialization are a new return. The old circuit is connected to the new one, where the outer lifetime arguments lead into the new template lifetime parameters.
+You might want to think of this process as extending an electrical circuit. The lifetime parameters outside of the class template are the source, and their usage on the template arguments are the return. When we instantiate a class template, the invented template lifetime parameters become a new source, and their use as lifetime arguments in the data members of the specialization are a new return. The old circuit is connected to the new one, where the outer lifetime arguments lead into the new template lifetime parameters.
 
 ```
 Foo<string_view/a>
@@ -1842,14 +1841,14 @@ Foo<string_view/a>
 
 transforms to:
 
-Foo<string_view:string_view/Foo>
+Foo<string_view/T0.0.0>/a
   Source: /a
-  Return: Foo (user-facing)
-  Source: Foo (definition-facing)
+  Return: T0.0.0 (user-facing)
+  Source: T0.0.0 (definition-facing)
   Return: string_view
 ```
 
-Because Rust doesn't support partial or explicit specialization of its generics, it has no corresponding distinction between type parameters that bind lifetimes and type parameters don't. There's nothing like `is_same` that would be confused by lifetime arguments in its operands.
+Because Rust doesn't support partial or explicit specialization of its generics, it has no corresponding distinction between type parameters which bind lifetimes and type parameters which don't. There's nothing like `is_same` that would be confused by lifetime arguments in its operands.
 
 Deciding when to use the `typename T+` parameter kind on class templates will hopefully be straight-forward. If the class template is a container and the parameter represents a thing being contained, use the new syntax. If the class template exists for metaprogramming, like the classes found in `<type_traits>`, it's probably uninterested in bound lifetimes. Use the traditional `typename T` parameter kind.
 
@@ -1879,7 +1878,7 @@ Obj<int^>   obj2;  // Well-formed at #1 and #2.
 
 ### Lifetime normalization
 
-Lifetime normalization conditions the lifetime parameters and lifetime arguments on function declarations and function types. After normalization, function parameters and return types have fully bound lifetimes. Their lifetime arguments always refer to lifetime parameters on the function, and not to those on any other scope, such as the containing class.
+Lifetime normalization conditions the lifetime parameters and lifetime arguments on function declarations and function types. After normalization, function parameters and return types have fully bound lifetimes. Their lifetime arguments always refer to lifetime parameters of the function, and not to those of any other scope, such as the containing class.
 
 _Lifetime elision_ assigns lifetime arguments to function parameters and return types with unbound lifetimes.
 * If the type with unbound lifetimes is the enclosing class of a member function, the lifetime parameters of the enclosing class are used for elision.
@@ -1896,7 +1895,7 @@ void func/(where T1:static, T2:T3)(T1 x, T2 y, T3 Z);
 &func<int^, const string_view^, double>;
 ```
 
-During normalization of this function specialization, the _outlives-constraint_ is rebuilt with the substituted lifetime arguments on its type parameters. The template lifetime parameter on `int^` outlives `/static`. All lifetime parameters bound on `const string_view^` (one for the outer borrow, one on the string_view) outlive all lifetime parameters bound on the `double`. But `double` isn't a lifetime binder. As it contributes no lifetime parameters, so the `T2:T3` type constraint is dropped.
+During normalization of this function specialization, the _outlives-constraint_ is rebuilt with the substituted lifetime arguments on its type parameters. The template lifetime parameter on `int^` outlives `/static`. Both lifetime parameters bound on `const string_view^` (one for the outer borrow, one on the string_view) outlive the lifetime parameters bound on the `double`. But `double` isn't a lifetime binder. Since it contributes no lifetime parameters, the `T2:T3` type constraint is dropped during normalization.
 
 ## Explicit mutation
 
