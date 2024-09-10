@@ -1189,9 +1189,9 @@ N10__cxxabiv117__class_type_infoEN10__cxxabiv117__pbase_type_infoEN10__cxxabiv11
 9__pointer_type_infoE
 ```
 
-This example declares two initializer lists of string views, `initlist1` and `initlist2`, declares two strings, and assigns views of the strings into the two initializer lists. Printing their contents is undefined behavior. It may go undetected. But compiling with clang -O2 and targeting libc++ manifests the defect: the program is printing uncontrollably from some arbitrary place in memory. This is the kind of memory safety defect that the NSA and corporate researchers have been warning industry about.
+This example declares two initializer lists of string views, `initlist1` and `initlist2`. It declares two strings objects and assigns views of the strings into those initializer lists. Printing their contents is undefined behavior. It may go undetected. But compiling with `clang++ -O2` and targeting libc++ manifests the defect: the program is printing uncontrollably from some arbitrary place in memory. This is the kind of safety defect that the NSA and corporate researchers have been warning industry about.
 
-The defect is perplexing because the string objects `s` and `t` _are still in scope_! This is a use-after-free bug, but not with an object the user wrote. It's a use-after-free of implicit backing stores that C++ generates when lowering initializer list expressions.
+The defect is perplexing because the string objects `s` and `t` _are still in scope_! This is a use-after-free bug, but not with any object that the user declared. It's a use-after-free of implicit backing stores that C++ generates when lowering initializer list expressions.
 
 ```cpp
   // initializer lists holds dangling pointers into backing array.
@@ -1199,7 +1199,7 @@ The defect is perplexing because the string objects `s` and `t` _are still in sc
   initlist2 = { t, t, t, t };
 ```
 
-Each statement provisions a 4-element `string_view` array as a backing store. An initializer list object is simply a pointer into the array and a length. It's the pointer into the backing store that's copied into `initlist1` and `initlist2`. At the end of each full expression, those backing stores go out of scope, leaving dangling pointers in the initializer lists. When compiled with aggressive local storage optimizations, the stack space that hosted the backing store for `{ t, t, t, t }` gets reused for other objects. A new initialization overwrites the pointer and length fields of the string views in that reclaimed backing store. Printing from the initializer lists prints from the smashed pointers.
+Each initializer list expression provisions a 4-element array of `string_view` as a backing store. An initializer list object is simply a pointer into the array and a length. It's the pointer into the backing store that's copied into `initlist1` and `initlist2`. At the end of each full expression, those backing stores fall out of scope, leaving dangling pointers in the initializer lists that the user declared. When compiled with aggressive local storage optimizations, the stack space that hosted the backing store for `{ t, t, t, t }` gets reused for other objects. Some subsequent initialization overwrites the pointer and length fields of the string views in that reclaimed backing store. Printing from the `initlist2` declaration prints from the smashed pointers.
 
 [**initlist1.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/initlist1.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/xxdTfdh1d)
 ```cxx
@@ -1239,7 +1239,7 @@ safety: during safety checking of int main() safe
 
 Safe C++ includes a new `std2::initializer_list` which sits side-by-side with the legacy type. The compiler provisions a backing store to hold the data, and the new initializer list also keeps pointers into that. The backing store expires at the end of the assignment state. But borrow checking prevents the use-after-free defect that troubles `std::initializer_list`. An error is filed where the initializer list constructs a vector: `use of initlist depends on expired loan`.
 
-The Safe C++ replacement for initializer lists takes the _ownership and borrowing_ model to heart by doing both. It borrows the storage its elements are held in, but it also owns the elements and calls their destructors. We want to support relocation out of the initializer list. That means the backing store can't call the element destructors, because those elements may have been relocated out by the user. `std2::initializer_list` is more a vector, in that it destroys un-consumed objects when dropped, but also like a view, in that sees into another object's storage.
+The Safe C++ replacement for initializer lists takes the _ownership and borrowing_ model to heart by both owning and borrowing. It borrows the storage its elements are held in, but it also owns the elements and calls their destructors. We want to support relocation out of the initializer list. That means the backing store doesn't call the element destructors, because those elements may have been relocated out by the user. `std2::initializer_list` is more a vector, in that it destroys un-consumed objects when dropped, but also like a view, in that sees into another object's storage.
 
 ```cpp
 template<class T+>
@@ -1292,17 +1292,17 @@ public:
 };
 ```
 
-`std2::initializer_list` has a named lifetime parameter, `a`, which puts a constraint on the backing store. The private explicit constructor is called with compiler magic. The argument is a [slice](#arrays-and-slice) borrow to the backing store. Note the lifetime argument on the borrow is the class's named lifetime parameter. This means the backing store outlives the initializer list.
+`std2::initializer_list` has a named lifetime parameter, `/a`, which puts a constraint on the backing store. The private explicit constructor is called when lowering the braced initializer expression--that's compiler magic. The argument to the constructor is a [slice](#tuples-arrays-and-slice) borrow to the backing store. Note the lifetime argument on the borrow is the class's named lifetime parameter. This means the backing store outlives the initializer list.
 
-This initializer has a relatively rich interface. Of course you can query for the pointer to the data and its length. But users may also call `next` to pop off an elmeent at a time. `initializer_list` is essentially an iterator. But for element types that are trivially relocatable, users can call `data` and `size` to relocate them in bulk, and then `advance` by the number of consumed elements. When the init list goes out of scope, it destroys all unconsumed elements.
+This class has a relatively rich interface. Of course you can query for the pointer to the data and its length. But users may also call `next` to pop off an element at a time and use it much like an [iterator](#iterator-invalidation). But for element types that are trivially relocatable, users can call `data` and `size` to relocate them in bulk, and then `advance` by the number of consumed elements. When the `initializer_list` goes out of scope, it destructs all unconsumed elements.
 
 ### Scope and liveness
 
-Key to one's understanding of lifetime safety is the distinction between scope and liveness. Consider lowering your function to instructions which are indexed by points. The set of points at which an object is initialized is its _scope_. In normal C++, this corresponds to its lexical scope. In Safe C++, due to relocation/destructive move, there are points in the lexical scope where the object may not be initialized, making the scope a subset of the lexical scope.
+Key to one's understanding of lifetime safety is the distinction between scope and liveness. Consider lowering your function to MIR instructions which are indexed by program points. The set of points at which an object is initialized is its _scope_. In normal C++, this corresponds to its lexical scope. In Safe C++, due to relocation/destructive move, there are points in the lexical scope where the object may not be initialized, making the scope a subset of the lexical scope.
 
-The compiler lowers AST to MIR control flow graph and runs _initialization analysis_, a form of forward dataflow analysis that computes the scope of all local variables. If a local variable has been relocated or dropped, and is then named in an expression, the scope information helps the compiler flag this as an illegal usage.
+The compiler lowers AST to MIR and runs _initialization analysis_, a form of forward dataflow analysis that computes the scope of all local variables. If a local variable has been relocated or dropped, and is then named in an expression, the scope information helps the compiler flag this as an illegal usage.
 
-Liveness is a different property than scope, but they're often confused: users speak of lifetime to mean initialization or scope, while backend engineers speak of lifetime to mean liveness. Liveness is the set of points where the value (i.e. a specific bit pattern) stored in a variable is yet to be used.
+Liveness is a different property than scope, but they're often confused: end users speak of lifetime to mean initialization or scope, while backend engineers speak of lifetime to mean liveness. Borrow checking is concerned with liveness. That's the set of points where the value stored in a variable (i.e. a specific bit pattern) is subsequently used.
 
 ```cpp
 void f(int);
@@ -1321,7 +1321,7 @@ int main() {
 
 Live analysis is a reverse dataflow computation. Start at the return instruction of the control flow graph and work your way up to the entry point. When you encounter a load instruction, that variable becomes live. When you encounter a store instruction, that variable is marked dead.
 
-The liveness property is useful in register alloction: you only care about representing a variable in register while it's holding a value that has yet to be used. But we're solving lifetime safety, we're not doing code generation. Here, we're only concerned with liveness as a property of _borrows_.
+The liveness property is useful in register alloction: you only care about representing a variable in register while it's holding a value that has an upcoming use. But we're solving lifetime safety, we're not doing code generation. Here, we're only concerned with liveness as a property of _borrows_.
 
 ```cpp
 #feature on safety
@@ -1339,21 +1339,21 @@ int main() {
     f(*ref);  // ref is still live, due to read below.
   }
 
-  f(*ref);    // ref was live but y was uninitialized.
+  f(*ref);    // ref is live but y is uninitialized.
 }
 ```
 
-Borrows are checked references. It's a compile-time error to use a borrow after the data it refers to has gone out of scope. Consider the set of all live references at each point in the program. Is there an invalidating action on a place referred to by one of these live references? If so, that's a contradiction that makes the program ill-formed. In this example, the contradiction occurs when `y` goes out of scope, because at that point, `ref` is a live reference to it. What makes `ref` live at that point?--The last `f(*ref)` expression in the program.
+Borrows are checked references. It's a compile-time error to use a borrow after the data it refers to has gone out of scope. Consider the set of all live references at each point in the program. Is there an invalidating action on a place referred to by one of these live references? If so, that's a contradiction that makes the program ill-formed. In this example, the contradiction occurs when `y` goes out of scope, because at that point, `ref` is a live reference to it. What makes `ref` live at that point?--Its use in the last `f(*ref)` expression in the program.
 
-It's not enough to compute liveness of references. To determine the invalidating actions, it's important to know which place the live borrow refers to. `ref` is live until the end of the function, but `x` going out of scope is not an invalidating function, because `ref` doesn't refer to `x` anymore. We need data structures that indicate not just when a borrow is live, but to which places it may refer.
+It's not enough to compute liveness of references. To determine the invalidating actions, it's important to know which place the live borrow refers to. `ref` is live until the end of the function, but `x` going out of scope is not an invalidating function because `ref` doesn't refer to `x` anymore. We need data structures that indicate not just when a borrow is live, but to which places it may refer.
 
 ### Systems of constraints
 
-NLL borrow checking[@borrow-checking] is Rust's innovative method for testing invalidating actions against live borrows in the presence of control flow. The algorithm involves generating a system of lifetime constraints which map borrow variables back to _loans_, growing points until all the constraints are satisfied, and then testing invalidating actions against all loans in scope.
+NLL borrow checking[@borrow-checking] tests invalidating actions against live borrows in the presence of control flow. The algorithm involves generating a system of lifetime constraints which relate regions at program points, growing region variables until all the constraints are satisfied, and then testing invalidating actions against all loans in scope.
 
-A loan is the action that forms a borrow to a place. In the example above, there are two loans: `^x` and `^y`. Solving the constraint equation extends the liveness of loans `^x` for and `^y` up until the point of the last dereferences to them. When `y` goes out of scope, it doesn't invalidate the loan `^x`, because that's not live. But it does invalidate the loan `^y`, which is lifetime extended by the final `f(*ref)` expression.
+A loan is the action that forms a borrow to a place. In the example above, there are two loans: `^x` and `^y`. Solving the constraint equation extends the liveness of loans `^x` and `^y` up until their last indirect uses through `ref`. When `y` goes out of scope, it doesn't invalidate the loan `^x`, because that's not live. But it does invalidate the loan `^y`, which is lifetime extended by the final `f(*ref)` expression.
 
-Liveness is stored in bit vectors called `regions`. There's a region for loans `^x` and `^y` and there's a region for variables with borrow types, such as `ref`. There are also regions for user-defined types with lifetime parameters, such as `string_view`.
+Liveness is stored in bit vectors called _regions variables_. There are region variables for loans `^x` and `^y` and regions for objects with borrow types, such as `ref`. There are also regions for user-defined types with lifetime parameters, such as `string_view`.
 
 A lifetime constraint `'R0 : 'R1 : P` reads "region 0 outlives region 1 at point P." The compiler emits constraints when encountering assignment and function calls involving types with regions.
 
@@ -1382,11 +1382,11 @@ P11:  f(*ref);
     }
 ```
 
-I've relabelled the example to show function points and region names of variables and loans. If we run live analysis on 'R0, the region for the variable `ref`, we see it's live at points 'R0 = { 4, 8, 9, 10, 11 }. We'll grow the loan regions 'R1 and 'R2 until their constraint equations are satisfied.
+I've relabelled the example to show function points and region names of variables and loans. If we run live analysis on 'R0, the region for the variable `ref`, we see it's live at points 'R0 = { 4, 8, 9, 10, 11 }. These are the points where its subsequently used. We'll grow the loan regions 'R1 and 'R2 until their constraint equations are satisfied.
 
 `'R1 : 'R0 @ P3` means that starting at P3, the 'R1 contains all points 'R0 does, along all control flow paths, as long as 'R0 is live. 'R1 = { 3, 4 }. Grow 'R2 the same way: 'R2 = { 7, 8, 9, 10, 11 }.
 
-Now we can hunt for contradictions. Visit each point in the function and consider, "is there a read, write, move, drop or other invalidating action on any of the loans in scope?" The only potential invalidating actions are the drops of `x` and `y` where they fall out of scope. At P9, the loan `^y` is in scope, because P9 is an element of its region 'R2. This is a conflicting action, because the loan is also on the variable `y`. That raises a borrow checker error. There's also a drop at P10. P10 is in the region for `^y`, but that is not an invalidating action, because the loan is not on a place that overlaps with with `x`, the operand of the drop.
+Now we can hunt for contradictions. Visit each point in the function and consider, "is there a read, write, move, drop or other invalidating action on any of the loans in scope?" The only potential invalidating actions are the drops of `x` and `y` where they go out of scope. At P9, the loan `^y` is in scope, because P9 is an element of its region 'R2. This is a conflicting action, because the loan is also on the variable `y`. That raises a borrow checker error. There's also a drop at P10. P10 is in the region for `^y`, but that is not an invalidating action, because the loan is not on a place that overlaps with with `x`, the operand of the drop.
 
 The law of exclusivity is enforced at this point. A new mutable loan is an invalidating action on loans that are live at an overlapping place. A new shared loan is an invalidating action on mutable loans that are live at an overlapping place. Additionally, storing to variables is always an invalidating action when there is any loan, shared or mutable, on an overlapping place.
 
@@ -1434,14 +1434,15 @@ safety: during safety checking of int main() safe
 
 Circle tries to identify all three of these points when forming borrow checker errors. Usually they're printed in bottom-to-top order. That is, the first source location printed is the location of the use of the invalidated loan. Next, the invalidating action is categorized and located. Lastly, the creation of the loan is indicated.
 
-The invariants that are tested are established with a network of lifetime constraints. It might not be the case that the invalidating action is obviously related to either the place of the loan or the use that extends the loan. More completely describing the chain of constraints could help users diagnose borrow checker errors. But there's a fine line between presenting an error like the one above, which is already pretty wordy, and inundating programmers with too much information.
+The invariants that are tested are established with a network of lifetime constraints. It might not be the case that the invalidating action is obviously related to either the place of the loan or the use that extends the loan. More completely describing the chain of constraints could help users diagnose borrow checker errors. But there's a fine line between presenting an error like the one above, which is already pretty wordy, and overwhelming programmers with information.
 
 ### Lifetime constraints on called functinos
 
-Borrow checking is really easy to understand when applied to a single function. The function is lowered to a control flow graph, the compiler assigns regions to loans and borrow variables, emits lifetime constraints where there are assignments, iteratively grows regions until the constraints are solved, and walks the instructions, checking for invalidating actions on loans in scope. The compiler automatically assigns regions to all loans and borrow variables. Within the definition of the function, there's nothing it can't analyze. The complexity arises when passing and receiving borrows through function calls.
+Borrow checking is easiest to understand when applied to a single function. The function is lowered to a control flow graph, the compiler assigns regions to loans and borrow variables, emits lifetime constraints where there are assignments, iteratively grows regions until the constraints are solved, and walks the instructions, checking for invalidating actions on loans in scope. Within the definition of the function, there's nothing it can't analyze. The complexity arises when passing and receiving borrows through function calls.
 
-Whole program analysis is not practical. In order to extend static lifetime safety guarantees outside of single functions, we have to introduce _lifetime contracts_ on function boundaries that are satisfied by both caller and callee. These contracts are noted by _lifetime parameters_.
+Whole program analysis is not practical. In order to extend lifetime safety guarantees outside of single functions, we have to introduce _lifetime contracts_ on function boundaries that are satisfied by both caller and callee. These contracts are noted by _lifetime parameters_.
 
+[**get.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/get.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/GWrfY5qMT)
 ```cpp
 #feature on safety
 
@@ -1465,7 +1466,7 @@ int main() {
   int val2 = *ref2;  // Borrow checker error.
 }
 ```
-```txt
+```
 $ circle get.cxx
 safety: get.cxx:20:14
   int val2 = *ref2;
@@ -1480,13 +1481,9 @@ loan created at get.cxx:17:21
                     ^
 ```
 
-Inside function declarations and function types, borrow types must be qualified with lifetime arguments. The arguments name lifetime parameters associated with the function.
-
 `get_x` takes two shared borrow parameters and returns a shared borrow. The return type is marked with the lifetime parameter `/a`, which corresponds with the lifetime argument on the returned value `x`. `get_y` is declared to return a shared borrow with a lifetime associated with the parameter `y`. Since we're not specifying an _outlives-constraint_ between the lifetime parameters, the function bodies can't assume anything about how these lifetimes relate to each other. It would be ill-formed for `get_x` to return `y` or `get_y` to return `x`.
 
-The caller, `main` performs borrow checking on its side of the function calls and assumes `get_x` and `get_y` perform borrow checking on their side of the function calls. The function lifetime parameterizations define a contract so that each side can be sure that its caller or callee is upholding program soundness.
-
-Compiling this code raises a borrow checker error when dereferencing `*ref2`, since it's a use-after-free. Static analysis on `main` knows this even without looking into the definition of `get_y`. The lifetime parameterization generates constraints at the point of the function call, so that the region on the loan on `y` outlives the region on the result object `ref2`.
+This code raises a borrow checker error when dereferencing `*ref2`. As a human with access to the definiton of `get_y`, it's obvious that the use of `ref2` is a use-after-free defect. We can see that `get_y` returns `y`, and `y` goes out of scope by the time `ref2` is used. But static analysis can't see this--when `main` is being analyzed, it doesn't look into the definitions of other functions. Instead, it's the lifetime parameterization on the `get_y` declaration which informs the borrow checker. The call generates a constraint: at the point of the call, the lifetime on the borrow of the second function parameter outlives the lifetime on the borrow of the result object. That means that the region on the loan `^y` in the `get_y` call _outlives_ the region on the result object `ref2` at point of the call. As long as `ref2` is live, so is the loan on `y`. That's the transitive property and the result of solving the constraint equation. When `y` goes out of scope, the borrow checker raises an error, because a loan on it is still in scope.
 
 ```cpp
     int main() {
@@ -1513,16 +1510,16 @@ P8:     ref2 = get_y(<loan R6>, <loan R7>);
         // 'R7 : 'R9 @ P8
         // 'R9 : 'R1 @ P8
 
-P9:     drop y
+P9:     drp y
       }
 P10:  int val1 = *ref1;  // OK.
 P11:  int val2 = *ref2;  // Borrow checker error.
 
-P12:  drop x
+P12:  drp x
     }
 ```
 
-For every function calls, the lifetime parameters of that function are assigned regions. The regions of the function arguments outlive their corresponding lifetime parameters, and the lifetime parameters outlive their correspond result object parameters. This creates a chain of custody from the arguments, through the function, and out the result. The caller doesn't have to know the definition of the function, because it upholds the constraints at the point of the call, and the callee upholds the constraints in the definition of the function.
+For every function call, the lifetime parameters of that function are assigned regions distinct from the regions of the arguments and result object. This is done to more cleanly support [_outlives-constraints_](#lifetime-parameters). The regions of the function arguments outlive their corresponding lifetime parameters, and the lifetime parameters outlive their corresponding result object regions. This creates a chain of custody in from the arguments, through the function's lifetime parameters, and out through the result object. The caller doesn't have to know the definition of the function, because it upholds the constraints at the point of the call, and the callee upholds the constraints in the definition of the function.
 
 Let's solve for the regions of the four loans:
 
@@ -1533,7 +1530,7 @@ Let's solve for the regions of the four loans:
 'R7 = { 8, 9, 10, 11 }
 ```
 
-The drops of `x` and `y`, when they go out of scope, are the potentially invalidating actions. `y` goes out of scope at P9, and the loans with regions `R2` and `R7` are live at P9 (because they have 9 in their sets). The 'R2 loan borrows variable `x`, which is non-overlapping with the drop operand `y`, so it's not an invalidating action. The 'R7 loan borrows variable `y`, which is overlapping with the drop operand `y`, so we get a borrow checker error. The drop of `x` is benign, since no loan is live at P12.
+The drops of `x` and `y` are the potentially invalidating actions. `y` goes out of scope at P9, and the loans with regions `R2` and `R7` are live at P9 (because they have 9 in their sets). The 'R2 loan borrows variable `x`, which is non-overlapping with the drop operand `y`, so it's not an invalidating action. The 'R7 loan borrows variable `y`, which is overlapping with the drop operand `y`, so we get a borrow checker error. The drop of `x` is benign, since no loan is live at P12.
 
 ### Lifetime parameters
 
@@ -1554,15 +1551,13 @@ template<typename char_type>
 class basic_string_view/(a);
 ```
 
-All types with lifetime binders named in function declarations and data members must be qualified with lifetime arguments. This helps define the soundness contract between callers and callees.
-
-Often, it's necessary to specify requirements between lifetime parameters. These take the form of _outlives-constraints_. They're specified in a _where-clause_ inside the _lifetime-parameter-list_.
+All types with lifetime binders named in function declarations and data members must be qualified with lifetime arguments. This helps define the lifetime contract between callers and callees. Often it's necessary to specify requirements between lifetime parameters. These take the form of _outlives-constraints_. They're specified in a _where-clause_ inside the _lifetime-parameter-list_:
 
 ```cpp
 using F2 = void/(a, b where a : b)(int^/a x, int^/b y) safe;
 ```
 
-Rust chose a different syntax, mixing lifetime parameters and type parameters into the same parameter list. Coming from C++, where templates supply our generics, I find this misleading. Lifetime parameters are really nothing like template parameters. A function with lifetime parameters isn't really a generic function. Lifetime parameters are never substituted with any kind of concrete lifetime argument. Instead, the relationship between lifetime parameters, as deduced from _outlives-constraints_, implied bounds and variances of function parameters, establishes constraints that are used by the borrow checker at the point of call.
+Rust chose a different syntax, mixing lifetime parameters and type parameters into the same parameter list. Coming from C++, where templates supply our generics, I find this misleading. Lifetime parameters are nothing like template parameters. A function with lifetime parameters isn't really a generic function. Lifetime parameters are never substituted with any kind of concrete lifetime argument. Instead, the relationship between lifetime parameters, as deduced from _outlives-constraints_, implied bounds and variances of function parameters, establishes constraints that are used by the borrow checker at the point of call.
 
 ```rust
 // A Rust declaration.
@@ -1601,7 +1596,7 @@ P4:   f(<loan R0>, <loan R1>);
     }
 ```
 
-The _where-clause_ establishes the relationship that `/a` outlives `/b`. Does this mean that the variable pointed at by `x` goes out of scope later than the variable pointed at by `y`? No, that would be too straight-forward. This declaration emits a _lifetime-constraint_ at the point of the function call. The regions of the arguments already constrain the regions of the lifetime parameters. The _where-clause_ constrains the lifetime parameters to one another. `f`'s outlives constraint is responsible for the constraint `'R2 : 'R3 @ P4`.
+The _where-clause_ establishes the relationship that `/a` outlives `/b`. Does this mean that the variable pointed at by `x` goes out of scope later than the variable pointed at by `y`? No, that would be too straight-forward. This declaration emits a _lifetime-constraint_ at the point of the function call. The regions of the arguments already constrain the regions of the lifetime parameters. The _where-clause_ constrains the lifetime parameters to each other. `f`'s outlives constraint is responsible for the lifetime constraint `'R2 : 'R3 @ P4`.
 
 Lifetime parameters and _where-clauses_ are a facility for instructing the borrow checker. The obvious mental model is that the lifetimes of references are connected to the scope of the objects they point to. But this is not accurate. Think about lifetimes as defining rules that can't be violated, with the borrow checker looking for contradictions of these rules.
 
