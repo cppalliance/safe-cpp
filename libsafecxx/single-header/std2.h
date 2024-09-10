@@ -486,6 +486,12 @@ choice expected {
 ////////////////////////////////////////////////////////////////////////////////
 // optional.h
 
+template<class F, class R, class ...Args>
+concept FnMut = requires(F f, Args ...args)
+{
+  requires safe(mut f(^args...));
+};
+
 template<class T+>
 choice optional
 {
@@ -508,10 +514,41 @@ choice optional
   }
 
   T unwrap(self) noexcept safe {
-    return match(self) -> T {
+    return match(rel self) -> T {
       .some(t) => rel t;
       .none    => panic("{} is none".format(optional~string));
     };
+  }
+
+  optional<T> take(self^) noexcept safe {
+    return replace<optional<T>>(self, .none);
+  }
+
+  template<class P>
+  optional<T> take_if(self^, P p) safe
+  requires FnMut<P, bool, T>
+  {
+    return match(*self) -> optional<T> {
+      .some(^x) => return (
+        // p(x) ? replace<optional<T>>(self, .none) : optional<T>::none
+        match(bool{p(x)}) -> optional<T> {
+          true => replace<optional<T>>(self, .none);
+          _ => .none;
+        }
+      );
+      .none => return .none;
+    };
+  }
+
+  bool is_some(self const^) noexcept safe {
+    return match(*self) {
+      .some(_) => true;
+      .none => false;
+    };
+  }
+
+  bool is_none(self const^) noexcept safe {
+    return !self.is_some();
   }
 };
 
@@ -629,6 +666,16 @@ public:
     return const_cast<T*>(addr self->t_);
   }
 };
+
+template<class T+>
+T replace/(a)(T^/a dst, T src) safe
+{
+  unsafe {
+    T result = __rel_read(addr *dst);
+    __rel_write(addr *dst, rel src);
+    return result;
+  }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // atomic.h
@@ -767,16 +814,16 @@ public:
   }
 
   explicit
-  box(T t) safe : unsafe p_(new T(rel t)) { }
+  box(T t) safe : p_(new T(rel t)) { }
 
   [[unsafe::drop_only(T)]]
   ~box() safe {
     delete p_;
   }
 
-  template<typename... Ts>
-  static box make(Ts... args) safe {
-    unsafe { return box(new T(rel args...)); }
+  static
+  box make_default() safe(safe(T())) {
+    unsafe { return box(new T()); }
   }
 
   T^ borrow(self^) noexcept safe {
@@ -852,7 +899,7 @@ class [[unsafe::sync(false)]] cell
     unsafe { *self->t_.get() = rel t; }
   }
 
-  T replace(self const^, T t) safe {
+  T replace(self const^, T t) noexcept safe {
     unsafe { auto old = __rel_read(self->t_.get()); }
     unsafe { __rel_write(self->t_.get(), rel t); }
     return old;
@@ -1214,7 +1261,7 @@ public:
 
   explicit mutex(T data) noexcept safe
     : data_(rel data)
-    , unsafe mtx_(box<mutex_type>::make())
+    , unsafe mtx_(box<mutex_type>::make_default())
   {
   }
 

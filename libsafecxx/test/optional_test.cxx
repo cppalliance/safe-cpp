@@ -52,7 +52,56 @@ void optional_accessors() safe
   }
 }
 
+void take() safe
+{
+  {
+    std2::optional<std2::box<int>> opt = .some(std2::box{1234});
+    auto m_p = mut opt.take();
+
+    assert_true(m_p.is_some());
+    assert_true(!m_p.is_none());
+
+    assert_true(opt.is_none());
+    assert_true(!opt.is_some());
+  }
+
+  {
+    std2::optional<std2::box<int>> opt = .none;
+    auto m_p = mut opt.take();
+
+    assert_true(m_p.is_none());
+    assert_true(!m_p.is_some());
+
+    assert_true(opt.is_none());
+    assert_true(!opt.is_some());
+  }
+
+  {
+    // struct C
+    // {
+    //   static
+    //   bool invoke/(a)(int^/a x) safe {
+    //     std2::println("x is: ");
+    //     std2::println(*x);
+    //     bool b = (*x < 4321);
+    //     std2::println(b);
+    //     return b;
+    //   }
+    // };
+
+    // std2::optional<int> opt = .some(1234);
+    // auto m_p = mut opt.take_if(addr C::invoke);
+
+    // assert_true(m_p.is_some());
+    // assert_true(!m_p.is_none());
+
+    // assert_true(opt.is_none());
+    // assert_true(!opt.is_some());
+  }
+}
+
 int main() safe
 {
   optional_accessors();
+  take();
 }
