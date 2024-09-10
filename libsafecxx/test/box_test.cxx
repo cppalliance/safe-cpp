@@ -28,17 +28,19 @@ void box_constructor() safe
   }
 }
 
+// proves niche optimization
+static_assert(sizeof(std2::unique_ptr<int>) == sizeof(std2::box<int>));
+
 void unique_ptr_constructor() safe
 {
-  // std2::unique_ptr<int> p = .some(std2::box<int>(1337));
-  // auto x = match(p) -> int {
-  //   .some(x) => { *x };
-  //   .none => { 7331 };
-  // };
+  std2::unique_ptr<int> p = .some(std2::box<int>(1337));
+  auto x = match(p) -> int {
+    .some(x) => *x;
+    .none => 7331;
+  };
 
-  // assert_eq(x, 1337);
+  assert_eq(x, 1337);
 
-  static_assert(sizeof(std2::unique_ptr<int>) == sizeof(std2::box<int>));
 }
 
 int main()
