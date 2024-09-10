@@ -11,12 +11,12 @@ int main() safe {
   mut views.push_back("From a string literal");
 
   // string_view with outer scope lifetime.
-  string s1{"From string object 1"};
+  string s1("From string object 1");
   mut views.push_back(s1);
 
   {
     // string_view with inner scope lifetime.
-    string s2{"From string object 2"};
+    string s2("From string object 2");
     mut views.push_back(s2);
 
     // s2 goes out of scope. views now holds dangling pointers into

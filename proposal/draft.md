@@ -139,7 +139,7 @@ Borrow checking is an advanced form of live analysis. It keeps track of the _liv
 
 Borrow checking is a kind of local analysis. It avoids whole-program analysis by enforcing the _law of exclusivity_. Checked references (borrows) come in two flavors: mutable and shared, spelled `T^` and `const T^`, respectively. There can be one live mutable reference to a place, or any number of shared references to a place, but not both at once. Upholding this principle makes it easier to reason about your program. Since the law of exclusivity prohibits mutable aliasing, if a function is passed a mutable reference and some shared references, you can be certain that the function won't have side effects that, through the mutable reference, cause the invalidation of those shared references.
 
-[**string_view.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/string_view.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/6YcGP8f4W)
+[**string_view.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/string_view.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/8KabhKP97)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -154,12 +154,12 @@ int main() safe {
   mut views.push_back("From a string literal");
 
   // string_view with outer scope lifetime.
-  string s1{"From string object 1"};
+  string s1("From string object 1");
   mut views.push_back(s1);
 
   {
     // string_view with inner scope lifetime.
-    string s2{"From string object 2"};
+    string s2("From string object 2");
     mut views.push_back(s2);
 
     // s2 goes out of scope. views now holds dangling pointers into
@@ -178,15 +178,15 @@ int main() safe {
 $ circle string_view.cxx -I ../libsafecxx/single-header/
 safety: during safety checking of int main() safe
   borrow checking: string_view.cxx:30:24
-    for(string_view sv : views)
+    for(string_view sv : views) 
                          ^
   use of views depends on expired loan
   drop of s2 between its shared borrow and its use
   s2 declared at string_view.cxx:19:12
-      string s2 = "From string object 2";
+      string s2("From string object 2"); 
              ^
   loan created at string_view.cxx:20:25
-      mut views.push_back(s2);
+      mut views.push_back(s2); 
                           ^
 ```
 
@@ -1398,19 +1398,19 @@ The borrow checker is concerned with invalidating actions on in-scope loans. The
 * **(A)** The action that invalidates the loan. That includes taking a mutable borrow on a place with a shared loan, or taking any borrow or writing to a place with a mutable borrow. These actions could lead to use-after-free bugs.
 * **(U)** A use that extends the liveness of the borrow past the point of the invalidating action.
 
-[**view.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/view.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/f663aeeoh)
+[**view.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/view.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/qqq3889M4)
 ```cpp
 #feature on safety
 #include <std2.h>
 
 int main() safe {
-  std2::string s{"Hello safety"};
+  std2::string s("Hello safety");
 
   // (B) - borrow occurs here.
   std2::string_view view = s;
 
   // (A) - invalidating action
-  s = std2::string{"A different string"};
+  s = std2::string("A different string");
 
   // (U) - use that extends borrow
   std2::println(view);
@@ -1995,8 +1995,6 @@ f(x);         // Pass by const lvalue ref.
 f(&const x);  // Extra verbose -- call attention to it.
 ```
 
-The availability of relocation forces another choice on users: to load an lvalue into a prvalue, do you want to copy, or do you want to relocate? If the expression's type is trivially copyable and trivially destructible, it'll copy. Otherwise, the compiler will prompt for a `rel` or `cpy` token to resolve how to resolve the copy initialization. You're not going to accidentally hit the slow path or the mutable path. Opt into mutation. Opt into non-trivial copies.
-
 ### The mutable context
 
 The mutable context is the preferred way to express mutation. In a sense it returns Safe C++ to legacy C++'s default binding behavior. Use it at the start of a _cast-expression_ and the mutable context lasts for all subsequent higher-precedence operations. In the mutable context, standard conversion may bind mutable borrows and mutable lvalue references to lvalue operands.
@@ -2055,84 +2053,59 @@ The mutable context explicitly marks points of mutation while letting standard c
 
 ## Relocation object model
 
-A core enabling feature of Safe C++ is the new object model. It supports relocation/destructive move of local objects, which is necessary for satisfying type safety. Additionally, _all mutations are explicit_. This is nice in its own right, but it's really important for distinguishing between mutable and shared borrows.
+A core enabling feature of Safe C++ is its new object model. It supports relocation/destructive move of local objects, which is necessary for satisfying [type safety](#type-safety). 
 
-```cpp
-#feature on safety
-#include <std2.h>
-
-int main() safe {
-  // No default construct. p is uninitialized.
-  std2::box<string> p;
-
-  // Ill-formed: p is uninitialized.
-  println(*p);
-}
-```
-```txt
-$ circle unique1.cxx
-safety: unique1.cxx:11:12
-  println(*p);
-           ^
-cannot use uninitialized object p
-```
-
-The `std2::box` has no default state. It's safe against [null pointer type safety bugs](#type-safety). A `box` that's declared without a constructor is not default initialized. It's uninitialized. It's illegal to use until it's been assigned to.
-
-```cpp
-#feature on safety
-#include <std2.h>
-
-using namespace std2;
-
-void f(box<string> p) safe { }
-
-int main() safe {
-  // No default construct. p is uninitialized.
-  box<string> p;
-  p = box<string>("Hello");
-  println(*p);
-
-  // Relocate to another function.
-  f(rel p);
-
-  // Ill-formed: p is uninitialized.
-  println(*p);
-}
-```
-```txt
-$ circle unique2.cxx
-safety: unique2.cxx:18:12
-  println(*p);  // Ill-formed.
-           ^
-cannot use uninitialized object p
-```
-
-Once we assign to `p`, we can use it. But we can't `std::move` into another function, because move semantics put the operand into its default state, and we're stipulating that the box has no default state. Fortunately, the new object model provides for _relocation_, which moves the contents of the object into a value, and sets the source to uninitialized. The destructor on the old object never gets run, because that old declaration no longer owns the object. Ownership has changed with the relocation.
-
-It's a feature, not a defect, that the compiler errors when you use an uninitialized or potentially uninitialized object. The alternative is a type safety error, such as a null pointer dereference undefined behavior.
-
-In Rust, objects are _relocated by default_, unless they implement the `Copy` trait,[@copy-trait] in which case they're copied. If you want to copy a non-Copy object, implement the `Clone` trait[@clone-trait] and call the `clone` member function.
-
-I think implicit relocation is too surprising for C++ users. We're more likely to have raw pointers and legacy references tracking objects, and you don't want to pull the storage out from under them, at least not without some clear token in the source code. That's why Safe C++ includes _rel-expression_ and _cpy-expression_.
+In Rust, objects are _relocated by default_. Implicit relocation is too surprising for C++ users. We're more likely to have raw pointers and legacy references tracking objects, and you don't want to pull the storage out from under them, at least not without some clear token in the source code. That's why Safe C++ includes _rel-expression_ and _cpy-expression_.
 
 * `rel x` - relocate `x` into a new value. `x` is set as uninitialized.
 * `cpy x` - copy construct `x` into a new value. `x` remains initialized.
 
-Why make copy and relocation explicit? In line with C++'s goals of _zero-cost abstractions_, we want to make it easy for users to choose the more efficient option. If a type is not trivially copyable, you can opt into an expensive copy with _cpy-expression_. This avoids performance bugs, where an object undergoes an expensive copy just because the user didn't know it was there. Or, if you don't want to copy, use _rel-expression_, which is efficient but destroys the old object, without destructing it.
+In line with C++'s goals of _zero-cost abstractions_, we want to make it easy for users to choose the more efficient option between relocaton and copy. If the expression's type is trivially copyable and trivially destructible, it'll initialize a copy from an lvalue. Otherwise, the compiler prompts for a `rel` or `cpy` token to resolve the copy initialization. You're not going to accidentally hit the slow path or the mutable path. Opt into mutation. Opt into non-trivial copies.
+opy, or do you want to relocate?
 
-If an object is _trivially copyable_, as all scalar types are, then you don't need either of these tokens. The compiler will copy your value without prompting.
+You've noticed the nonsense spellings for some of these keywords. Why not call them `relocate`, `copy` and `drop`? Alternative token spelling avoids shadowing these common identifiers and improves results when searching code or the web.
 
-The relocation object model also supports _drp-expression_, noted by the `drp` token, which calls the destructor on an object and leaves it uninitialized. See the [Destructors and phantom data](#destructors-and-phantom-data) for details.
+[**move.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/move.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/5bsfnfG16)
+```cpp
+#feature on safety
+#include <std2.h>
 
-Consider a function like `std::unique_ptr::reset`. It destructs the existing object, if one is engaged, and sets the unique_ptr to its null state. But in our safe version, box doesn't have a default state. It doesn't supply the `reset` member function. Instead, users just drop it, running its destructor and leaving it uninitialized.
+int main() safe {
+  // Objects start off uninitialized. A use of an uninitialized
+  // object is ill-formed.
+  std2::string s;
 
-You've noticed the nonsense spellings for these keywords. Why not call them `move`, `copy` and `drop`? Alternative token spelling avoids shadowing these common identifiers and improves results when searching code or the web.
+  // Require explicit initialization.
+  s = std2::string("Hello ");
 
+  // Require explicit mutation.
+  mut s.append("World");
+
+  // Require explicit relocation.
+  std2::string s2 = rel s;  // Now s is uninitialized.
+
+  // Require explicit non-trivial copy.
+  std2::string s3 = cpy s2;
+
+  // `Hello World`.
+  println(s3);
+}
+```
+
+Initialization, copy, move and mutation are explicit. Deleting the `rel` token in this example breaks translation and prompts for guidance:
+
+```
+  std2::string s2 = s;  // Now s is uninitialized. 
+                    ^
+implicit copy from lvalue std2::string not allowed
+specify cpy or rel or add the [[safety::copy]] attribute
+```
+
+A standard conversion from `lvalue std2::string` to `std2::string` is found. But without the user's help, the compiler doesn't know how satsify the conversion: does it call the copy constructor, which is expensive, or does it perform relocation, which is cheap but changes the operand by ending its scope?
 
 ### Tuples, arrays and slices
 
-Using an uninitialized or potentially uninitialized object raises a compile-time error. But initialization analysis only accounts for the state of local variables that are directly named and not part of a dereference. Local objects and their subobjects are _owned places_. Initialization analysis allocates flags for owned places, so that it can track their initialization status and error when there's a use of a place that's _definitely initialized_. It's not possible for the compiler to chase through references and function calls to find initialization data for objects potentially owned by other functions.
+Using an uninitialized or potentially uninitialized object raises a compile-time error. But initialization analysis only accounts for the state of local variables that are directly named and not part of a dereference. Local objects and their subobjects are _owned places_. Initialization analysis allocates flags for owned places, so that it can track their initialization status and error when there's a use of a place that's not _definitely initialized_. It's not possible for the compiler to chase through references and function calls to find initialization data for objects potentially owned by other functions--that's a capability of _whole program analysis_, which is beyond of the scope of this proposal.
 
 [**rel1.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/rel1.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/8nGo59E1v)
 ```cpp
@@ -2185,11 +2158,11 @@ Pair g { 10, 20 };
      ^
 ```
 
-This example demonstrates that you can't relocate through the reference returned from `std::get`. You can't relocate through a dynamic subscript of an array. You can't relocate the subobject of a global variable. You can only relocate or drop _owned places_.
+This example shows that you can't relocate through the reference returned from `std::get`. You can't relocate through a dynamic subscript of an array. You can't relocate the subobject of a global variable. You can only relocate or drop _owned places_.
 
-If we can't relocate through a reference, how do we relocate through elements of `std::tuple`, `std::array` or `std::variant`? Unless those become magic types with special compiler support, you can't. Those standard containers only provide access to their elements through accessor functions. But initialization analysis only considers the definition of the current function; it doesn't leap into other functions, because that's on the slippery slope to whole-program analysis.
+If we can't relocate through a reference, how do we relocate through elements of `std::tuple`, `std::array` or `std::variant`? Unless those become magic types with special compiler support, you can't. Those standard containers only provide access to their elements through accessor functions which return references. Subobjects behind references are not _owned places_.
 
-We address the defects in C++'s algebraic types by including new first-class tuple, array and [choice](#choice-types) types. Safe C++ is still compatible with legacy types, but due to their non-local element access, relocation from their subobjects is not feasible. Relocation is important to type safety, because many types prohibit default states, making C++-style move semantics impossible. Either relocate your object, or put it in an `optional` from which it can be unwrapped.
+We address the defects in C++'s algebraic types by including new first-class tuple, array and [choice](#choice-types) types. Safe C++ is still compatible with legacy types, but due to their non-local element access, relocation from their subobjects is not currently implemented. Relocation is important to type safety, because many types prohibit default states, making C++-style move semantics impossible. Either relocate your object, or put it in an `optional` from which it can be unwrapped.
 
 [**tuple1.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/tuple1.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/4hq7Eb86x)
 ```cpp
@@ -2249,7 +2222,7 @@ Slices have dynamic length and are _incomplete types_. You may form borrows, ref
 
 The new array type, the slice type and the legacy builtin array type panic on out-of-bounds subscripts. They exhibit bounds safety in the new object model. Use [unsafe subscripts](#unsafe-subscripts) to suppress the runtime bounds check.
 
-Making `std::pair`, `std::tuple` and `std::array` magic types with native support for relocation is on the short list of language improvements. In the meanwhile, their first-class replacements provide us with a convenient path forward for developing the safe standard library.
+Making `std::pair`, `std::tuple` and `std::array` magic types with native support for relocation is on the short list of language improvements. We hope to incorporate this functionality for the next revision of this proposal. In the meantime, the first-class replacement types provide us with a convenient path forward for developing the safe standard library.
 
 ### `operator rel`
 
@@ -2261,6 +2234,8 @@ Safe C++ introduces a new special member function, the _relocation constructor_,
 * `= delete` - A deleted relocation constructor _pins_ a type. Objects of that type can't be relocated. A `rel-expression` is a SFINAE failure. Rust uses its `std::Pin`[@pin] pin type as a container for structs with with address-sensitive states. That's an option with Safe C++'s deleted relocation constructors. Or, users can write user-defined relocation constructors to update address-sensitive states.
 
 Relocation constructors are always noexcept. It's used to implement the drop-and-replace semantics of assignment expressions. If a relocation constructor was throwing, it might leave objects involved in drop-and-replace in illegal uninitialized states. An uncaught exception in a user-defined or defaulted relocation constructor will panic and terminate.
+
+[@P1144R11] proposes tests to automatically classify types that should exhibit trivial relocation based on other properties. The Safe C++ model will need to work through the same issues, but with a richer set of language features to consider.
 
 ## Choice types
 
