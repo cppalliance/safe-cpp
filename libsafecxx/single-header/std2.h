@@ -760,11 +760,11 @@ arc
   };
 
 public:
+
   explicit
   arc(T t) safe
+    : p_(new(std::nothrow) arc_inner(rel t))
   {
-    unsafe { p_ = static_cast<arc_inner*>(::operator new(sizeof(arc_inner))); }
-    new(p_) arc_inner(rel t);
   }
 
   template<typename T2>
@@ -786,7 +786,7 @@ public:
 
       std::size_t w = --p_->weak_;
       if (w == 0) {
-        unsafe { ::operator delete(p_); }
+        delete p_;
       }
     }
   }
@@ -814,7 +814,10 @@ public:
   }
 
   explicit
-  box(T t) safe : p_(new T(rel t)) { }
+  box(T t) safe
+    : p_(new(std::nothrow) T(rel t))
+  {
+  }
 
   [[unsafe::drop_only(T)]]
   ~box() safe {
@@ -822,7 +825,8 @@ public:
   }
 
   static
-  box make_default() safe(safe(T())) {
+  box make_default() safe requires(safe(T()))
+  {
     unsafe { return box(new T()); }
   }
 
@@ -1302,9 +1306,8 @@ class [[unsafe::send(false)]] rc
 
   explicit
   rc(T t) safe
+    : p_(new(std::nothrow) rc_inner(rel t))
   {
-    unsafe { p_ = static_cast<rc_inner*>(::operator new(sizeof(rc_inner))); }
-    new(p_) rc_inner(rel t);
   }
 
   rc(rc const^ rhs) safe
@@ -1322,7 +1325,7 @@ class [[unsafe::send(false)]] rc
 
       std::size_t w = --p_->weak_;
       if (w == 0) {
-        unsafe { ::operator delete(p_); }
+        delete p_;
       }
     }
   }
@@ -1467,15 +1470,6 @@ shared_mutex
   unsafe_cell<T> data_;
   box<mutex_type> mtx_;
 
-  static
-  box<mutex_type>
-  init_mtx()
-  {
-    auto p = static_cast<mutex_type*>(::operator new(sizeof(mutex_type)));
-    new(p) mutex_type();
-    return box<mutex_type>(p);
-  }
-
 public:
   class lock_guard/(a)
   {
@@ -1541,7 +1535,7 @@ public:
 
   explicit shared_mutex(T data) noexcept safe
     : data_(rel data)
-    , unsafe mtx_(init_mtx())
+    , unsafe mtx_(box<mutex_type>::make_default())
   {
   }
 
