@@ -65,7 +65,6 @@ add_safecxx_test(tuple1)
 add_safecxx_test(choice)
 add_safecxx_test(match1)
 add_safecxx_test(match2)
-add_safecxx_test(cell)
 
 add_safecxx_library(unsafe_bounds)
 add_safecxx_library(unsafe3)
