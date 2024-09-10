@@ -481,7 +481,7 @@ mutability<span></span></a></li>
 <li><a href="#send-and-sync" id="toc-send-and-sync"><span class="toc-section-number">2.7</span>
 <code class="sourceCode cpp">send</code> and
 <code class="sourceCode cpp">sync</code><span></span></a></li>
-<li><a href="#unresolved-or-unimplemented-design-issues" id="toc-unresolved-or-unimplemented-design-issues"><span class="toc-section-number">2.8</span> Unresolved or unimplemented design
+<li><a href="#unresolved-design-issues" id="toc-unresolved-design-issues"><span class="toc-section-number">2.8</span> Unresolved design
 issues<span></span></a></li>
 </ul></li>
 <li><a href="#implementation-guidance" id="toc-implementation-guidance"><span class="toc-section-number">3</span> Implementation
@@ -1087,7 +1087,7 @@ mutability</a> and <a href="#borrow-checking">borrow checking</a> to
 establish a system of constraints guaranteeing that shared mutable state
 is only accessed through synchronization primitives like
 <code class="sourceCode cpp">std2<span class="op">::</span>mutex</code>.</p>
-<p><a href="https://github.com/cppalliance/safe-cpp/blob/master/proposal/thread_safety.cxx"><strong>thread_safety</strong></a>
+<p><a href="https://github.com/cppalliance/safe-cpp/blob/master/proposal/thread_safety.cxx"><strong>thread_safety.cxx</strong></a>
 – <a href="https://godbolt.org/z/es9nx5sqd">(Compiler Explorer)</a></p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;std2.h&gt;</span></span>
@@ -4166,67 +4166,31 @@ with the borrow checker. We hope to show more complex usage for the next
 revision.</p>
 <h2 data-number="2.6" id="interior-mutability"><span class="header-section-number">2.6</span> Interior mutability<a href="#interior-mutability" class="self-link"></a></h2>
 <p>Recall the law of exclusivity, the program-wide invariant that
-guarantees a resource isn’t mutated while another user has access to it.
-How does this square with the use of shared pointers, which enables
-shared ownership of a mutable resource? How does it support threaded
-programs, where access to shared mutable state is permitted between
-threads? Shared mutable access exists in this safety model, but the way
-it’s enabled involves some trickery.</p>
-<p>** NOW A BROKEN TEST DUE TO CHANGE IN CELL <strong> </strong> REPLACE
-WITH SOMETHING ELSE **</p>
-<p><a href="https://github.com/cppalliance/safe-cpp/blob/master/proposal/cell.cxx"><strong>cell.cxx</strong></a>
-– <a href="https://godbolt.org/z/M6df3jbhs">(Compiler Explorer)</a></p>
-<div class="sourceCode" id="cb80"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb80-1"><a href="#cb80-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
-<span id="cb80-2"><a href="#cb80-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;std2.h&gt;</span></span>
-<span id="cb80-3"><a href="#cb80-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb80-4"><a href="#cb80-4" aria-hidden="true" tabindex="-1"></a><span class="kw">using</span> <span class="kw">namespace</span> std2;</span>
+guarantees a resource isn’t mutated while another user aliases it. How
+does this square with the use of shared pointers, which enables shared
+ownership of a mutable resource? How does it support threaded programs,
+where access to shared mutable state is permitted between threads?
+Shared mutable access exists in this safety model, but the way it’s
+enabled involves some trickery.</p>
+<div class="sourceCode" id="cb80"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb80-1"><a href="#cb80-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">class</span> T<span class="op">+&gt;</span></span>
+<span id="cb80-2"><a href="#cb80-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> <span class="op">[[</span><span class="at">unsafe</span><span class="op">::</span><span class="at">sync</span><span class="op">(</span><span class="at">false</span><span class="op">)]]</span> unsafe_cell</span>
+<span id="cb80-3"><a href="#cb80-3" aria-hidden="true" tabindex="-1"></a><span class="op">{</span></span>
+<span id="cb80-4"><a href="#cb80-4" aria-hidden="true" tabindex="-1"></a>  T t_;</span>
 <span id="cb80-5"><a href="#cb80-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb80-6"><a href="#cb80-6" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
-<span id="cb80-7"><a href="#cb80-7" aria-hidden="true" tabindex="-1"></a>  <span class="co">// rc - Shared ownership within a thread.</span></span>
-<span id="cb80-8"><a href="#cb80-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">// ref_cell - Shared mutable access checked at runtime.</span></span>
-<span id="cb80-9"><a href="#cb80-9" aria-hidden="true" tabindex="-1"></a>  rc<span class="op">&lt;</span>ref_cell<span class="op">&lt;</span>string<span class="op">&gt;&gt;</span> s1<span class="op">(</span>ref_cell<span class="op">&lt;</span>string<span class="op">&gt;(</span>string<span class="op">{</span><span class="st">&quot;A string set from s1&quot;</span><span class="op">}))</span>;</span>
-<span id="cb80-10"><a href="#cb80-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb80-11"><a href="#cb80-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Copying the rc increments the reference counter on the control block.</span></span>
-<span id="cb80-12"><a href="#cb80-12" aria-hidden="true" tabindex="-1"></a>  rc<span class="op">&lt;</span>ref_cell<span class="op">&lt;</span>string<span class="op">&gt;&gt;</span> s2 <span class="op">=</span> cpy s1;</span>
-<span id="cb80-13"><a href="#cb80-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb80-14"><a href="#cb80-14" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Read the data out from s2.</span></span>
-<span id="cb80-15"><a href="#cb80-15" aria-hidden="true" tabindex="-1"></a>  println<span class="op">(*</span>s2<span class="op">-&gt;</span>borrow<span class="op">())</span>;</span>
-<span id="cb80-16"><a href="#cb80-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb80-17"><a href="#cb80-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The string data is now owned by three rcs.</span></span>
-<span id="cb80-18"><a href="#cb80-18" aria-hidden="true" tabindex="-1"></a>  <span class="co">// cell&#39;s transactional access upholds the law of exclusivity.</span></span>
-<span id="cb80-19"><a href="#cb80-19" aria-hidden="true" tabindex="-1"></a>  mut <span class="op">*</span>s2<span class="op">-&gt;</span>borrow_mut<span class="op">()</span> <span class="op">=</span>  string<span class="op">{</span><span class="st">&quot;A string set from s2&quot;</span><span class="op">}</span>;</span>
-<span id="cb80-20"><a href="#cb80-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb80-21"><a href="#cb80-21" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Read out through s1.</span></span>
-<span id="cb80-22"><a href="#cb80-22" aria-hidden="true" tabindex="-1"></a>  println<span class="op">(*</span>s1<span class="op">-&gt;</span>borrow<span class="op">())</span>;</span>
-<span id="cb80-23"><a href="#cb80-23" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
-<div class="sourceCode" id="cb81"><pre class="sourceCode default"><code class="sourceCode default"><span id="cb81-1"><a href="#cb81-1" aria-hidden="true" tabindex="-1"></a>A string set from s1</span>
-<span id="cb81-2"><a href="#cb81-2" aria-hidden="true" tabindex="-1"></a>A string set from s2</span></code></pre></div>
-<p><code class="sourceCode cpp">rc</code> is a non-atomic (intra-thread)
-reference-counted pointer. It provides shared ownership to a resource.
-To avoid violating the law of exclusivity, its accessors <code class="sourceCode cpp"><span class="kw">operator</span><span class="op">*</span></code>
-and <code class="sourceCode cpp"><span class="kw">operator</span><span class="op">-&gt;</span></code>
-return <em>const</em> borrows to its inner type. That means it practices
-<em>shared immutable access</em>. In order to mutate the data it holds,
-the inner type must exhibit <em>interior mutability</em>.</p>
-<div class="sourceCode" id="cb82"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb82-1"><a href="#cb82-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">class</span> T<span class="op">+&gt;</span></span>
-<span id="cb82-2"><a href="#cb82-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> <span class="op">[[</span><span class="at">unsafe</span><span class="op">::</span><span class="at">sync</span><span class="op">(</span><span class="at">false</span><span class="op">)]]</span> unsafe_cell</span>
-<span id="cb82-3"><a href="#cb82-3" aria-hidden="true" tabindex="-1"></a><span class="op">{</span></span>
-<span id="cb82-4"><a href="#cb82-4" aria-hidden="true" tabindex="-1"></a>  T t_;</span>
-<span id="cb82-5"><a href="#cb82-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb82-6"><a href="#cb82-6" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
-<span id="cb82-7"><a href="#cb82-7" aria-hidden="true" tabindex="-1"></a>  unsafe_cell<span class="op">()</span> <span class="op">=</span> <span class="cf">default</span>;</span>
-<span id="cb82-8"><a href="#cb82-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb82-9"><a href="#cb82-9" aria-hidden="true" tabindex="-1"></a>  <span class="kw">explicit</span></span>
-<span id="cb82-10"><a href="#cb82-10" aria-hidden="true" tabindex="-1"></a>  unsafe_cell<span class="op">(</span>T t<span class="op">)</span> <span class="kw">noexcept</span> safe</span>
-<span id="cb82-11"><a href="#cb82-11" aria-hidden="true" tabindex="-1"></a>    <span class="op">:</span> t_<span class="op">(</span>rel t<span class="op">)</span> <span class="op">{</span> <span class="op">}</span></span>
-<span id="cb82-12"><a href="#cb82-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb82-13"><a href="#cb82-13" aria-hidden="true" tabindex="-1"></a>  T<span class="op">*</span> get<span class="op">(</span>self <span class="kw">const</span><span class="op">^)</span> <span class="kw">noexcept</span> safe <span class="op">{</span></span>
-<span id="cb82-14"><a href="#cb82-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="kw">const_cast</span><span class="op">&lt;</span>T<span class="op">*&gt;(</span>addr self<span class="op">-&gt;</span>t_<span class="op">)</span>;</span>
-<span id="cb82-15"><a href="#cb82-15" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
-<span id="cb82-16"><a href="#cb82-16" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
+<span id="cb80-6"><a href="#cb80-6" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb80-7"><a href="#cb80-7" aria-hidden="true" tabindex="-1"></a>  unsafe_cell<span class="op">()</span> <span class="op">=</span> <span class="cf">default</span>;</span>
+<span id="cb80-8"><a href="#cb80-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb80-9"><a href="#cb80-9" aria-hidden="true" tabindex="-1"></a>  <span class="kw">explicit</span></span>
+<span id="cb80-10"><a href="#cb80-10" aria-hidden="true" tabindex="-1"></a>  unsafe_cell<span class="op">(</span>T t<span class="op">)</span> <span class="kw">noexcept</span> safe</span>
+<span id="cb80-11"><a href="#cb80-11" aria-hidden="true" tabindex="-1"></a>    <span class="op">:</span> t_<span class="op">(</span>rel t<span class="op">)</span> <span class="op">{</span> <span class="op">}</span></span>
+<span id="cb80-12"><a href="#cb80-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb80-13"><a href="#cb80-13" aria-hidden="true" tabindex="-1"></a>  T<span class="op">*</span> get<span class="op">(</span>self <span class="kw">const</span><span class="op">^)</span> <span class="kw">noexcept</span> safe <span class="op">{</span></span>
+<span id="cb80-14"><a href="#cb80-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="kw">const_cast</span><span class="op">&lt;</span>T<span class="op">*&gt;(</span>addr self<span class="op">-&gt;</span>t_<span class="op">)</span>;</span>
+<span id="cb80-15"><a href="#cb80-15" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb80-16"><a href="#cb80-16" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
 <p>Types with interior mutability implement <em>deconfliction</em>
-strategies to support shared mutation without the risk of data races.
-They encapsulate <code class="sourceCode cpp">std2<span class="op">::</span>unsafe_cell</code>,
+strategies to support shared mutation without the risk of data races or
+violating exclusivity. They encapsulate <code class="sourceCode cpp">std2<span class="op">::</span>unsafe_cell</code>,
 which is based on Rust’s
 <code class="sourceCode cpp">UnsafeCell</code><span class="citation" data-cites="unsafe-cell">[<a href="https://doc.rust-lang.org/std/cell/struct.UnsafeCell.html" role="doc-biblioref">unsafe-cell</a>]</span> struct. <code class="sourceCode cpp">unsafe_cell<span class="op">::</span>get</code>
 is a blessed way of stripping away const. While the function is safe, it
@@ -4234,6 +4198,8 @@ returns a raw pointer, which is unsafe to dereference. Types
 encapsulating <code class="sourceCode cpp">unsafe_cell</code> must take
 care to only permit mutation through this const-stripped pointer one
 user at a time.</p>
+<p>Our safe standard library currently offers four types with interior
+mutability:</p>
 <ul>
 <li><code class="sourceCode cpp">std2<span class="op">::</span>cell<span class="op">&lt;</span>T<span class="op">&gt;</span></code><span class="citation" data-cites="cell">[<a href="https://doc.rust-lang.org/std/cell/struct.Cell.html" role="doc-biblioref">cell</a>]</span> provides get and set methods to
 read out the current value and store new values into the protected
@@ -4259,47 +4225,104 @@ single-write lock. The interface is similar to
 deconfliction, so clients can sit on the lock until their request is
 serviced.</li>
 </ul>
-<div class="sourceCode" id="cb83"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb83-1"><a href="#cb83-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">class</span> T<span class="op">+&gt;</span></span>
-<span id="cb83-2"><a href="#cb83-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> <span class="op">[[</span><span class="at">unsafe</span><span class="op">::</span><span class="at">sync</span><span class="op">(</span><span class="at">false</span><span class="op">)]]</span> cell</span>
-<span id="cb83-3"><a href="#cb83-3" aria-hidden="true" tabindex="-1"></a><span class="op">{</span></span>
-<span id="cb83-4"><a href="#cb83-4" aria-hidden="true" tabindex="-1"></a>  unsafe_cell<span class="op">&lt;</span>T<span class="op">&gt;</span> t_;</span>
-<span id="cb83-5"><a href="#cb83-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb83-6"><a href="#cb83-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">public</span><span class="op">:</span></span>
-<span id="cb83-7"><a href="#cb83-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb83-8"><a href="#cb83-8" aria-hidden="true" tabindex="-1"></a>  cell<span class="op">(</span>T t<span class="op">)</span> <span class="kw">noexcept</span> safe</span>
-<span id="cb83-9"><a href="#cb83-9" aria-hidden="true" tabindex="-1"></a>    <span class="op">:</span> t_<span class="op">(</span>rel t<span class="op">)</span></span>
-<span id="cb83-10"><a href="#cb83-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">requires</span><span class="op">(</span>T<span class="op">~</span>is_trivially_copyable <span class="op">&amp;&amp;</span> T<span class="op">~</span>is_trivially_destructible<span class="op">)</span></span>
-<span id="cb83-11"><a href="#cb83-11" aria-hidden="true" tabindex="-1"></a>  <span class="op">{</span></span>
-<span id="cb83-12"><a href="#cb83-12" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
-<span id="cb83-13"><a href="#cb83-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb83-14"><a href="#cb83-14" aria-hidden="true" tabindex="-1"></a>  T get<span class="op">(</span>self <span class="kw">const</span><span class="op">^)</span> safe <span class="op">{</span></span>
-<span id="cb83-15"><a href="#cb83-15" aria-hidden="true" tabindex="-1"></a>    <span class="co">// rely on implicit copy operator erroring out for types with non-trivial</span></span>
-<span id="cb83-16"><a href="#cb83-16" aria-hidden="true" tabindex="-1"></a>    <span class="co">// destructors or types that have user-defined copy constructors</span></span>
-<span id="cb83-17"><a href="#cb83-17" aria-hidden="true" tabindex="-1"></a>    unsafe <span class="op">{</span> <span class="cf">return</span> cpy <span class="op">*</span>self<span class="op">-&gt;</span>t_<span class="op">.</span>get<span class="op">()</span>; <span class="op">}</span></span>
-<span id="cb83-18"><a href="#cb83-18" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
-<span id="cb83-19"><a href="#cb83-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb83-20"><a href="#cb83-20" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> set<span class="op">(</span>self <span class="kw">const</span><span class="op">^</span>, T t<span class="op">)</span> safe <span class="op">{</span></span>
-<span id="cb83-21"><a href="#cb83-21" aria-hidden="true" tabindex="-1"></a>    unsafe <span class="op">{</span> <span class="op">*</span>self<span class="op">-&gt;</span>t_<span class="op">.</span>get<span class="op">()</span> <span class="op">=</span> rel t; <span class="op">}</span></span>
-<span id="cb83-22"><a href="#cb83-22" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
-<span id="cb83-23"><a href="#cb83-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb83-24"><a href="#cb83-24" aria-hidden="true" tabindex="-1"></a>  T replace<span class="op">(</span>self <span class="kw">const</span><span class="op">^</span>, T t<span class="op">)</span> safe <span class="op">{</span></span>
-<span id="cb83-25"><a href="#cb83-25" aria-hidden="true" tabindex="-1"></a>    unsafe <span class="op">{</span> <span class="kw">auto</span> old <span class="op">=</span> __rel_read<span class="op">(</span>self<span class="op">-&gt;</span>t_<span class="op">.</span>get<span class="op">())</span>; <span class="op">}</span></span>
-<span id="cb83-26"><a href="#cb83-26" aria-hidden="true" tabindex="-1"></a>    unsafe <span class="op">{</span> __rel_write<span class="op">(</span>self<span class="op">-&gt;</span>t_<span class="op">.</span>get<span class="op">()</span>, rel t<span class="op">)</span>; <span class="op">}</span></span>
-<span id="cb83-27"><a href="#cb83-27" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> old;</span>
-<span id="cb83-28"><a href="#cb83-28" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
-<span id="cb83-29"><a href="#cb83-29" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
-<p>The <code class="sourceCode cpp">cell</code> class provides
-<code class="sourceCode cpp">get</code>,
-<code class="sourceCode cpp">set</code> and
-<code class="sourceCode cpp">replace</code> member functions. These take
-shared borrow operands. Since <code class="sourceCode cpp">cell</code>
-doesn’t expose references to its inner data to users, it’s not violating
-the law of exclusivity. Mutating data through
-<code class="sourceCode cpp">set</code> and reading it through
-<code class="sourceCode cpp">get</code> is <em>transactional</em>. Even
-though it’s internally casting away const, it’s not violating
-exclusivity because its deconfliction strategy prevents concurrent
-mutable access.</p>
+<div class="sourceCode" id="cb81"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb81-1"><a href="#cb81-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">class</span> T<span class="op">+&gt;</span></span>
+<span id="cb81-2"><a href="#cb81-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span></span>
+<span id="cb81-3"><a href="#cb81-3" aria-hidden="true" tabindex="-1"></a><span class="op">[[</span><span class="at">unsafe</span><span class="op">::</span><span class="at">send</span><span class="op">(</span><span class="at">T</span><span class="op">~</span><span class="at">is_send</span><span class="op">)</span>,<span class="at"> unsafe</span><span class="op">::</span><span class="at">sync</span><span class="op">(</span><span class="at">T</span><span class="op">~</span><span class="at">is_send</span><span class="op">)]]</span></span>
+<span id="cb81-4"><a href="#cb81-4" aria-hidden="true" tabindex="-1"></a>mutex</span>
+<span id="cb81-5"><a href="#cb81-5" aria-hidden="true" tabindex="-1"></a><span class="op">{</span></span>
+<span id="cb81-6"><a href="#cb81-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">using</span> mutex_type <span class="op">=</span> unsafe_cell<span class="op">&lt;</span>std<span class="op">::</span>mutex<span class="op">&gt;</span>;</span>
+<span id="cb81-7"><a href="#cb81-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb81-8"><a href="#cb81-8" aria-hidden="true" tabindex="-1"></a>  unsafe_cell<span class="op">&lt;</span>T<span class="op">&gt;</span> data_;</span>
+<span id="cb81-9"><a href="#cb81-9" aria-hidden="true" tabindex="-1"></a>  box<span class="op">&lt;</span>mutex_type<span class="op">&gt;</span> mtx_;</span>
+<span id="cb81-10"><a href="#cb81-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb81-11"><a href="#cb81-11" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb81-12"><a href="#cb81-12" aria-hidden="true" tabindex="-1"></a>  <span class="kw">class</span> lock_guard<span class="op">/(</span>a<span class="op">)</span></span>
+<span id="cb81-13"><a href="#cb81-13" aria-hidden="true" tabindex="-1"></a>  <span class="op">{</span></span>
+<span id="cb81-14"><a href="#cb81-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">friend</span> <span class="kw">class</span> mutex;</span>
+<span id="cb81-15"><a href="#cb81-15" aria-hidden="true" tabindex="-1"></a>    mutex <span class="kw">const</span><span class="op">^/</span>a m_;</span>
+<span id="cb81-16"><a href="#cb81-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb81-17"><a href="#cb81-17" aria-hidden="true" tabindex="-1"></a>    lock_guard<span class="op">(</span>mutex <span class="kw">const</span><span class="op">^/</span>a m<span class="op">)</span> <span class="kw">noexcept</span> safe</span>
+<span id="cb81-18"><a href="#cb81-18" aria-hidden="true" tabindex="-1"></a>      <span class="op">:</span> m_<span class="op">(</span>m<span class="op">)</span> <span class="op">{</span> <span class="op">}</span></span>
+<span id="cb81-19"><a href="#cb81-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb81-20"><a href="#cb81-20" aria-hidden="true" tabindex="-1"></a>    <span class="kw">public</span><span class="op">:</span></span>
+<span id="cb81-21"><a href="#cb81-21" aria-hidden="true" tabindex="-1"></a>    <span class="op">~</span>lock_guard<span class="op">()</span> safe <span class="op">{</span></span>
+<span id="cb81-22"><a href="#cb81-22" aria-hidden="true" tabindex="-1"></a>      unsafe <span class="op">{</span> mut m_<span class="op">-&gt;</span>mtx_<span class="op">-&gt;</span>get<span class="op">()-&gt;</span>unlock<span class="op">()</span>; <span class="op">}</span></span>
+<span id="cb81-23"><a href="#cb81-23" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb81-24"><a href="#cb81-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb81-25"><a href="#cb81-25" aria-hidden="true" tabindex="-1"></a>    T<span class="op">^</span> borrow<span class="op">(</span>self<span class="op">^)</span> <span class="kw">noexcept</span> safe <span class="op">{</span></span>
+<span id="cb81-26"><a href="#cb81-26" aria-hidden="true" tabindex="-1"></a>      unsafe <span class="op">{</span> <span class="cf">return</span> <span class="op">^*</span>self<span class="op">-&gt;</span>m_<span class="op">-&gt;</span>data_<span class="op">.</span>get<span class="op">()</span>; <span class="op">}</span></span>
+<span id="cb81-27"><a href="#cb81-27" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb81-28"><a href="#cb81-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb81-29"><a href="#cb81-29" aria-hidden="true" tabindex="-1"></a>    <span class="op">...</span></span>
+<span id="cb81-30"><a href="#cb81-30" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span>;</span>
+<span id="cb81-31"><a href="#cb81-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb81-32"><a href="#cb81-32" aria-hidden="true" tabindex="-1"></a>  <span class="kw">explicit</span> mutex<span class="op">(</span>T data<span class="op">)</span> <span class="kw">noexcept</span> safe</span>
+<span id="cb81-33"><a href="#cb81-33" aria-hidden="true" tabindex="-1"></a>    <span class="op">:</span> data_<span class="op">(</span>rel data<span class="op">)</span></span>
+<span id="cb81-34"><a href="#cb81-34" aria-hidden="true" tabindex="-1"></a>    , unsafe mtx_<span class="op">(</span>box<span class="op">&lt;</span>mutex_type<span class="op">&gt;::</span>make<span class="op">())</span> <span class="op">{</span> <span class="op">}</span></span>
+<span id="cb81-35"><a href="#cb81-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb81-36"><a href="#cb81-36" aria-hidden="true" tabindex="-1"></a>  mutex<span class="op">(</span>mutex <span class="kw">const</span><span class="op">^)</span> <span class="op">=</span> <span class="kw">delete</span>;</span>
+<span id="cb81-37"><a href="#cb81-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb81-38"><a href="#cb81-38" aria-hidden="true" tabindex="-1"></a>  lock_guard lock<span class="op">(</span>self <span class="kw">const</span><span class="op">^)</span> safe <span class="op">{</span></span>
+<span id="cb81-39"><a href="#cb81-39" aria-hidden="true" tabindex="-1"></a>    unsafe <span class="op">{</span> mut self<span class="op">-&gt;</span>mtx_<span class="op">-&gt;</span>get<span class="op">()-&gt;</span>lock<span class="op">()</span>;<span class="op">}</span></span>
+<span id="cb81-40"><a href="#cb81-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> lock_guard<span class="op">(</span>self<span class="op">)</span>;</span>
+<span id="cb81-41"><a href="#cb81-41" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb81-42"><a href="#cb81-42" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
+<div class="sourceCode" id="cb82"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb82-1"><a href="#cb82-1" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> entry_point<span class="op">(</span>arc<span class="op">&lt;</span>mutex<span class="op">&lt;</span>string<span class="op">&gt;&gt;</span> data, <span class="dt">int</span> thread_id<span class="op">)</span> safe <span class="op">{</span></span>
+<span id="cb82-2"><a href="#cb82-2" aria-hidden="true" tabindex="-1"></a>  <span class="kw">auto</span> lock_guard <span class="op">=</span> data<span class="op">-&gt;</span>lock<span class="op">()</span>;</span>
+<span id="cb82-3"><a href="#cb82-3" aria-hidden="true" tabindex="-1"></a>  string<span class="op">^</span> s <span class="op">=</span> mut lock_guard<span class="op">.</span>borrow<span class="op">()</span>;</span>
+<span id="cb82-4"><a href="#cb82-4" aria-hidden="true" tabindex="-1"></a>  s<span class="op">.</span>append<span class="op">(</span><span class="st">&quot;🔥&quot;</span><span class="op">)</span>;</span>
+<span id="cb82-5"><a href="#cb82-5" aria-hidden="true" tabindex="-1"></a>  println<span class="op">(*</span>s<span class="op">)</span>;</span>
+<span id="cb82-6"><a href="#cb82-6" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>Let’s examine how
+<code class="sourceCode cpp">std2<span class="op">::</span>mutex</code>
+implements interior mutability to obey the law of exclusivity while
+permitting mutation through const borrows. We’ve stripped the comments
+from the example in the <a href="#thread-safety">thread safety</a>
+section. <code class="sourceCode cpp">data</code> is an
+<code class="sourceCode cpp">arc</code> and
+<code class="sourceCode cpp">data<span class="op">-&gt;</span></code>
+returns a <code class="sourceCode cpp"><span class="kw">const</span> mutex<span class="op">&lt;</span>string<span class="op">&gt;^</span></code>.
+Normally this is immutable. But <code class="sourceCode cpp">std2<span class="op">::</span>mutex<span class="op">::</span>lock</code>
+binds a const <code class="sourceCode cpp">self</code>. Its
+<code class="sourceCode cpp">mtx_</code> data member has type <code class="sourceCode cpp">box<span class="op">&lt;</span>unsafe_cell<span class="op">&lt;</span>std<span class="op">::</span>mutex<span class="op">&gt;&gt;</span></code>.
+<code class="sourceCode cpp">std<span class="op">::</span>mutex</code>
+is non-movable, so we’re hosting it in a box on the heap to make
+<code class="sourceCode cpp">std2<span class="op">::</span>mutex</code>
+movable.
+<code class="sourceCode cpp">mut_<span class="op">-&gt;</span></code>
+returns <code class="sourceCode cpp"><span class="kw">const</span> unsafe_cell<span class="op">&lt;</span>std<span class="op">::</span>mutex<span class="op">&gt;^</span></code>
+because the <code class="sourceCode cpp">self</code> reference is const.
+But <code class="sourceCode cpp">mut_<span class="op">-&gt;</span>get<span class="op">()</span></code>
+returns <code class="sourceCode cpp">std<span class="op">::</span>mutex<span class="op">*</span></code>!
+The const was stripped off by <code class="sourceCode cpp">unsafe_cell<span class="op">::</span>get</code>.
+This is the pivot in interior mutability that allows the system to work.
+We have mutable pointer to
+<code class="sourceCode cpp">std<span class="op">::</span>mutex</code>
+and simply lock it.</p>
+<p>The <code class="sourceCode cpp">lock_guard</code> is a view into the
+<code class="sourceCode cpp">std2<span class="op">::</span>mutex</code>
+with a named lifetime parameter. When the
+<code class="sourceCode cpp">lock_guard</code> goes out of scope, it
+calls <code class="sourceCode cpp">unlock</code> on the system mutex.
+The guard’s lifetime parameter
+<code class="sourceCode cpp"><span class="op">/</span>a</code> keeps the
+mutex in scope as long as the
+<code class="sourceCode cpp">lock_guard</code> is in scope, or the
+borrow checker errors.</p>
+<p>Lifetime safety also guarantees that the
+<code class="sourceCode cpp">lock_guard</code> is in scope (meaning the
+mutex is locked) whenever the reference into the protected resource is
+used. <code class="sourceCode cpp">lock_guard<span class="op">::</span>borrow</code>
+connects the lifetime on the return borrow
+<code class="sourceCode cpp">T<span class="op">^</span></code> with the
+lifetime on self. If the lock guard goes out of scope while the returned
+borrow is live, that’s a borrow checker error.</p>
+<p>Interior mutability is a legal loophole around exclusivity. You’re
+still limited to one mutable borrow or any number of shared borrows to
+an object. Types with a deconfliction strategy use
+<code class="sourceCode cpp">unsafe_cell</code> to safely strip the
+const off shared borrows, allowing users to mutate the protected
+resource.</p>
 <p>Safe C++ and Rust and conflate exclusive access with mutable borrows
 and shared access with const borrows. It’s is an economical choice,
 because one type qualifier,
@@ -4358,18 +4381,18 @@ attributes. Query the interface values with the
 and
 <code class="sourceCode cpp">T<span class="op">~</span>is_sync</code>
 member traits.</p>
-<div class="sourceCode" id="cb84"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb84-1"><a href="#cb84-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">class</span> T<span class="op">+&gt;</span></span>
-<span id="cb84-2"><a href="#cb84-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> <span class="op">[[</span><span class="at">unsafe</span><span class="op">::</span><span class="at">send</span><span class="op">(</span><span class="at">false</span><span class="op">)]]</span> rc;</span></code></pre></div>
+<div class="sourceCode" id="cb83"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb83-1"><a href="#cb83-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">class</span> T<span class="op">+&gt;</span></span>
+<span id="cb83-2"><a href="#cb83-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> <span class="op">[[</span><span class="at">unsafe</span><span class="op">::</span><span class="at">send</span><span class="op">(</span><span class="at">false</span><span class="op">)]]</span> rc;</span></code></pre></div>
 <p><code class="sourceCode cpp">std2<span class="op">::</span>rc</code>
 is the non-atomic reference-counted pointer. It permits shared ownership
 but only within a single thread. Its declaration marks it <code class="sourceCode cpp">send<span class="op">(</span><span class="kw">false</span><span class="op">)</span></code>.
 It can’t be copied to other threads, since the non-atomic reference
 counter would cause data races.</p>
-<div class="sourceCode" id="cb85"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb85-1"><a href="#cb85-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">class</span> T<span class="op">+&gt;</span></span>
-<span id="cb85-2"><a href="#cb85-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> <span class="op">[[</span></span>
-<span id="cb85-3"><a href="#cb85-3" aria-hidden="true" tabindex="-1"></a><span class="at">  unsafe</span><span class="op">::</span><span class="at">send</span><span class="op">(</span><span class="at">T</span><span class="op">~</span><span class="at">is_send </span><span class="op">&amp;&amp;</span><span class="at"> T</span><span class="op">~</span><span class="at">is_sync</span><span class="op">)</span>,</span>
-<span id="cb85-4"><a href="#cb85-4" aria-hidden="true" tabindex="-1"></a><span class="at">  unsafe</span><span class="op">::</span><span class="at">sync</span><span class="op">(</span><span class="at">T</span><span class="op">~</span><span class="at">is_send </span><span class="op">&amp;&amp;</span><span class="at"> T</span><span class="op">~</span><span class="at">is_sync</span><span class="op">)</span></span>
-<span id="cb85-5"><a href="#cb85-5" aria-hidden="true" tabindex="-1"></a><span class="op">]]</span> arc;</span></code></pre></div>
+<div class="sourceCode" id="cb84"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb84-1"><a href="#cb84-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">class</span> T<span class="op">+&gt;</span></span>
+<span id="cb84-2"><a href="#cb84-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> <span class="op">[[</span></span>
+<span id="cb84-3"><a href="#cb84-3" aria-hidden="true" tabindex="-1"></a><span class="at">  unsafe</span><span class="op">::</span><span class="at">send</span><span class="op">(</span><span class="at">T</span><span class="op">~</span><span class="at">is_send </span><span class="op">&amp;&amp;</span><span class="at"> T</span><span class="op">~</span><span class="at">is_sync</span><span class="op">)</span>,</span>
+<span id="cb84-4"><a href="#cb84-4" aria-hidden="true" tabindex="-1"></a><span class="at">  unsafe</span><span class="op">::</span><span class="at">sync</span><span class="op">(</span><span class="at">T</span><span class="op">~</span><span class="at">is_send </span><span class="op">&amp;&amp;</span><span class="at"> T</span><span class="op">~</span><span class="at">is_sync</span><span class="op">)</span></span>
+<span id="cb84-5"><a href="#cb84-5" aria-hidden="true" tabindex="-1"></a><span class="op">]]</span> arc;</span></code></pre></div>
 <p><code class="sourceCode cpp">std2<span class="op">::</span>arc</code>
 is the atomic reference-counted pointer. If its inner type is both
 <code class="sourceCode cpp">send</code> and
@@ -4398,8 +4421,8 @@ that deconfliction mechanism <em>single threaded</em>
 (<code class="sourceCode cpp">sync</code>=false) or
 <em>multi-threaded</em>
 (<code class="sourceCode cpp">sync</code>=true)?</p>
-<div class="sourceCode" id="cb86"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb86-1"><a href="#cb86-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">class</span> T<span class="op">+&gt;</span></span>
-<span id="cb86-2"><a href="#cb86-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> <span class="op">[[</span><span class="at">unsafe</span><span class="op">::</span><span class="at">sync</span><span class="op">(</span><span class="at">false</span><span class="op">)]]</span> cell;</span></code></pre></div>
+<div class="sourceCode" id="cb85"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb85-1"><a href="#cb85-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">class</span> T<span class="op">+&gt;</span></span>
+<span id="cb85-2"><a href="#cb85-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> <span class="op">[[</span><span class="at">unsafe</span><span class="op">::</span><span class="at">sync</span><span class="op">(</span><span class="at">false</span><span class="op">)]]</span> cell;</span></code></pre></div>
 <p><code class="sourceCode cpp">std2<span class="op">::</span>cell</code>
 implements interior mutability, making it a candidate for use with
 <code class="sourceCode cpp">std2<span class="op">::</span>arc</code>.
@@ -4414,11 +4437,11 @@ is marked <code class="sourceCode cpp">sync<span class="op">(</span><span class=
 it’s unsafe to share borrows to a
 <code class="sourceCode cpp">cell</code> across threads due to risk of
 data race.</p>
-<div class="sourceCode" id="cb87"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb87-1"><a href="#cb87-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">class</span> T<span class="op">+&gt;</span></span>
-<span id="cb87-2"><a href="#cb87-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> <span class="op">[[</span></span>
-<span id="cb87-3"><a href="#cb87-3" aria-hidden="true" tabindex="-1"></a><span class="at">  unsafe</span><span class="op">::</span><span class="at">send</span><span class="op">(</span><span class="at">T</span><span class="op">~</span><span class="at">is_send</span><span class="op">)</span>,</span>
-<span id="cb87-4"><a href="#cb87-4" aria-hidden="true" tabindex="-1"></a><span class="at">  unsafe</span><span class="op">::</span><span class="at">sync</span><span class="op">(</span><span class="at">T</span><span class="op">~</span><span class="at">is_send</span><span class="op">)</span></span>
-<span id="cb87-5"><a href="#cb87-5" aria-hidden="true" tabindex="-1"></a><span class="op">]]</span> mutex;</span></code></pre></div>
+<div class="sourceCode" id="cb86"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb86-1"><a href="#cb86-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">class</span> T<span class="op">+&gt;</span></span>
+<span id="cb86-2"><a href="#cb86-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> <span class="op">[[</span></span>
+<span id="cb86-3"><a href="#cb86-3" aria-hidden="true" tabindex="-1"></a><span class="at">  unsafe</span><span class="op">::</span><span class="at">send</span><span class="op">(</span><span class="at">T</span><span class="op">~</span><span class="at">is_send</span><span class="op">)</span>,</span>
+<span id="cb86-4"><a href="#cb86-4" aria-hidden="true" tabindex="-1"></a><span class="at">  unsafe</span><span class="op">::</span><span class="at">sync</span><span class="op">(</span><span class="at">T</span><span class="op">~</span><span class="at">is_send</span><span class="op">)</span></span>
+<span id="cb86-5"><a href="#cb86-5" aria-hidden="true" tabindex="-1"></a><span class="op">]]</span> mutex;</span></code></pre></div>
 <p><code class="sourceCode cpp">std2<span class="op">::</span>mutex</code>
 is another candidate for use with
 <code class="sourceCode cpp">std2<span class="op">::</span>arc</code>.
@@ -4450,18 +4473,18 @@ and that’s owned by an
 The <code class="sourceCode cpp">arc</code> provides shared ownership.
 The <code class="sourceCode cpp">mutex</code> provides shared
 mutation.</p>
-<div class="sourceCode" id="cb88"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb88-1"><a href="#cb88-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> thread <span class="op">{</span></span>
-<span id="cb88-2"><a href="#cb88-2" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
-<span id="cb88-3"><a href="#cb88-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">template</span><span class="op">&lt;</span><span class="kw">class</span> F<span class="op">+</span>, <span class="kw">class</span> <span class="op">...</span>Args<span class="op">+&gt;</span></span>
-<span id="cb88-4"><a href="#cb88-4" aria-hidden="true" tabindex="-1"></a>  thread<span class="op">/(</span>where F<span class="op">:</span> <span class="kw">static</span>, Args<span class="op">...:</span> <span class="kw">static</span><span class="op">)(</span>F f, Args<span class="op">...</span> args<span class="op">)</span> safe</span>
-<span id="cb88-5"><a href="#cb88-5" aria-hidden="true" tabindex="-1"></a>  <span class="kw">requires</span><span class="op">(</span></span>
-<span id="cb88-6"><a href="#cb88-6" aria-hidden="true" tabindex="-1"></a>    F<span class="op">~</span>is_send <span class="op">&amp;&amp;</span></span>
-<span id="cb88-7"><a href="#cb88-7" aria-hidden="true" tabindex="-1"></a>    <span class="op">(</span>Args<span class="op">~</span>is_send <span class="op">&amp;&amp;</span> <span class="op">...)</span> <span class="op">&amp;&amp;</span></span>
-<span id="cb88-8"><a href="#cb88-8" aria-hidden="true" tabindex="-1"></a>    safe<span class="op">(</span>mut f<span class="op">(</span>rel args<span class="op">...)))</span></span>
-<span id="cb88-9"><a href="#cb88-9" aria-hidden="true" tabindex="-1"></a>    <span class="op">:</span> unsafe t_<span class="op">()</span></span>
-<span id="cb88-10"><a href="#cb88-10" aria-hidden="true" tabindex="-1"></a>  <span class="op">{</span> <span class="op">...</span> <span class="op">}</span></span>
-<span id="cb88-11"><a href="#cb88-11" aria-hidden="true" tabindex="-1"></a>  <span class="op">...</span></span>
-<span id="cb88-12"><a href="#cb88-12" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
+<div class="sourceCode" id="cb87"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb87-1"><a href="#cb87-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> thread <span class="op">{</span></span>
+<span id="cb87-2"><a href="#cb87-2" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb87-3"><a href="#cb87-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">template</span><span class="op">&lt;</span><span class="kw">class</span> F<span class="op">+</span>, <span class="kw">class</span> <span class="op">...</span>Args<span class="op">+&gt;</span></span>
+<span id="cb87-4"><a href="#cb87-4" aria-hidden="true" tabindex="-1"></a>  thread<span class="op">/(</span>where F<span class="op">:</span> <span class="kw">static</span>, Args<span class="op">...:</span> <span class="kw">static</span><span class="op">)(</span>F f, Args<span class="op">...</span> args<span class="op">)</span> safe</span>
+<span id="cb87-5"><a href="#cb87-5" aria-hidden="true" tabindex="-1"></a>  <span class="kw">requires</span><span class="op">(</span></span>
+<span id="cb87-6"><a href="#cb87-6" aria-hidden="true" tabindex="-1"></a>    F<span class="op">~</span>is_send <span class="op">&amp;&amp;</span></span>
+<span id="cb87-7"><a href="#cb87-7" aria-hidden="true" tabindex="-1"></a>    <span class="op">(</span>Args<span class="op">~</span>is_send <span class="op">&amp;&amp;</span> <span class="op">...)</span> <span class="op">&amp;&amp;</span></span>
+<span id="cb87-8"><a href="#cb87-8" aria-hidden="true" tabindex="-1"></a>    safe<span class="op">(</span>mut f<span class="op">(</span>rel args<span class="op">...)))</span></span>
+<span id="cb87-9"><a href="#cb87-9" aria-hidden="true" tabindex="-1"></a>    <span class="op">:</span> unsafe t_<span class="op">()</span></span>
+<span id="cb87-10"><a href="#cb87-10" aria-hidden="true" tabindex="-1"></a>  <span class="op">{</span> <span class="op">...</span> <span class="op">}</span></span>
+<span id="cb87-11"><a href="#cb87-11" aria-hidden="true" tabindex="-1"></a>  <span class="op">...</span></span>
+<span id="cb87-12"><a href="#cb87-12" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
 <p>The <code class="sourceCode cpp">send</code> property is enforced by
 <code class="sourceCode cpp">std2<span class="op">::</span>thread</code>’s
 constructor. If all the thread arguments are
@@ -4509,8 +4532,7 @@ soundness defects. After all, the library author is a specialist in that
 domain. This is a friendlier system than Standard C++, which places the
 all the weight of writing thread safe code on the shoulders of
 users.</p>
-<h2 data-number="2.8" id="unresolved-or-unimplemented-design-issues"><span class="header-section-number">2.8</span> Unresolved or unimplemented
-design issues<a href="#unresolved-or-unimplemented-design-issues" class="self-link"></a></h2>
+<h2 data-number="2.8" id="unresolved-design-issues"><span class="header-section-number">2.8</span> Unresolved design issues<a href="#unresolved-design-issues" class="self-link"></a></h2>
 <h3 data-number="2.8.1" id="expression-outlives-constraint"><span class="header-section-number">2.8.1</span>
 <em>expression-outlives-constraint</em><a href="#expression-outlives-constraint" class="self-link"></a></h3>
 <p>C++ variadics don’t convey lifetime constraints from a function’s
@@ -4532,8 +4554,8 @@ borrow parameters with additional constraints than their template
 lifetime parameters have.</p>
 <p>In order to name the function parameters, we’ll need a trailing
 <em>expression-lifetime-constraint</em> syntax. Something like,</p>
-<div class="sourceCode" id="cb89"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb89-1"><a href="#cb89-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">+</span>, <span class="kw">typename</span><span class="op">...</span> Ts<span class="op">+&gt;</span></span>
-<span id="cb89-2"><a href="#cb89-2" aria-hidden="true" tabindex="-1"></a>box<span class="op">&lt;</span>T<span class="op">&gt;</span> make_box<span class="op">(</span>Ts<span class="op">...</span> args<span class="op">)</span> safe where<span class="op">(</span>T<span class="op">:</span>T<span class="op">(</span>rel args<span class="op">...))</span>;</span></code></pre></div>
+<div class="sourceCode" id="cb88"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb88-1"><a href="#cb88-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">+</span>, <span class="kw">typename</span><span class="op">...</span> Ts<span class="op">+&gt;</span></span>
+<span id="cb88-2"><a href="#cb88-2" aria-hidden="true" tabindex="-1"></a>box<span class="op">&lt;</span>T<span class="op">&gt;</span> make_box<span class="op">(</span>Ts<span class="op">...</span> args<span class="op">)</span> safe where<span class="op">(</span>T<span class="op">:</span>T<span class="op">(</span>rel args<span class="op">...))</span>;</span></code></pre></div>
 <p>There’s a unique tooling aspect to this. To evaluate the implied
 constraints of the outlives expression, we have to lower the expression
 to MIR, create new region variables for the locals, generate
@@ -4617,23 +4639,23 @@ capability will be included.</p>
 <p>Constructors, destructors and the relocation constructor don’t take
 explicit <code class="sourceCode cpp">self</code> parameters. But that’s
 less problematic because the language won’t form function pointers.</p>
-<div class="sourceCode" id="cb90"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb90-1"><a href="#cb90-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> Foo<span class="op">/</span>a <span class="op">{</span></span>
-<span id="cb90-2"><a href="#cb90-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Self parameter syntax. Supported.</span></span>
-<span id="cb90-3"><a href="#cb90-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> func1<span class="op">(</span>Foo<span class="op">^/</span>a self, <span class="dt">int</span> x<span class="op">)</span> safe;</span>
-<span id="cb90-4"><a href="#cb90-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb90-5"><a href="#cb90-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Equivalent abbreviated self parameter syntax. Supported.</span></span>
-<span id="cb90-6"><a href="#cb90-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> func2<span class="op">(</span>self<span class="op">^</span>, <span class="dt">int</span> x<span class="op">)</span> safe;</span>
-<span id="cb90-7"><a href="#cb90-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb90-8"><a href="#cb90-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Possible non-static member function syntax.</span></span>
-<span id="cb90-9"><a href="#cb90-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Bind a mutable borrow.</span></span>
-<span id="cb90-10"><a href="#cb90-10" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> func3<span class="op">(</span><span class="dt">int</span> x<span class="op">)</span> <span class="op">^</span> safe;</span>
-<span id="cb90-11"><a href="#cb90-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb90-12"><a href="#cb90-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Bind a shared borrow.</span></span>
-<span id="cb90-13"><a href="#cb90-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> func4<span class="op">(</span><span class="dt">int</span> x<span class="op">)</span> <span class="kw">const</span><span class="op">^</span> safe;</span>
-<span id="cb90-14"><a href="#cb90-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb90-15"><a href="#cb90-15" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Bind a consuming object. cv-qualifiers are unsupported.</span></span>
-<span id="cb90-16"><a href="#cb90-16" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> func5<span class="op">(</span><span class="dt">int</span> x<span class="op">)</span> rel safe;</span>
-<span id="cb90-17"><a href="#cb90-17" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
+<div class="sourceCode" id="cb89"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb89-1"><a href="#cb89-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> Foo<span class="op">/</span>a <span class="op">{</span></span>
+<span id="cb89-2"><a href="#cb89-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Self parameter syntax. Supported.</span></span>
+<span id="cb89-3"><a href="#cb89-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> func1<span class="op">(</span>Foo<span class="op">^/</span>a self, <span class="dt">int</span> x<span class="op">)</span> safe;</span>
+<span id="cb89-4"><a href="#cb89-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb89-5"><a href="#cb89-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Equivalent abbreviated self parameter syntax. Supported.</span></span>
+<span id="cb89-6"><a href="#cb89-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> func2<span class="op">(</span>self<span class="op">^</span>, <span class="dt">int</span> x<span class="op">)</span> safe;</span>
+<span id="cb89-7"><a href="#cb89-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb89-8"><a href="#cb89-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Possible non-static member function syntax.</span></span>
+<span id="cb89-9"><a href="#cb89-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Bind a mutable borrow.</span></span>
+<span id="cb89-10"><a href="#cb89-10" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> func3<span class="op">(</span><span class="dt">int</span> x<span class="op">)</span> <span class="op">^</span> safe;</span>
+<span id="cb89-11"><a href="#cb89-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb89-12"><a href="#cb89-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Bind a shared borrow.</span></span>
+<span id="cb89-13"><a href="#cb89-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> func4<span class="op">(</span><span class="dt">int</span> x<span class="op">)</span> <span class="kw">const</span><span class="op">^</span> safe;</span>
+<span id="cb89-14"><a href="#cb89-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb89-15"><a href="#cb89-15" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Bind a consuming object. cv-qualifiers are unsupported.</span></span>
+<span id="cb89-16"><a href="#cb89-16" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> func5<span class="op">(</span><span class="dt">int</span> x<span class="op">)</span> rel safe;</span>
+<span id="cb89-17"><a href="#cb89-17" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
 <p>Supporting
 <code class="sourceCode cpp"><span class="op">^</span></code> and
 <code class="sourceCode cpp">rel</code> in the <em>ref-qualifier</em> on
@@ -4663,12 +4685,12 @@ returns.</p>
 <span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
 <p>The blog post considers the above swap function, which transliterates
 to the Safe C++ code below.</p>
-<div class="sourceCode" id="cb91"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb91-1"><a href="#cb91-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">&gt;</span></span>
-<span id="cb91-2"><a href="#cb91-2" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> swap<span class="op">(</span>T<span class="op">^</span> a, T<span class="op">^</span> b<span class="op">)</span> safe <span class="op">{</span></span>
-<span id="cb91-3"><a href="#cb91-3" aria-hidden="true" tabindex="-1"></a>  T tmp <span class="op">=</span> rel <span class="op">*</span>a;</span>
-<span id="cb91-4"><a href="#cb91-4" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>a <span class="op">=</span> rel <span class="op">*</span>b;</span>
-<span id="cb91-5"><a href="#cb91-5" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>b <span class="op">=</span> rel tmp;</span>
-<span id="cb91-6"><a href="#cb91-6" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb90"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb90-1"><a href="#cb90-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">&gt;</span></span>
+<span id="cb90-2"><a href="#cb90-2" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> swap<span class="op">(</span>T<span class="op">^</span> a, T<span class="op">^</span> b<span class="op">)</span> safe <span class="op">{</span></span>
+<span id="cb90-3"><a href="#cb90-3" aria-hidden="true" tabindex="-1"></a>  T tmp <span class="op">=</span> rel <span class="op">*</span>a;</span>
+<span id="cb90-4"><a href="#cb90-4" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>a <span class="op">=</span> rel <span class="op">*</span>b;</span>
+<span id="cb90-5"><a href="#cb90-5" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>b <span class="op">=</span> rel tmp;</span>
+<span id="cb90-6"><a href="#cb90-6" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
 <p>This code doesn’t compile under Rust or Safe C++ because the operand
 of the relocation is a projection involving a reference, which is not an
 <em>owned place</em>. This defeats the abilities of initialization
@@ -4856,27 +4878,29 @@ borrowing</em> safety model that security professionals have been
 pointing to is the sensible and timely way to keep C++ viable for
 another generation.</p>
 <p>Safe C++ must provide safe alternatives to everything in today’s
-Standard Library. Adoption will look daunting to teams that maintain
-large applications. However, users aren’t compelled to switch everything
-over at once. If you need to stick with some legacy types, that’s fine.
-The compiler can’t enforce sound usage of that code, but that’s always
-been the case. As developers incorporate more of the safe standard
-library, their safety coverage increases. This is not an all-or-nothing
-system. Some unsafe code doesn’t mean that your whole project is unsafe.
-A project with 50% safe code should have half as many undetected
-soundness bugs as a project with no safe code. A project with 99% safe
-code, as many Rust applications have, should have 1% as many undetected
-soundness bugs. Rather than focusing on the long tail of difficult use
-cases, we encourage developers to think about the bulk of code that is
-amenable to the safety improvements that a mature Safe C++ toolchain
-will offer.</p>
+Standard Library. This proposal is a healthy beginning but it’s not
+comprehensive treatment. Adoption will look daunting to teams that
+maintain large applications. However, users aren’t compelled to switch
+everything over at once. If you need to stick with some legacy types,
+that’s fine. The compiler can’t enforce sound usage of that code, but
+that’s always been the case. As developers incorporate more of the safe
+standard library, their safety coverage increases. This is not an
+all-or-nothing system. Some unsafe code doesn’t mean that your whole
+project is unsafe. A project with 50% safe code should have half as many
+undetected soundness bugs as a project with no safe code. A project with
+99% safe code, as many Rust applications have, should have 1% as many
+undetected soundness bugs. Rather than focusing on the long tail of
+difficult use cases, we encourage developers to think about the bulk of
+code that is amenable to the safety improvements that a mature Safe C++
+toolchain will offer.</p>
 <p>We’re co-designing the Safe C++ standard library along with the
 language extensions. Visit our repository to follow our work. You can
 access all the examples included in this document. Or visit our Slack
 channel to get involved in the effort:</p>
 <blockquote>
 <p>github: <a href="https://github.com/cppalliance/safe-cpp">https://github.com/cppalliance/safe-cpp</a><br />
-slack: <a href="https://cpplang.slack.com/archives/C07GH9NFK0F">https://cpplang.slack.com/archives/C07GH9NFK0F</a></p>
+slack: <a href="https://cpplang.slack.com/archives/C07GH9NFK0F">https://cpplang.slack.com/archives/C07GH9NFK0F</a>
+Circle download: <a href="https://www.circle-lang.org/">https://www.circle-lang.org/</a></p>
 </blockquote>
 <p>Everything in this proposal took about 18 months to design and
 implement in Circle. With participation from industry, we could resolve
