@@ -2239,9 +2239,15 @@ Relocation constructors are always noexcept. It's used to implement the drop-and
 
 ## Choice types
 
-The new `choice` type is a type safe discriminated union. It's equivalent to Rust's `enum` type. Choice types contain a list of alternatives, each with an optional payload type. Choice does not replace C++'s enum type, which is still available to support support existing code.
+The new `choice` type is a type safe discriminated union. It's equivalent to Rust's `enum` type. Choice types contain a list of alternatives, each with an optional payload type. `choice` does not replace C++'s `enum` type. It's a different type with different capabilities.
 
-Scoped enums and unscoped enums with fixed underlying types are permitted to hold values outside of the listed enumerators, as long as the value is within the range of the underlying type. But choice types only contain the alternatives listed in their definitions, making them easier to reason about. There's no safe conversion between choice types and their underlying types; programmers must use choice initializers to create new choice objects and _match-expressions_ to interrogate them.
+> For an enumeration whose underlying type is fixed, the values of the enumeration are the values of the underlying type. Otherwise, the values of the enumeration are the values representable by a hypothetical integer type with minimal width M such that all enumerators can be represented. The width of the smallest bit-field large enough to hold all the values of the enumeration type is M. _It is possible to define an enumeration that has values not defined by any of its enumerators._
+>
+> -- <cite>[dcl.enum](https://eel.is/c++draft/dcl.enum#8)</cite>
+
+It's not possible to safely exhaustiveness checking on C++ enums, because enums may hold values that aren't among their enumerators.
+
+`choice` types are more rigorously defined. They may only hold values that are specified alternatives. That makes them much easier to reason about, and permits the compiler perform exhaustiveness checking. There's no safe conversion between choice types and their underlying types; programmers must use choice initializers to create new choice objects and _match-expressions_ to interrogate them.
 
 [**choice.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/choice.cxx)
 ```cpp
@@ -2292,7 +2298,7 @@ int main() safe {
 }
 ```
 
-Rust uses traits to extend data types with new member functions outside of their definitions. Safe C++ doesn't have that capability, so it's important that choice types support member functions directly. These member functions may internalize pattern matching on their `self` parameters, improving the ergonomics of these type-safe variants.
+Construct a `choice` type using the qualified _choice-initializer_ syntax `ChoiceName::Alternative(args)`. In the context of copy initialization, which include return statements, _mem-initializer_, function arguments, and so on, use the _abbreviated-choice-name_, `.Alternative` or `.Alternative(args)` to create a choice object with less typing. The choice type is inferred from type being initialized.
 
 ```cxx
 template<class T+, class E+>
@@ -2335,14 +2341,20 @@ choice optional
       .none    => panic("{} is none".format(optional~string));
     };
   }
+
+  ...
 };
 ```
 
+Rust uses traits to extend data types with new member functions outside of their definitions. Safe C++ doesn't have that capability, so it's important that choice types support member functions directly. These member functions may internalize pattern matching on their `self` parameters, improving the ergonomics of these type-safe variants.
+
+`std2::expected` and `std2::optional` are choice types important to the safe standard library. They implement a suite of member functions as a convenience.
+
 ### Pattern matching
 
-The _match-expression_ in Safe C++ offers much the same capabilities as the pattern matching implemented in C# and Swift and proposed for C++ in [@P2688R1]. But the requirements of borrow checking and relocation make it most similar to Rust's feature. Pattern matching is the only way to access alternatives of choice types. It's important in achieving Safe C++'s type safety goals.
+The _match-expression_ in Safe C++ offers much the same capabilities as the pattern matching implemented in C# and Swift and proposed for C++ in [@P2688R1]. But the requirements of borrow checking and relocation make it most similar to Rust's feature. Pattern matching is the only way to access alternatives of choice types. Pattern matching important in achieving Safe C++'s type safety goals.
 
-[**match1.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/match1.cxx)
+[**match1.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/match1.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/q1xsMzMKP)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -2385,14 +2397,14 @@ int test(Primitive obj) noexcept safe {
 }
 ```
 
-A _match-expression_'s operand is expression of class, choice, array, slice, arithmetic, builtin vector or builtin matrix type. The match body is a set of _match-clauses_. Each _match-clause_ has a _pattern_ on the left, an optional _match-guard_ in the middle, and a _match-body_ after the `=>` token.
+A _match-expression_'s operand is an expression of class, choice, array, slice, arithmetic, builtin vector or builtin matrix type. The _match-specifier_ is populated with a set of _match-clauses_. Each _match-clause_ has a _pattern_ on the left, an optional _match-guard_ in the middle, and a _match-body_ after the `=>` token.
 
 A match is rich in the kind of patterns it supports:
 
-* **structured pattern** `[p1, p2]` - Matches aggregates and C++ types implementing the `tuple_size`/`tuple_element` customization point. These are useful when destructuring Safe C++'s first-class tuple and array types. Nest the patterns to destructure multiple levels of subobjects. The pattern corresponding to structured bindings and aggregate initializers.
-* **designated pattern** `[x: p1, y: p2]` - Matches aggregates by member name rather than ordinal. The pattern corresponding to designated bindings and designated initializers.
-* **choice pattern** `.alt` or `.alt(p)` - Matches a choice alternative. If the choice alternative has a payload type, the `.alt(p)` opens a pattern on the payload.
-* **variant pattern** `{type}` or `{type}(p)` - Matches all choice alternatives with a payload type of _type_. The `{type}(p)` form opens a pattern on the payload.
+* **structured pattern** `[p1, p2]` - Matches subobjects of aggregates and C++ types that implement the `tuple_size`/`tuple_element` customization point. These are useful when destructuring Safe C++'s first-class tuple and array types. Nest the patterns to destructure multiple levels of subobjects. The syntax of this pattern corresponds to structured bindings and aggregate initializers.
+* **designated pattern** `[x: p1, y: p2]` - Matches subobjects of aggregates by member name rather than ordinal. The syntax of this pattern corresponds to designated bindings and designated initializers.
+* **choice pattern** `.alt` or `.alt(p)` - Matches choice alternatives. If the choice alternative has a payload type, the `.alt(p)` syntax opens a pattern on its payload.
+* **variant pattern** `{type}` or `{type}(p)` - Matches all choice alternatives with a payload type of _type_. The `{type}(p)` syntax opens a pattern on the payload.
 * **wildcard pattern** `_` Matches any pattern. These correspond to the `default` case of a _switch-statement_ and may be required to satisfy a _match-expression_'s exhaustiveness requirement.
 * **rest pattern** - `..` Matches any number of elements. Use inside structured patterns to produce patterns on the beginning or end elements. Also used to supports patterns on slice operands.
 * **binding declaration** _binding-mode_ `decl` - Bind a declaration to the pattern's operand. There are six binding modes: _default_, `cpy`, `rel`, `^` for mutable borrows, `^const` for shared borrows and `&` for lvalue references.
@@ -2401,7 +2413,7 @@ A match is rich in the kind of patterns it supports:
 
 This example uses choice, test, variant, binding, disjunction and wildcard patterns. The wildcard pattern at the end proves exhaustiveness.
 
-[**match2.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/match2.cxx)
+[**match2.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/match2.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/h1rhajorG)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -2440,7 +2452,9 @@ int main() safe {
 }
 ```
 
-The _concise-match-expression_ is a form of pattern matching that applies a test and optional _match-guard_ on the operand and returns true or false. This maps directly to Rust's [@matches] facility, although instead of being a macro, this is a first-class language feature.
+The _concise-match-expression_ is an abbreviated syntax for pattern matching that evaluates a pattern and a _match-guard_. This maps directly to Rust's [@matches] facility, although instead of being a macro, this is a first-class language feature.
+
+We're working on better specifying the binding modes for match declarations and their interactions with the relocation object model and with the borrow checker. We hope to show more complex usage for the next revision.
 
 ## Interior mutability
 
