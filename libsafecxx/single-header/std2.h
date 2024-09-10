@@ -767,17 +767,16 @@ public:
   }
 
   explicit
-  box(T t) safe
-    : unsafe p_(static_cast<T*>(::operator new(sizeof(T))))
-  {
-    __rel_write(p_, rel t);
-  }
+  box(T t) safe : unsafe p_(new T(rel t)) { }
 
   [[unsafe::drop_only(T)]]
-  ~box() safe
-  {
-    std::destroy_at(p_);
-    ::operator delete(p_);
+  ~box() safe {
+    delete p_;
+  }
+
+  template<typename... Ts>
+  static box make(Ts... args) safe {
+    unsafe { return box(new T(rel args...)); }
   }
 
   T^ borrow(self^) noexcept safe {
@@ -1178,14 +1177,6 @@ mutex
   unsafe_cell<T> data_;
   box<mutex_type> mtx_;
 
-  static
-  box<mutex_type>
-  init_mtx()
-  {
-    auto p = static_cast<mutex_type*>(::operator new(sizeof(mutex_type)));
-    new(p) mutex_type();
-    return box<mutex_type>(p);
-  }
 
 public:
   class lock_guard/(a)
@@ -1223,7 +1214,7 @@ public:
 
   explicit mutex(T data) noexcept safe
     : data_(rel data)
-    , unsafe mtx_(init_mtx())
+    , unsafe mtx_(box<mutex_type>::make())
   {
   }
 

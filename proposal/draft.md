@@ -2460,6 +2460,47 @@ We're working on better specifying the binding modes for match declarations and 
 
 Recall the law of exclusivity, the program-wide invariant that guarantees a resource isn't mutated while another user has access to it. How does this square with the use of shared pointers, which enables shared ownership of a mutable resource? How does it support threaded programs, where access to shared mutable state is permitted between threads? Shared mutable access exists in this safety model, but the way it's enabled involves some trickery.
 
+```cpp
+template<class T+>
+class [[unsafe::sync(false)]] unsafe_cell
+{
+  T t_;
+
+public:
+  unsafe_cell() = default;
+
+  explicit
+  unsafe_cell(T t) noexcept safe
+    : t_(rel t) { }
+
+  T* get(self const^) noexcept safe {
+    return const_cast<T*>(addr self->t_);
+  }
+};
+```
+
+Types with interior mutability implement _deconfliction_ strategies to support shared mutation without the risk of data races or violating exclusivity. They encapsulate `std2::unsafe_cell`, which is based on Rust's `UnsafeCell`[@unsafe-cell] struct. `unsafe_cell::get` is a blessed way of stripping away const. While the function is safe, it returns a raw pointer, which is unsafe to dereference. Types encapsulating `unsafe_cell` must take care to only permit mutation through this const-stripped pointer one user at a time.
+
+Our safe standard library currently offers four types with interior mutability:
+
+* `std2::cell<T>`[@cell] provides get and set methods to read out the current value and store new values into the protected resource. Since `cell` can't be used across threads, there's no risk of violating exclusivity.
+* `std2::ref_cell<T>`[@ref-cell] is a single-threaded multiple-read, single-write lock. If the caller requests a mutable reference to the interior object, the implementation checks its counter, and if the object is not locked, it establishes a mutable lock and returns a mutable borrow. If the caller requests a shared reference to the interior object, the implementation checks that there is no live mutable borrow, and if there isn't, increments the counter. When users are done with the borrow, they have to release the lock, which decrements the reference count. If the user's request can't be serviced, the `ref_cell` can either gracefully return with an error code, or it can panic and abort.
+* `std2::mutex<T>`[@mutex] provides mutable borrows to the interior data across threads. A mutex synchronization object deconflicts access, so there's only one live borrow at a time.
+* `std2::shared_mutex<T>`[@rwlock] is the threaded multiple-read, single-write lock. The interface is similar to `ref_cell`'s, but it uses a mutex for deconfliction, so clients can sit on the lock until their request is serviced.
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
 
 ** NOW A BROKEN TEST DUE TO CHANGE IN CELL **
 ** REPLACE WITH SOMETHING ELSE **
@@ -2517,11 +2558,6 @@ public:
 ```
 
 Types with interior mutability implement _deconfliction_ strategies to support shared mutation without the risk of data races. They encapsulate `std2::unsafe_cell`, which is based on Rust's `UnsafeCell`[@unsafe-cell] struct. `unsafe_cell::get` is a blessed way of stripping away const. While the function is safe, it returns a raw pointer, which is unsafe to dereference. Types encapsulating `unsafe_cell` must take care to only permit mutation through this const-stripped pointer one user at a time.
-
-* `std2::cell<T>`[@cell] provides get and set methods to read out the current value and store new values into the protected resource. Since `cell` can't be used across threads, there's no risk of violating exclusivity.
-* `std2::ref_cell<T>`[@ref-cell] is a single-threaded multiple-read, single-write lock. If the caller requests a mutable reference to the interior object, the implementation checks its counter, and if the object is not locked, it establishes a mutable lock and returns a mutable borrow. If the caller requests a shared reference to the interior object, the implementation checks that there is no live mutable borrow, and if there isn't, increments the counter. When users are done with the borrow, they have to release the lock, which decrements the reference count. If the user's request can't be serviced, the `ref_cell` can either gracefully return with an error code, or it can panic and abort.
-* `std2::mutex<T>`[@mutex] provides mutable borrows to the interior data across threads. A mutex synchronization object deconflicts access, so there's only one live borrow at a time.
-* `std2::shared_mutex<T>`[@rwlock] is the threaded multiple-read, single-write lock. The interface is similar to `ref_cell`'s, but it uses a mutex for deconfliction, so clients can sit on the lock until their request is serviced.
 
 ```cpp
 template<class T+>
@@ -2641,7 +2677,7 @@ The `send` constraint against demonstrates the safety model's [theme of responsi
 
 It's the responsibility of a safe library to think through all possible scenarios of use and prevent execution that could result in soundness defects. After all, the library author is a specialist in that domain. This is a friendlier system than Standard C++, which places the all the weight of writing thread safe code on the shoulders of users.
 
-## Unresolved or unimplemented design issues
+## Unresolved design issues
 
 ### _expression-outlives-constraint_
 
