@@ -339,7 +339,7 @@ Due to their non-deterministic nature, data race defects are notoriously difficu
 
 The thread safety model uses [send and sync](#send-and-sync) interfaces, [interior mutability](#interior-mutability) and [borrow checking](#borrow-checking) to establish a system of constraints guaranteeing that shared mutable state is only accessed through synchronization primitives like `std2::mutex`.
 
-[**thread_safety**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/thread_safety.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/es9nx5sqd)
+[**thread_safety.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/thread_safety.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/es9nx5sqd)
 ```cpp
 #feature on safety
 #include <std2.h>
@@ -2458,7 +2458,7 @@ We're working on better specifying the binding modes for match declarations and 
 
 ## Interior mutability
 
-Recall the law of exclusivity, the program-wide invariant that guarantees a resource isn't mutated while another user has access to it. How does this square with the use of shared pointers, which enables shared ownership of a mutable resource? How does it support threaded programs, where access to shared mutable state is permitted between threads? Shared mutable access exists in this safety model, but the way it's enabled involves some trickery.
+Recall the law of exclusivity, the program-wide invariant that guarantees a resource isn't mutated while another user aliases it. How does this square with the use of shared pointers, which enables shared ownership of a mutable resource? How does it support threaded programs, where access to shared mutable state is permitted between threads? Shared mutable access exists in this safety model, but the way it's enabled involves some trickery.
 
 ```cpp
 template<class T+>
@@ -2488,110 +2488,66 @@ Our safe standard library currently offers four types with interior mutability:
 * `std2::mutex<T>`[@mutex] provides mutable borrows to the interior data across threads. A mutex synchronization object deconflicts access, so there's only one live borrow at a time.
 * `std2::shared_mutex<T>`[@rwlock] is the threaded multiple-read, single-write lock. The interface is similar to `ref_cell`'s, but it uses a mutex for deconfliction, so clients can sit on the lock until their request is serviced.
 
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-** NOW A BROKEN TEST DUE TO CHANGE IN CELL **
-** REPLACE WITH SOMETHING ELSE **
-
-[**cell.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/cell.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/M6df3jbhs)
-```cpp
-#feature on safety
-#include <std2.h>
-
-using namespace std2;
-
-int main() {
-  // rc - Shared ownership within a thread.
-  // ref_cell - Shared mutable access checked at runtime.
-  rc<ref_cell<string>> s1(ref_cell<string>(string{"A string set from s1"}));
-
-  // Copying the rc increments the reference counter on the control block.
-  rc<ref_cell<string>> s2 = cpy s1;
-
-  // Read the data out from s2.
-  println(*s2->borrow());
-
-  // The string data is now owned by three rcs.
-  // cell's transactional access upholds the law of exclusivity.
-  mut *s2->borrow_mut() =  string{"A string set from s2"};
-
-  // Read out through s1.
-  println(*s1->borrow());
-}
-```
-```
-A string set from s1
-A string set from s2
-```
-
-`rc` is a non-atomic (intra-thread) reference-counted pointer. It provides shared ownership to a resource. To avoid violating the law of exclusivity, its accessors `operator*` and `operator->` return _const_ borrows to its inner type. That means it practices _shared immutable access_. In order to mutate the data it holds, the inner type must exhibit _interior mutability_.
-
 ```cpp
 template<class T+>
-class [[unsafe::sync(false)]] unsafe_cell
+class
+[[unsafe::send(T~is_send), unsafe::sync(T~is_send)]]
+mutex
 {
-  T t_;
+  using mutex_type = unsafe_cell<std::mutex>;
+
+  unsafe_cell<T> data_;
+  box<mutex_type> mtx_;
 
 public:
-  unsafe_cell() = default;
-
-  explicit
-  unsafe_cell(T t) noexcept safe
-    : t_(rel t) { }
-
-  T* get(self const^) noexcept safe {
-    return const_cast<T*>(addr self->t_);
-  }
-};
-```
-
-Types with interior mutability implement _deconfliction_ strategies to support shared mutation without the risk of data races. They encapsulate `std2::unsafe_cell`, which is based on Rust's `UnsafeCell`[@unsafe-cell] struct. `unsafe_cell::get` is a blessed way of stripping away const. While the function is safe, it returns a raw pointer, which is unsafe to dereference. Types encapsulating `unsafe_cell` must take care to only permit mutation through this const-stripped pointer one user at a time.
-
-```cpp
-template<class T+>
-class [[unsafe::sync(false)]] cell
-{
-  unsafe_cell<T> t_;
-
-  public:
-
-  cell(T t) noexcept safe
-    : t_(rel t)
-    requires(T~is_trivially_copyable && T~is_trivially_destructible)
+  class lock_guard/(a)
   {
-  }
+    friend class mutex;
+    mutex const^/a m_;
 
-  T get(self const^) safe {
-    // rely on implicit copy operator erroring out for types with non-trivial
-    // destructors or types that have user-defined copy constructors
-    unsafe { return cpy *self->t_.get(); }
-  }
+    lock_guard(mutex const^/a m) noexcept safe
+      : m_(m) { }
 
-  void set(self const^, T t) safe {
-    unsafe { *self->t_.get() = rel t; }
-  }
+    public:
+    ~lock_guard() safe {
+      unsafe { mut m_->mtx_->get()->unlock(); }
+    }
 
-  T replace(self const^, T t) safe {
-    unsafe { auto old = __rel_read(self->t_.get()); }
-    unsafe { __rel_write(self->t_.get(), rel t); }
-    return old;
+    T^ borrow(self^) noexcept safe {
+      unsafe { return ^*self->m_->data_.get(); }
+    }
+
+    ...
+  };
+
+  explicit mutex(T data) noexcept safe
+    : data_(rel data)
+    , unsafe mtx_(box<mutex_type>::make()) { }
+
+  mutex(mutex const^) = delete;
+
+  lock_guard lock(self const^) safe {
+    unsafe { mut self->mtx_->get()->lock();}
+    return lock_guard(self);
   }
 };
 ```
+```cpp
+void entry_point(arc<mutex<string>> data, int thread_id) safe {
+  auto lock_guard = data->lock();
+  string^ s = mut lock_guard.borrow();
+  s.append("🔥");
+  println(*s);
+}
+```
 
-The `cell` class provides `get`, `set` and `replace` member functions. These take shared borrow operands. Since `cell` doesn't expose references to its inner data to users, it's not violating the law of exclusivity. Mutating data through `set` and reading it through `get` is _transactional_. Even though it's internally casting away const, it's not violating exclusivity because its deconfliction strategy prevents concurrent mutable access.
+Let's examine how `std2::mutex` implements interior mutability to obey the law of exclusivity while permitting mutation through const borrows. We've stripped the comments from the example in the [thread safety](#thread-safety) section. `data` is an `arc` and `data->` returns a `const mutex<string>^`. Normally this is immutable. But `std2::mutex::lock` binds a const `self`. Its `mtx_` data member has type `box<unsafe_cell<std::mutex>>`. `std::mutex` is non-movable, so we're hosting it in a box on the heap to make `std2::mutex` movable. `mut_->` returns `const unsafe_cell<std::mutex>^` because the `self` reference is const. But `mut_->get()` returns `std::mutex*`! The const was stripped off by `unsafe_cell::get`. This is the pivot in interior mutability that allows the system to work. We have mutable pointer to `std::mutex` and simply lock it.
+
+The `lock_guard` is a view into the `std2::mutex` with a named lifetime parameter. When the `lock_guard` goes out of scope, it calls `unlock` on the system mutex. The guard's lifetime parameter `/a` keeps the mutex in scope as long as the `lock_guard` is in scope, or the borrow checker errors.
+
+Lifetime safety also guarantees that the `lock_guard` is in scope (meaning the mutex is locked) whenever the reference into the protected resource is used. `lock_guard::borrow` connects the lifetime on the return borrow `T^` with the lifetime on self. If the lock guard goes out of scope while the returned borrow is live, that's a borrow checker error.
+
+Interior mutability is a legal loophole around exclusivity. You're still limited to one mutable borrow or any number of shared borrows to an object. Types with a deconfliction strategy use `unsafe_cell` to safely strip the const off shared borrows, allowing users to mutate the protected resource. 
 
 Safe C++ and Rust and conflate exclusive access with mutable borrows and shared access with const borrows. It's is an economical choice, because one type qualifier, `const` or `mut`, also determines exclusivity. But the cast-away-const model of interior mutability is an awkward consequence. But this design is not the only way: The Ante language[@ante] experiments with separate `own mut` and `shared mut` qualifiers. That's really attractive, because you're never mutating something through a const reference. This three-state system doesn't map onto C++'s existing type system as easily, but that doesn't mean the const/mutable borrow treatment, which does integrate elegantly, is the most expressive. A `shared` type qualifier merits investigation during the course of this project.
 
@@ -2816,12 +2772,13 @@ The US Government is telling industry to stop using C++ for reasons of national 
 
 Instead of being received as a threat, we greet the safety model developed by Rust as an opportunity to strengthen C++. The Rust community has spent a decade generating _soundness knowledge_, which is the tactics and strategies (interior mutability, send/sync, borrow checking, and so on) for achieving memory safety without the overhead of garbage collection. Their investment in soundness knowledge informs our design of Safe C++. Adopting the same _ownership and borrowing_ safety model that security professionals have been pointing to is the sensible and timely way to keep C++ viable for another generation.
 
-Safe C++ must provide safe alternatives to everything in today's Standard Library. Adoption will look daunting to teams that maintain large applications. However, users aren't compelled to switch everything over at once. If you need to stick with some legacy types, that's fine. The compiler can't enforce sound usage of that code, but that's always been the case. As developers incorporate more of the safe standard library, their safety coverage increases. This is not an all-or-nothing system. Some unsafe code doesn't mean that your whole project is unsafe. A project with 50% safe code should have half as many undetected soundness bugs as a project with no safe code. A project with 99% safe code, as many Rust applications have, should have 1% as many undetected soundness bugs. Rather than focusing on the long tail of difficult use cases, we encourage developers to think about the bulk of code that is amenable to the safety improvements that a mature Safe C++ toolchain will offer.
+Safe C++ must provide safe alternatives to everything in today's Standard Library. This proposal is a healthy beginning but it's not comprehensive treatment. Adoption will look daunting to teams that maintain large applications. However, users aren't compelled to switch everything over at once. If you need to stick with some legacy types, that's fine. The compiler can't enforce sound usage of that code, but that's always been the case. As developers incorporate more of the safe standard library, their safety coverage increases. This is not an all-or-nothing system. Some unsafe code doesn't mean that your whole project is unsafe. A project with 50% safe code should have half as many undetected soundness bugs as a project with no safe code. A project with 99% safe code, as many Rust applications have, should have 1% as many undetected soundness bugs. Rather than focusing on the long tail of difficult use cases, we encourage developers to think about the bulk of code that is amenable to the safety improvements that a mature Safe C++ toolchain will offer.
 
 We're co-designing the Safe C++ standard library along with the language extensions. Visit our repository to follow our work. You can access all the examples included in this document. Or visit our Slack channel to get involved in the effort:
 
 > github: [https://github.com/cppalliance/safe-cpp](https://github.com/cppalliance/safe-cpp)\
 > slack: [https://cpplang.slack.com/archives/C07GH9NFK0F](https://cpplang.slack.com/archives/C07GH9NFK0F)
+> Circle download: [https://www.circle-lang.org/](https://www.circle-lang.org/)
 
 Everything in this proposal took about 18 months to design and implement in Circle. With participation from industry, we could resolve the remaining design questions and in another 18 months have a language and standard library robust enough for mainstream evaluation. While Safe C++ is a large extension to the language, the cost of building new tooling is not steep. If C++ continues to go forward without a memory safety strategy, that's because institutional users are choosing not to pursue it; it's not because memory safe tooling is too expensive or difficult to build.
 
