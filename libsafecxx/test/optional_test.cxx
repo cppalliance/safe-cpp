@@ -76,32 +76,51 @@ void take() safe
     assert_true(!opt.is_some());
   }
 
+  struct C
   {
-    // struct C
-    // {
-    //   static
-    //   bool invoke/(a)(int^/a x) safe {
-    //     std2::println("x is: ");
-    //     std2::println(*x);
-    //     bool b = (*x < 4321);
-    //     std2::println(b);
-    //     return b;
-    //   }
-    // };
+    static
+    bool invoke/(a)(int^/a x) safe {
+      bool b = (*x < 4321);
+      return b;
+    }
+  };
 
-    // std2::optional<int> opt = .some(1234);
-    // auto m_p = mut opt.take_if(addr C::invoke);
+  {
+    std2::optional<int> opt = .some(1234);
+    auto m_p = mut opt.take_if(addr C::invoke);
 
-    // assert_true(m_p.is_some());
-    // assert_true(!m_p.is_none());
+    assert_true(m_p.is_some());
+    assert_true(!m_p.is_none());
 
-    // assert_true(opt.is_none());
-    // assert_true(!opt.is_some());
+    assert_true(opt.is_none());
+    assert_true(!opt.is_some());
+  }
+
+  {
+    std2::optional<int> opt = .some(43211234);
+    auto m_p = mut opt.take_if(addr C::invoke);
+
+    assert_true(!m_p.is_some());
+    assert_true(m_p.is_none());
+
+    assert_true(!opt.is_none());
+    assert_true(opt.is_some());
+  }
+
+  {
+    std2::optional<int> opt = .none;
+    auto m_p = mut opt.take_if(addr C::invoke);
+
+    assert_true(!m_p.is_some());
+    assert_true(m_p.is_none());
+
+    assert_true(opt.is_none());
+    assert_true(!opt.is_some());
   }
 }
 
 int main() safe
 {
-  optional_accessors();
+  // optional_accessors();
   take();
 }

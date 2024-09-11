@@ -529,14 +529,12 @@ choice optional
   requires FnMut<P, bool, T>
   {
     return match(*self) -> optional<T> {
-      .some(^x) => return (
-        // p(x) ? replace<optional<T>>(self, .none) : optional<T>::none
-        match(bool{p(x)}) -> optional<T> {
-          true => replace<optional<T>>(self, .none);
-          _ => .none;
-        }
-      );
-      .none => return .none;
+      .some(^x) => (
+        match(p(x)) -> optional<T> {
+          true => replace<optional>(self, .none);
+          false => .none;
+        });
+      .none => .none;
     };
   }
 
