@@ -654,7 +654,7 @@ iterators, which are pointers wrapped in classes. C++ iterators are
 unsafe. They come in begin and end pairs, and don’t share common
 lifetime parameters, making borrow checking them impractical. The Safe
 C++ version uses slice iterators, which resemble Rust’s
-<code class="sourceCode cpp">Iterator</code>.<span class="citation" data-cites="rust-iterator">[<a href="https://doc.rust-lang.org/std/iter/trait.Iterator.html" role="doc-biblioref">rust-iterator</a>]</span> These safe iterator are
+<code class="sourceCode cpp">Iterator</code>.<span class="citation" data-cites="rust-iterator">[<a href="https://doc.rust-lang.org/std/iter/trait.Iterator.html" role="doc-biblioref">rust-iterator</a>]</span> These safe iterators are
 implemented with lifetime parameters, making them robust against
 iterator invalidation defects.</p>
 <p>Line 10: <code class="sourceCode cpp">mut vec<span class="op">.</span>push_back<span class="op">(</span>x<span class="op">)</span>;</code>
@@ -4734,7 +4734,11 @@ described in this document.</p>
 <p>The AST-&gt;MIR and MIR-&gt;LLVM pipelines (or whatever codegen is
 used) fully replaces the compiler’s old AST-&gt;LLVM codegen. It is more
 difficult to lower through MIR than directly emitting LLVM, but
-implementing new codegen is not a very large investment.</p>
+implementing new codegen is not a very large investment. You can look
+into Circle’s MIR support with the <code class="sourceCode cpp"><span class="op">-</span>print<span class="op">-</span>mir</code>
+and <code class="sourceCode cpp"><span class="op">-</span>print<span class="op">-</span>mir<span class="op">-</span>drop</code>
+cmdline options, which print the MIR before and after drop elaboration,
+respectively.</p>
 <p>Once there is a MIR representation with adequete coverage, begin work
 on the MIR analysis. Borrow checking is a very intricate algorithm, but
 fortunately it’s easy to interrogate. Print the MIR and the lifetime and
@@ -4910,8 +4914,8 @@ and standard library robust enough for mainstream evaluation. While Safe
 C++ is a large extension to the language, the cost of building new
 tooling is not steep. If C++ continues to go forward without a memory
 safety strategy, that’s because institutional users are choosing not to
-pursue it; it’s not because memory safe tooling is too expensive or
-difficult to build.</p>
+pursue it; it’s not because memory safe tooling is “impossible” to
+build.</p>
 <p>An earlier version of this work was presented to SG23 at the St Louis
 2024 ISO meeting, with the closing poll “We should promise more
 committee time on borrow checking?” — SF: 20, WF: 7, N: 1, WA: 0, SA:
