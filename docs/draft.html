@@ -1070,7 +1070,7 @@ improvement. They’re a critical part of the memory safety puzzle.</p>
 <h3 data-number="1.5.3" id="thread-safety"><span class="header-section-number">1.5.3</span> Thread safety<a href="#thread-safety" class="self-link"></a></h3>
 <p>A memory safe language should be robust against data races to shared
 mutable state. If one thread is writing to shared state, no other thread
-may access it. C++ is not thread safe language. Its synchronization
+may access it. C++ is not a thread safe language. Its synchronization
 objects, such as
 <code class="sourceCode cpp">std<span class="op">::</span>mutex</code>,
 are opt-in. If a user reads shared mutable state from outside of a
@@ -1309,8 +1309,8 @@ arrays and slice types. The runtime can be elided with <a href="#unsafe-subscrip
 message. Unlike Standard C++, our containers always perform bounds
 checking. As with builtin types, the runtime check can be elided with <a href="#unsafe-subscripts">unsafe subscripts</a> or disabled for the
 entire translation unit with the <code class="sourceCode cpp"><span class="op">-</span>no<span class="op">-</span>panic</code>
-compiler switch. This is a drastic measure and is intending for
-profiling the effects of runtime checks.</p>
+compiler switch. This is a drastic measure and is intended for profiling
+the effects of runtime checks.</p>
 <div class="sourceCode" id="cb16"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">+&gt;</span></span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> vector <span class="op">{</span></span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>

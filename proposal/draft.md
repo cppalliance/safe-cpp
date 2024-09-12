@@ -333,7 +333,7 @@ Pattern matching and choice types aren't just a qualify-of-life improvement. The
 
 ### Thread safety
 
-A memory safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread may access it. C++ is not thread safe language. Its synchronization objects, such as `std::mutex`, are opt-in. If a user reads shared mutable state from outside of a mutex, that's a potential data race. It's up to users to coordinate that the same synchronization objects are locked before accessing the same shared mutable state.
+A memory safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread may access it. C++ is not a thread safe language. Its synchronization objects, such as `std::mutex`, are opt-in. If a user reads shared mutable state from outside of a mutex, that's a potential data race. It's up to users to coordinate that the same synchronization objects are locked before accessing the same shared mutable state.
 
 Due to their non-deterministic nature, data race defects are notoriously difficult to debug. Safe C++ prevents them from occurring in the first place. Programs with potential data race bugs in the safe context are ill-formed at compile time.
 
@@ -512,7 +512,7 @@ vector subscript is out-of-bounds
 Aborted (core dumped)
 ```
 
-Out-of-contract use of user-defined types should panic with a similar message. Unlike Standard C++, our containers always perform bounds checking. As with builtin types, the runtime check can be elided with [unsafe subscripts](#unsafe-subscripts) or disabled for the entire translation unit with the `-no-panic` compiler switch. This is a drastic measure and is intending for profiling the effects of runtime checks.
+Out-of-contract use of user-defined types should panic with a similar message. Unlike Standard C++, our containers always perform bounds checking. As with builtin types, the runtime check can be elided with [unsafe subscripts](#unsafe-subscripts) or disabled for the entire translation unit with the `-no-panic` compiler switch. This is a drastic measure and is intended for profiling the effects of runtime checks.
 
 ```cpp
 template<typename T+>
