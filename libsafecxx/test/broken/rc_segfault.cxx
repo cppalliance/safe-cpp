@@ -15,17 +15,6 @@ public:
   T const^ get(self const^) noexcept safe;
 };
 
-template<typename T+>
-struct rc_inner
-{
-  manually_drop<T> data_;
-  std::size_t strong_;
-  std::size_t weak_;
-
-  explicit
-  rc_inner(T data) noexcept safe;
-};
-
 template<class T+>
 struct rc_inner
 {
