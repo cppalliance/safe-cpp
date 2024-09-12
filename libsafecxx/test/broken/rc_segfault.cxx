@@ -13,21 +13,21 @@ public:
   T const^ get(self const^) noexcept safe;
 };
 
+template<typename T+>
+struct rc_inner
+{
+  manually_drop<T> data_;
+  std::size_t strong_;
+  std::size_t weak_;
+
+  explicit
+  rc_inner(T data) noexcept safe;
+};
+
 template<class T+>
 class [[unsafe::send(false)]] rc
 {
-  struct rc_inner;
-  rc_inner* unsafe p_;
-
-  struct rc_inner
-  {
-    manually_drop<T> data_;
-    std::size_t strong_;
-    std::size_t weak_;
-
-    explicit
-    rc_inner(T data) noexcept safe;
-  };
+  rc_inner<T>* unsafe p_;
 
 public:
 
