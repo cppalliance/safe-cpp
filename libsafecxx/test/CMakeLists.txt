@@ -117,6 +117,7 @@ safe_cxx_compile_fail_test(ref_cell2 "shared borrow of h between its mutable bor
 safe_cxx_compile_fail_test(cell1 "cannot convert prvalue int to std2::cell<int>")
 safe_cxx_compile_fail_test(cell2 "function candidate fails requires-clause")
 safe_cxx_compile_fail_test(cell3 "function candidate fails requires-clause")
+safe_cxx_compile_fail_test(cell_box_uaf, "drop of s2 between its shared borrow and its use")
 safe_cxx_compile_fail_test(manually_drop1 "cannot convert prvalue std2::box<int> to std2::manually_drop<std2::box<int>>")
 
 safe_cxx_compile_fail_test(vector1 "use of strs depends on expired loan")
