@@ -1,5 +1,7 @@
 #feature on safety
 
+#include <new>
+
 template<class T+>
 class manually_drop
 {
@@ -25,14 +27,31 @@ struct rc_inner
 };
 
 template<class T+>
+struct rc_inner
+{
+  manually_drop<T> data_;
+  std::size_t strong_;
+  std::size_t weak_;
+
+  explicit
+  rc_inner(T data) noexcept safe;
+};
+
+template<class T+>
 class [[unsafe::send(false)]] rc
 {
   rc_inner<T>* unsafe p_;
 
 public:
 
-  explicit rc(T t) safe;
+  explicit
+  rc(T t) safe
+    : p_(new(std::nothrow) rc_inner<T>(rel t))
+  {
+  }
+
   rc(rc const^ rhs) safe;
+
   [[unsafe::drop_only(T)]] ~rc() safe;
 
   T const^ operator*(self const^) noexcept safe {
