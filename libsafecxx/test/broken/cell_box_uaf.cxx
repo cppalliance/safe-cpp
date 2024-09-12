@@ -1,5 +1,10 @@
 #feature on safety
 
+namespace std2 {
+
+// unsafe_cell must be in std2 for the declaration to be seen by the
+// compiler.
+// We could improve by making an [[unsafe_cell]] attribute.
 template<class T+>
 class [[unsafe::sync(false)]] unsafe_cell
 {
@@ -18,11 +23,12 @@ public:
     return const_cast<T*>(addr self->t_);
   }
 };
+}
 
 template<class T+>
 class [[unsafe::sync(false)]] cell
 {
-  unsafe_cell<T> t_;
+  std2::unsafe_cell<T> t_;
 
   public:
 
