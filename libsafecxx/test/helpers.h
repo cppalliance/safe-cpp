@@ -27,3 +27,5 @@ void assert_throws(F f) safe
   }
   assert_true(threw);
 }
+
+using namespace std2::literals::string_literals;

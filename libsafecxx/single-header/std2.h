@@ -1684,8 +1684,7 @@ public:
       auto* pos = self^.data();
 
       while (pos < end) {
-        auto t = __rel_read(pos);
-        drp t;
+        std::destroy_at(pos);
         ++pos;
       }
 
@@ -1785,7 +1784,7 @@ private:
   value_type* unsafe  p_;
   size_type capacity_;
   size_type size_;
-  // value_type __phantom_data;
+  value_type __phantom_data;
 };
 
 template<class T>

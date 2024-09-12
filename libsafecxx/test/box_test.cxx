@@ -43,8 +43,22 @@ void unique_ptr_constructor() safe
 
 }
 
+void drop_only() safe
+{
+  {
+    std2::box<std2::string_view> p;
+
+    {
+      std2::string s("hello, world!");
+      p = std2::box<std2::string_view>(s.str());
+      assert_true(*p == "hello, world!"sv2);
+    }
+  }
+}
+
 int main()
 {
   box_constructor();
   unique_ptr_constructor();
+  drop_only();
 }
