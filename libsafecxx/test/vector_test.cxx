@@ -175,10 +175,24 @@ void vector_box() safe
   assert_eq(xs.size(), 16u);
 }
 
+void drop_only() safe
+{
+  {
+    std2::vector<std2::string_view> p;
+    {
+      std2::string s("hello, world!");
+      p = {s.str()};
+      assert_true(p[0] == "hello, world!"sv2);
+    }
+  }
+}
+
+
 int main()
 {
   vector_constructor();
   vector_iterator();
   vector_string_view();
   vector_box();
+  drop_only();
 }

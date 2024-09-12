@@ -30,7 +30,22 @@ void rc_constructor() safe
   }
 }
 
+void drop_only() safe
+{
+  {
+    std2::rc<std2::string_view> p;
+    {
+      std2::string s("hello, world!");
+
+      // TODO: re-enable this test once we get pointer variance working
+      // p = std2::rc(s.str());
+      // assert_true(*p == "hello, world!"sv2);
+    }
+  }
+}
+
 int main() safe
 {
   rc_constructor();
+  drop_only();
 }
