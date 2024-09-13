@@ -556,7 +556,7 @@ result in lifetime safety, type safety or thread safety undefined
 behaviors. Sometimes these operations are prohibited by the compiler
 frontend, as is the case with pointer arithmetic. Sometimes the
 operations are prohibited by static analysis in the compiler’s
-middle-end; that stops use of initialized variables and use-after-free
+middle-end; that stops use of uninitialized variables and use-after-free
 bugs, and it’s the enabling technology of the <em>ownership and
 borrowing</em> safety model. The remainder of issues, like out-of-bounds
 array subscripts, are addressed with runtime panic and aborts.</p>
