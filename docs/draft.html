@@ -1692,9 +1692,9 @@ the caller, not the callee.</p>
 <span id="cb26-15"><a href="#cb26-15" aria-hidden="true" tabindex="-1"></a>  Vec<span class="op">&lt;</span>unsafe String<span class="op">&gt;</span> vec <span class="op">{</span> <span class="op">}</span>;</span>
 <span id="cb26-16"><a href="#cb26-16" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb26-17"><a href="#cb26-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">// void Vec&lt;unsafe String&gt;::push_back(self^, unsafe String) safe;</span></span>
-<span id="cb26-18"><a href="#cb26-18" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Copy initialization of the `unsafe String` function parameter is</span></span>
-<span id="cb26-19"><a href="#cb26-19" aria-hidden="true" tabindex="-1"></a>  <span class="co">// permitted.</span></span>
-<span id="cb26-20"><a href="#cb26-20" aria-hidden="true" tabindex="-1"></a>  mut vec<span class="op">.</span>push_back<span class="op">(</span><span class="st">&quot;A string&quot;</span><span class="op">)</span>;</span>
+<span id="cb26-18"><a href="#cb26-18" aria-hidden="true" tabindex="-1"></a>  <span class="co">// This is ill-formed. We can&#39;t invoke the unsafe String constructor</span></span>
+<span id="cb26-19"><a href="#cb26-19" aria-hidden="true" tabindex="-1"></a>  <span class="co">// to initialize an unsafe type.</span></span>
+<span id="cb26-20"><a href="#cb26-20" aria-hidden="true" tabindex="-1"></a>  mut vec<span class="op">.</span>push_back<span class="op">(</span>String<span class="op">(</span><span class="st">&quot;A string&quot;</span><span class="op">))</span>;</span>
 <span id="cb26-21"><a href="#cb26-21" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
 <div class="sourceCode" id="cb27"><pre class="sourceCode default"><code class="sourceCode default"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>$ circle unsafe4.cxx</span>
 <span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>error: unsafe4.cxx:20:27</span>

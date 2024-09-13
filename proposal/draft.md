@@ -795,9 +795,9 @@ int main() safe {
   Vec<unsafe String> vec { };
 
   // void Vec<unsafe String>::push_back(self^, unsafe String) safe;
-  // Copy initialization of the `unsafe String` function parameter is
-  // permitted.
-  mut vec.push_back("A string");
+  // This is ill-formed. We can't invoke the unsafe String constructor
+  // to initialize an unsafe type.
+  mut vec.push_back(String("A string"));
 }
 ```
 ```
