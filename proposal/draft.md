@@ -2777,7 +2777,7 @@ Safe C++ must provide safe alternatives to everything in today's Standard Librar
 We're co-designing the Safe C++ standard library along with the language extensions. Visit our repository to follow our work. You can access all the examples included in this document. Or visit our Slack channel to get involved in the effort:
 
 > Github: [https://github.com/cppalliance/safe-cpp](https://github.com/cppalliance/safe-cpp)\
-> Slack: [https://cpplang.slack.com/archives/C07GH9NFK0F](https://cpplang.slack.com/archives/C07GH9NFK0F)\
+> Slack #safe-cpp channel: [https://cpplang.slack.com/](https://cpplang.slack.com/)\
 > Circle download: [https://www.circle-lang.org/](https://www.circle-lang.org/)\
 > Working draft: [https://cppalliance.org/safe-cpp/draft.html](https://cppalliance.org/safe-cpp/draft.html)
 
