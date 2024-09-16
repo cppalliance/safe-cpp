@@ -6,7 +6,7 @@
 
 #include <std2.h>
 
-#include "helpers.h"
+#include "lightweight_test.h"
 
 void simple() safe
 {
@@ -16,7 +16,7 @@ void simple() safe
     y if y >= 0 => 1337;
     _ => -1;
   };
-  assert_eq(z, 1337);
+  REQUIRE_EQ(z, 1337);
 }
 
 
@@ -92,28 +92,28 @@ void use_cow() safe
     };
 
     std2::string_view s = *borrow;
-    assert_eq(s, std2::string_view("rawr"));
+    REQUIRE_EQ(s, std2::string_view("rawr"));
   }
 
   {
     cow<std2::string> str = .owned(std2::string("rawr"));
-    assert_true(str.is_owned());
-    assert_true(!str.is_borrowed());
+    REQUIRE(str.is_owned());
+    REQUIRE(!str.is_borrowed());
 
     std2::string s = str rel.into_owned();
-    assert_eq(s, std2::string_view("rawr"));
+    REQUIRE_EQ(s, std2::string_view("rawr"));
   }
 
   {
     std2::string base("rawr");
     cow<std2::string> str = .borrowed(^const base);
-    assert_true(str.is_borrowed());
-    assert_true(!str.is_owned());
+    REQUIRE(str.is_borrowed());
+    REQUIRE(!str.is_owned());
 
     // std2::string^ b = mut str.to_mut();
 
     std2::string s = str rel.into_owned();
-    assert_eq(s, std2::string_view("rawr"));
+    REQUIRE_EQ(s, std2::string_view("rawr"));
   }
 
   {
@@ -122,8 +122,4 @@ void use_cow() safe
   }
 }
 
-int main() safe
-{
-  simple();
-  use_cow();
-}
+TEST_MAIN(simple, use_cow)

@@ -1,7 +1,7 @@
 #feature on safety
 
 #include <std2.h>
-#include "helpers.h"
+#include "lightweight_test.h"
 
 void drop_only() safe
 {
@@ -17,8 +17,4 @@ void drop_only() safe
   }
 }
 
-
-int main() safe
-{
-  drop_only();
-}
+TEST_MAIN(drop_only)
