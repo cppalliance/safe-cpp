@@ -1,7 +1,6 @@
 #feature on safety
 
-#include <std2.h>
-#include "helpers.h"
+#include "lightweight_test.h"
 
 struct borrow_with_drop/(a)
 {
@@ -24,7 +23,8 @@ void drop_only() safe
     std2::string s("hello, world!");
     std2::initializer_list<std2::string_view> list = { s.str() };
     {
-      assert_true(list.slice()[0] == "hello, world!"sv2);
+      REQUIRE_EQ(list.slice()[0], "hello, world!"sv2);
+
       std2::string s2("rawr");
       mut list.slice()[0] = s2.str();
     }
@@ -34,7 +34,7 @@ void drop_only() safe
     std2::string s("hello, world!");
     std2::initializer_list<std2::string> list = { rel s };
     {
-      assert_true(list.slice()[0] == "hello, world!"sv2);
+      REQUIRE_EQ(list.slice()[0], "hello, world!"sv2);
       std2::string s2("rawr");
       mut list.slice()[0] = rel s2;
     }
@@ -50,7 +50,4 @@ void drop_only() safe
   }
 }
 
-int main() safe
-{
-  drop_only();
-}
+TEST_MAIN(drop_only)

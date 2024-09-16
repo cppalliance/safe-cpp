@@ -8,7 +8,7 @@
 
 #include <cstdio>
 
-#include "helpers.h"
+#include "lightweight_test.h"
 
 int add(std2::arc<std2::mutex<int>> mtx, int x, int y) safe
 {
@@ -67,7 +67,7 @@ void thread_constructor() safe
     std2::thread t(add, cpy mtx, 1, 2);
 
     int r = *mtx->lock();
-    if (r != 1337) assert_eq(r, 1 + 2);
+    if (r != 1337) REQUIRE_EQ(r, 1 + 2);
 
     t rel.join();
   }
@@ -124,7 +124,7 @@ void mutex_test() safe
 
   int const val = *sp->lock()^.borrow();
   auto const expected = num_threads * 10'000;
-  assert_eq(val, expected);
+  REQUIRE_EQ(val, expected);
 }
 
 void shared_mutex_test() safe
@@ -189,12 +189,11 @@ void shared_mutex_test() safe
     t rel.join();
   }
 
-  assert_eq(**sp->lock_shared(), value);
+  REQUIRE_EQ(**sp->lock_shared(), value);
 }
 
-int main() safe
-{
-  thread_constructor();
-  mutex_test();
-  shared_mutex_test();
-}
+TEST_MAIN(
+  thread_constructor,
+  mutex_test,
+  shared_mutex_test
+)

@@ -5,26 +5,12 @@
 #feature on safety
 
 #include <std2.h>
-#include <cstdio>
-
-template<class T, class U>
-void assert_eq(const T^ t, const U^ u) safe
-{
-  if (*t != *u) throw "unequal values";
-}
-
-void assert_true(bool b) safe
-{
-  if (!b) throw "failed boolean assertion";
-}
+#include "lightweight_test.h"
 
 void source_location() safe
 {
-  char buf[] = {'l','m','a','o'};
-  auto loc = std2::source_location::current(buf);
+  auto loc = std2::source_location::current();
   unsafe { printf("%s\n", loc.file_name()); }
 }
 
-int main() {
-  source_location();
-}
+TEST_MAIN(source_location)

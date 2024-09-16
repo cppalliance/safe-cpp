@@ -7,44 +7,44 @@
 #include <std2.h>
 #include <string>
 
-#include "helpers.h"
+#include "lightweight_test.h"
 
 void vector_constructor() safe
 {
   {
     std2::vector<int> vec{};
-    assert_eq(vec.size(), 0u);
+    REQUIRE_EQ(vec.size(), 0u);
 
     vec^.push_back(1);
     vec^.push_back(2);
     vec^.push_back(3);
 
-    assert_eq(vec.size(), 3u);
+    REQUIRE_EQ(vec.size(), 3u);
 
     {
       auto s = vec^.slice();
-      assert_eq(s[0], 1);
-      assert_eq(s[1], 2);
-      assert_eq(s[2], 3);
+      REQUIRE_EQ(s[0], 1);
+      REQUIRE_EQ(s[1], 2);
+      REQUIRE_EQ(s[2], 3);
 
       s[0] = 17;
-      assert_eq((^vec)[0], 17);
+      REQUIRE_EQ((^vec)[0], 17);
 
       (^vec)[0] = 4;
-      assert_eq(vec[0], 4);
+      REQUIRE_EQ(vec[0], 4);
     }
 
     {
       auto s = vec.slice();
-      assert_eq(s[0], 4);
-      assert_eq(s[1], 2);
-      assert_eq(s[2], 3);
+      REQUIRE_EQ(s[0], 4);
+      REQUIRE_EQ(s[1], 2);
+      REQUIRE_EQ(s[2], 3);
     }
 
     {
       const std2::vector<int>^ v = ^vec;
       const int^ x = v[0];
-      assert_eq(*x, 4);
+      REQUIRE_EQ(*x, 4);
     }
   }
 
@@ -53,17 +53,17 @@ void vector_constructor() safe
     {
       std2::vector<int^> vec = {};
       vec^.push_back(^x);
-      assert_eq(vec.size(), 1u);
+      REQUIRE_EQ(vec.size(), 1u);
 
       {
         const [int^; dyn]^ elems = vec.slice();
-        assert_eq(*elems[0], 1);
+        REQUIRE_EQ(*elems[0], 1);
       }
 
       [int^; dyn]^ elems = (^vec).slice();
       *elems[0] = 20;
     }
-    assert_eq(x, 20);
+    REQUIRE_EQ(x, 20);
   }
 
   {
@@ -72,31 +72,31 @@ void vector_constructor() safe
       int^ p = ^x;
       std2::vector<int^^> vec = {};
       vec^.push_back(^p);
-      assert_eq(vec.size(), 1u);
+      REQUIRE_EQ(vec.size(), 1u);
 
       int^ const^ q = vec.slice()[0];
       (void)q;
 
-      assert_eq(**q, 1);
+      REQUIRE_EQ(**q, 1);
     }
   }
 
   {
     std2::vector<int> xs = { 1, 2, 3, 4, 5 };
-    assert_eq(xs.size(), 5u);
+    REQUIRE_EQ(xs.size(), 5u);
     for (int i = 0; i < 5; ++i) {
       auto idx = static_cast<std::size_t>(i);
-      assert_eq(xs[idx], i + 1);
+      REQUIRE_EQ(xs[idx], i + 1);
     }
   }
 
   {
     std2::vector<std2::box<int>> xs =
       { std2::box<int>(1), std2::box<int>(2), std2::box<int>(3), std2::box<int>(4), std2::box<int>(5) };
-    assert_eq(xs.size(), 5u);
+    REQUIRE_EQ(xs.size(), 5u);
     for (int i = 0; i < 5; ++i) {
       auto idx = static_cast<std::size_t>(i);
-      assert_eq(*xs[idx], i + 1);
+      REQUIRE_EQ(*xs[idx], i + 1);
     }
   }
 }
@@ -122,8 +122,8 @@ void vector_iterator() safe
       .none => true;
       .some(x) => false;
     };
-    assert_true(v.empty());
-    assert_true(b);
+    REQUIRE(v.empty());
+    REQUIRE(b);
 
     v^.push_back(1);
     v^.push_back(2);
@@ -131,14 +131,14 @@ void vector_iterator() safe
     v^.push_back(4);
     v^.push_back(5);
 
-    assert_eq(v.size(), 5u);
+    REQUIRE_EQ(v.size(), 5u);
 
     int sum = 0;
     for (int x : v.iter()) {
       sum += x;
     }
 
-    assert_eq(sum, 1 + 2 + 3 + 4 + 5);
+    REQUIRE_EQ(sum, 1 + 2 + 3 + 4 + 5);
   }
 }
 
@@ -157,11 +157,11 @@ void vector_string_view() safe
   strs^.push_back(sv2);
   strs^.push_back(sv3);
 
-  assert_eq(strs.size(), 3u);
+  REQUIRE_EQ(strs.size(), 3u);
 
   const std2::vector<std2::string_view>^ v = ^strs;
   const std2::string_view^ sv = v[0];
-  assert_eq(sv, sv1);
+  REQUIRE_EQ(sv, sv1);
 }
 
 void vector_box() safe
@@ -172,7 +172,7 @@ void vector_box() safe
     xs^.push_back(std2::box(1));
   }
 
-  assert_eq(xs.size(), 16u);
+  REQUIRE_EQ(xs.size(), 16u);
 }
 
 void drop_only() safe
@@ -182,17 +182,15 @@ void drop_only() safe
     {
       std2::string s("hello, world!");
       p = {s.str()};
-      assert_true(p[0] == "hello, world!"sv2);
+      REQUIRE(p[0] == "hello, world!"sv2);
     }
   }
 }
 
-
-int main()
-{
-  vector_constructor();
-  vector_iterator();
-  vector_string_view();
-  vector_box();
-  drop_only();
-}
+TEST_MAIN(
+  vector_constructor,
+  vector_iterator,
+  vector_string_view,
+  vector_box,
+  drop_only
+)
