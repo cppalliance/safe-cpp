@@ -168,7 +168,7 @@ public:
   static constexpr size_type npos = size_type(-1);
 
 private:
-  [[noreturn, safety::panic(panic_code::generic)]]
+  [[noreturn, noinline, safety::panic(panic_code::generic)]]
   static
   void panic_impl(string_constant<char> msg, source_location loc = source_location::current()) safe
   {
@@ -437,7 +437,7 @@ auto operator""sv2(wchar_t const* p, std::size_t len) noexcept safe -> wstring_v
 // Panic functions are categorized and marked with an safety::panic(N) attribute.
 // This makes it easy for the frontend to toggle on or off panic calls on a
 // per-file basis.
-[[noreturn, safety::panic(panic_code::generic)]]
+[[noreturn, noinline, safety::panic(panic_code::generic)]]
 inline void panic(
   str msg, source_location loc = source_location::current()) noexcept safe
 {
@@ -455,7 +455,7 @@ inline void panic(
   }
 }
 
-[[noreturn, safety::panic(panic_code::bounds)]]
+[[noreturn, noinline, safety::panic(panic_code::bounds)]]
 inline void panic_bounds(
   str msg, source_location loc = source_location::current()) noexcept safe
 {
