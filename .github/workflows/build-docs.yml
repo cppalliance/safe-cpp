@@ -1,0 +1,54 @@
+---
+name: Convert markdown docs to html
+
+on:
+  push:
+    branches: ["master", "develop"]
+    paths:
+      - proposal/**
+      - .github/workflows/build-docs.yml
+
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    container:
+      image: cppalliance/wg21:latest
+      options: --user 1001
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build docs
+        run: |
+            set -xe
+            # list_of_files="draft P3390R0"
+            list_of_files="draft"
+            cd proposal
+            git clone https://github.com/mpark/wg21.git
+            echo "include wg21/Makefile" > Makefile
+            for file in $list_of_files; do
+                make ${file}.html
+            done
+            cp generated/* ../docs/
+            cd ..
+            git config --global user.name 'commitbot'
+            git config --global user.email 'commitbot@boost.org'
+            git add docs/* || true
+            git commit -m "Docs: update from proposal/ md files" || true
+            git push
+
+      - name: Trigger Publish Workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.repos.createDispatchEvent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              event_type: 'publish-trigger',
+            });
