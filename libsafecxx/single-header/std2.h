@@ -798,6 +798,10 @@ public:
   T const^ operator->(self const^) noexcept safe {
     return ^*self->p_->data_.get();
   }
+
+  T const^ operator*(self const^) noexcept safe {
+    return ^*self->p_->data_.get();
+  }
 };
 
 ////////////////////////////////////////////////////////////////////////////////

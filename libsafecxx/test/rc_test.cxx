@@ -37,14 +37,13 @@ void drop_only() safe
       std2::string s("hello, world!");
 
       // TODO: re-enable this test once we get pointer variance working
-      // p = std2::rc(s.str());
-      // REQUIRE(*p == "hello, world!"sv2);
+      p = std2::rc(s.str());
+      REQUIRE(*p == "hello, world!"sv2);
     }
   }
 }
 
-int main() safe
-{
-  rc_constructor();
-  drop_only();
-}
+TEST_MAIN(
+  rc_constructor,
+  drop_only
+)
