@@ -38,7 +38,7 @@ jobs:
             cp generated/* ../docs/
             cd ..
             git config --global user.name 'commitbot'
-            git config --global user.email 'commitbot@boost.org'
+            git config --global user.email 'commitbot@example.com'
             git add docs/* || true
             git commit -m "Docs: update from proposal/ md files" || true
             git push
