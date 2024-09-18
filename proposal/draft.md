@@ -34,7 +34,11 @@ The government papers are backed by industry research. Microsoft's bug telemetry
 
 Security professionals urge projects to migrate away from C++ and adopt memory safe languages. But the scale of the problem is daunting. C++ powers software that has generated trillions of dollars of value. There are many veteran C++ programmers and lots of C++ code. Given how wide-spread C++ is, what can industry really do to improve software quality and reduce vulnerabilities? What are the options for introducing new memory safe code into existing projects and hardening software that already exists?
 
-There's only one popular systems level/non-garbage collected language that provides rigorous memory safety. That's the Rust language.[@rust-language] Although they play in the same space, C++ and Rust have different designs with limited interop capability, making incremental migration from C++ to Rust a painstaking process.
+> Decades of vulnerabilities have proven how difficult it is to prevent memory-corrupting bugs when using C/C++. While garbage-collected languages like C# or Java have proven more resilient to these issues, there are scenarios where they cannot be used. For such cases, we’re betting on Rust as the alternative to C/C++. Rust is a modern language designed to compete with the performance C/C++, but with memory safety and thread safety guarantees built into the language. While we are not able to rewrite everything in Rust overnight, we’ve already adopted Rust in some of the most critical components of Azure’s infrastructure. We expect our adoption of Rust to expand substantially over time.
+>
+> -- <cite>Microsoft Azure security evolution: Embrace secure multitenancy, Confidential Compute, and Rust</cite>cite>[@azure]
+
+There's only one mainstream systems level/non-garbage collected language that provides rigorous memory safety. That's the Rust language.[@rust-language] Although they play in the same space, C++ and Rust have different designs with limited interop capability, making incremental migration from C++ to Rust a painstaking process.
 
 Rust lacks function overloading, templates, inheritance and exceptions. C++ lacks traits, relocation and borrow checking. These discrepancies are responsible for an impedence mismatch when interfacing the two languages. Most code generators for inter-language bindings aren't able to represent features of one language in terms of the features of another. They typically identify a small number of special vocabulary types,[@vocabulary-types] which have first-class ergonomics, and limit functionality of other constructs.
 
@@ -2826,6 +2830,11 @@ references:
     citation-label: secure-by-design
     title: Secure by Design &colon; Google's Perspective on Memory Safety
     URL: https://research.google/pubs/secure-by-design-googles-perspective-on-memory-safety/
+
+  - id: azure
+    citation-label: azure
+    title: Microsoft Azure security evolution: Embrace secure multitenancy, Confidential Compute, and Rust
+    URL: https://azure.microsoft.com/en-us/blog/microsoft-azure-security-evolution-embrace-secure-multitenancy-confidential-compute-and-rust/
 
   - id: rust-language
     citation-label: rust-language
