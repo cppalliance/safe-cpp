@@ -36,7 +36,7 @@ Security professionals urge projects to migrate away from C++ and adopt memory s
 
 > Decades of vulnerabilities have proven how difficult it is to prevent memory-corrupting bugs when using C/C++. While garbage-collected languages like C# or Java have proven more resilient to these issues, there are scenarios where they cannot be used. For such cases, we’re betting on Rust as the alternative to C/C++. Rust is a modern language designed to compete with the performance C/C++, but with memory safety and thread safety guarantees built into the language. While we are not able to rewrite everything in Rust overnight, we’ve already adopted Rust in some of the most critical components of Azure’s infrastructure. We expect our adoption of Rust to expand substantially over time.
 >
-> -- <cite>Microsoft Azure security evolution: Embrace secure multitenancy, Confidential Compute, and Rust</cite>cite>[@azure]
+> -- <cite>Microsoft Azure security evolution: Embrace secure multitenancy, Confidential Compute, and Rust</cite>[@azure]
 
 There's only one mainstream systems level/non-garbage collected language that provides rigorous memory safety. That's the Rust language.[@rust-language] Although they play in the same space, C++ and Rust have different designs with limited interop capability, making incremental migration from C++ to Rust a painstaking process.
 
@@ -2833,7 +2833,7 @@ references:
 
   - id: azure
     citation-label: azure
-    title: Microsoft Azure security evolution: Embrace secure multitenancy, Confidential Compute, and Rust
+    title: Microsoft Azure security evolution&colon; Embrace secure multitenancy, Confidential Compute, and Rust
     URL: https://azure.microsoft.com/en-us/blog/microsoft-azure-security-evolution-embrace-secure-multitenancy-confidential-compute-and-rust/
 
   - id: rust-language

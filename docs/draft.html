@@ -526,8 +526,23 @@ wide-spread C++ is, what can industry really do to improve software
 quality and reduce vulnerabilities? What are the options for introducing
 new memory safe code into existing projects and hardening software that
 already exists?</p>
-<p>There’s only one popular systems level/non-garbage collected language
-that provides rigorous memory safety. That’s the Rust language.<span class="citation" data-cites="rust-language">[<a href="https://doc.rust-lang.org/book/" role="doc-biblioref">rust-language</a>]</span> Although they play in the
+<blockquote>
+<p>Decades of vulnerabilities have proven how difficult it is to prevent
+memory-corrupting bugs when using C/C++. While garbage-collected
+languages like C# or Java have proven more resilient to these issues,
+there are scenarios where they cannot be used. For such cases, we’re
+betting on Rust as the alternative to C/C++. Rust is a modern language
+designed to compete with the performance C/C++, but with memory safety
+and thread safety guarantees built into the language. While we are not
+able to rewrite everything in Rust overnight, we’ve already adopted Rust
+in some of the most critical components of Azure’s infrastructure. We
+expect our adoption of Rust to expand substantially over time.</p>
+<p>– <cite>Microsoft Azure security evolution: Embrace secure
+multitenancy, Confidential Compute, and Rust</cite><span class="citation" data-cites="azure">[<a href="https://azure.microsoft.com/en-us/blog/microsoft-azure-security-evolution-embrace-secure-multitenancy-confidential-compute-and-rust/" role="doc-biblioref">azure</a>]</span></p>
+</blockquote>
+<p>There’s only one mainstream systems level/non-garbage collected
+language that provides rigorous memory safety. That’s the Rust
+language.<span class="citation" data-cites="rust-language">[<a href="https://doc.rust-lang.org/book/" role="doc-biblioref">rust-language</a>]</span> Although they play in the
 same space, C++ and Rust have different designs with limited interop
 capability, making incremental migration from C++ to Rust a painstaking
 process.</p>
@@ -4927,6 +4942,10 @@ committee time on borrow checking?” — SF: 20, WF: 7, N: 1, WA: 0, SA:
 </div>
 <div id="ref-arc" class="csl-entry" role="doc-biblioentry">
 [arc] Automatic reference counting. <a href="https://docs.swift.org/swift-book/documentation/the-swift-programming-language/automaticreferencecounting/"><div class="csl-block">https://docs.swift.org/swift-book/documentation/the-swift-programming-language/automaticreferencecounting/</div></a>
+</div>
+<div id="ref-azure" class="csl-entry" role="doc-biblioentry">
+[azure] Microsoft Azure security evolution: Embrace secure multitenancy,
+Confidential Compute, and Rust. <a href="https://azure.microsoft.com/en-us/blog/microsoft-azure-security-evolution-embrace-secure-multitenancy-confidential-compute-and-rust/"><div class="csl-block">https://azure.microsoft.com/en-us/blog/microsoft-azure-security-evolution-embrace-secure-multitenancy-confidential-compute-and-rust/</div></a>
 </div>
 <div id="ref-borrow-checking" class="csl-entry" role="doc-biblioentry">
 [borrow-checking] The Rust RFC Book - Non-lexical lifetimes. <a href="https://rust-lang.github.io/rfcs/2094-nll.html"><div class="csl-block">https://rust-lang.github.io/rfcs/2094-nll.html</div></a>
