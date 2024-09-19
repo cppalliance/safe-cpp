@@ -28,11 +28,11 @@ Over the past two years, the United States Government has been issuing warnings 
 
 * May 7, 2024 - **National Cybersecurity Strategy Implementation Plan**[@ncsi-plan]
 
-The government papers are backed by industry research. Microsoft's bug telemetry reveals that 70% of its vulnerabilities would be stopped by memory safe languages.[@ms-vulnerabilities] Google's research finds 68% of 0day exploits are related to memory corruption.[@google-0day]
+The government papers are backed by industry research. Microsoft's bug telemetry reveals that 70% of its vulnerabilities would be stopped by memory safe languages.[@ms-vulnerabilities] Google's research finds 68% of 0-day exploits are related to memory corruption.[@google-0day]
 
 * Mar. 4, 2024 - **Secure by Design: Google's Perspective on Memory Safety**[@secure-by-design]
 
-Security professionals urge projects to migrate away from C++ and adopt memory safe languages. But the scale of the problem is daunting. C++ powers software that has generated trillions of dollars of value. There are many veteran C++ programmers and lots of C++ code. Given how wide-spread C++ is, what can industry really do to improve software quality and reduce vulnerabilities? What are the options for introducing new memory safe code into existing projects and hardening software that already exists?
+Security professionals urge projects to migrate away from C++ and adopt memory safe languages. But the scale of the problem is daunting. C++ powers software that has generated trillions of dollars of value. There are many veteran C++ programmers and lots of C++ code. Given how widespread C++ is, what can industry really do to improve software quality and reduce vulnerabilities? What are the options for introducing new memory safe code into existing projects and hardening software that already exists?
 
 > Decades of vulnerabilities have proven how difficult it is to prevent memory-corrupting bugs when using C/C++. While garbage-collected languages like C# or Java have proven more resilient to these issues, there are scenarios where they cannot be used. For such cases, we’re betting on Rust as the alternative to C/C++. Rust is a modern language designed to compete with the performance C/C++, but with memory safety and thread safety guarantees built into the language. While we are not able to rewrite everything in Rust overnight, we’ve already adopted Rust in some of the most critical components of Azure’s infrastructure. We expect our adoption of Rust to expand substantially over time.
 >
@@ -40,15 +40,15 @@ Security professionals urge projects to migrate away from C++ and adopt memory s
 
 There's only one mainstream systems level/non-garbage collected language that provides rigorous memory safety. That's the Rust language.[@rust-language] Although they play in the same space, C++ and Rust have different designs with limited interop capability, making incremental migration from C++ to Rust a painstaking process.
 
-Rust lacks function overloading, templates, inheritance and exceptions. C++ lacks traits, relocation and borrow checking. These discrepancies are responsible for an impedence mismatch when interfacing the two languages. Most code generators for inter-language bindings aren't able to represent features of one language in terms of the features of another. They typically identify a small number of special vocabulary types,[@vocabulary-types] which have first-class ergonomics, and limit functionality of other constructs.
+Rust lacks function overloading, templates, inheritance and exceptions. C++ lacks traits, relocation and borrow checking. These discrepancies are responsible for an impedance mismatch when interfacing the two languages. Most code generators for interlanguage bindings aren't able to represent features of one language in terms of the features of another. They typically identify a small number of special vocabulary types,[@vocabulary-types] which have first-class ergonomics, and limit functionality of other constructs.
 
-The foreignness of Rust for career C++ developers combined with the the friction of interop tools makes hardening C++ applications by rewriting critical sections in Rust difficult. Why is there no in-language solution to memory safety? _Why not a Safe C++?_
+The foreignness of Rust for career C++ developers combined with the friction of interop tools makes hardening C++ applications by rewriting critical sections in Rust difficult. Why is there no in-language solution to memory safety? _Why not a Safe C++?_
 
 ## Extend C++ for safety
 
 The goal of this proposal is to advance a superset of C++ with a _rigorously safe subset_. Begin a new project, or take an existing one, and start writing safe code in C++. Code in the safe context exhibits the same strong safety guarantees as code written in Rust.
 
-Rigorous safety is a carrot-and-stick approach. The stick comes first. The stick is what security researchers and regulators care about. Safe C++ developers are prohibited from writing operations that may result in lifetime safety, type safety or thread safety undefined behaviors. Sometimes these operations are prohibited by the compiler frontend, as is the case with pointer arithmetic. Sometimes the operations are prohibited by static analysis in the compiler's middle-end; that stops use of uninitialized variables and use-after-free bugs, and it's the enabling technology of the _ownership and borrowing_ safety model. The remainder of issues, like out-of-bounds array subscripts, are addressed with runtime panic and aborts.
+Rigorous safety is a carrot-and-stick approach. The stick comes first. The stick is what security researchers and regulators care about. Safe C++ developers are prohibited from writing operations that may result in lifetime safety, type safety or thread safety undefined behaviors. Sometimes these operations are prohibited by the compiler frontend, as is the case with pointer arithmetic. Sometimes the operations are prohibited by static analysis in the compiler's middle-end; that stops use of uninitialized variables and use-after-free bugs, and it's the enabling technology of the _ownership and borrowing_ safety model. The remaining issues, like out-of-bounds array subscripts, are addressed with runtime panic and aborts.
 
 The carrot is a suite of new capabilities which improve on the unsafe ones denied to users. The affine type system makes it easier to relocate objects without breaking type safety. Pattern matching, which is safe and expressive, interfaces with the extension's new choice types. Borrow checking,[@borrow-checking] the most sophisticated part of the Safe C++, provides a new reference type that flags use-after-free and iterator invalidation defects at compile time.
 
@@ -104,7 +104,7 @@ Line 7: `for(int x : vec)` - Ranged-for on the vector. The standard mechanism re
 
 Line 10: `mut vec.push_back(x);` - Push a value onto the vector. The `mut` token establishes a [_mutable context_](#the-mutable-context) which enables standard conversions from lvalues to mutable borrows and references. When `[safety]` is enabled, _all mutations are explicit_. Explicit mutation lends precision when choosing between shared borrows and mutable borrows of an object. Rust doesn't feature function overloading, so it will bind whatever kind of reference it needs to a member function's object. C++, by contrast, has function overloading, so we'll need to be explicit in order to get the overload we want. Use `mut` to bind mutable borrows. Or don't use it and bind shared borrows.
 
-If `main` checks out syntatically, its AST is lowered to MIR, where initialization and borrow checking takes place. The hidden `slice_iterator` that powers the ranged-for loop stays initialized over the duration of the loop. The `push_back` call _invalidates_ that iterator, by mutating a place (the vector) that the iterator has a constraint on. When the value `x` is next loaded out of the iterator, the borrow checker raises an error: `mutable borrow of vec between its shared borrow and its use`. The borrow checker prevents Safe C++ from compiling a program that may exhibit undefined behavior. This analysis is done at compile time. It has no impact on your binary's size or execution speed.
+If `main` checks out syntactically, its AST is lowered to MIR, where initialization and borrow checking takes place. The hidden `slice_iterator` that powers the ranged-for loop stays initialized over the duration of the loop. The `push_back` call _invalidates_ that iterator, by mutating a place (the vector) that the iterator has a constraint on. When the value `x` is next loaded out of the iterator, the borrow checker raises an error: `mutable borrow of vec between its shared borrow and its use`. The borrow checker prevents Safe C++ from compiling a program that may exhibit undefined behavior. This analysis is done at compile time. It has no impact on your binary's size or execution speed.
 
 This sample is only a few lines, but it introduces several new mechanisms and types. A comprehensive effort is needed to supply a superset of the language with a safe subset that has enough flexibility to remain expressive.
 
@@ -116,7 +116,7 @@ Many C++ functions have preconditions that you'd have to read the docs to unders
 
 Here's the memory safety value proposition: language and library vendors make an extra effort to provide a robust environment so that users _don't have to read the docs_. No matter how they use the tooling, their actions will not raise undefined behavior and compromise their software to safety-related exploits. No system can guard against all misuse, and hastily written code may have plenty of logic bugs. But those logic bugs won't lead to memory-safety vulnerabilities.
 
-Consider an old libc function, `std::isprint`,[@isprint] that exhibits unsafe design. This function takes an `int` parameter. _But it's not valid to call `std::isprint` for all int arguments_. The preconditions state the function be called only with arguments between -1 and 255:
+Consider an old libc function, `std::isprint`,[@isprint] that exhibits unsafe design. This function takes an `int` parameter. _But it's not valid to call `std::isprint` for all int arguments_. The preconditions state the function can be called only with arguments between -1 and 255:
 
 > Like all other functions from `<cctype>`, the behavior of `std::isprint` is undefined if the argument's value is neither representable as unsigned char nor equal to EOF. To use these functions safely with plain chars (or signed chars), the argument should first be converted to unsigned char.
 > Similarly, they should not be directly used with standard algorithms when the iterator's value type is char or signed char. Instead, convert the value to unsigned char first.
@@ -210,7 +210,7 @@ The "billion-dollar mistake" is a type safety problem. Consider `std::unique_ptr
 
 As Hoare observes, the problem comes from conflating two different things, a pointer to an object and an empty state, into the same type and giving them the same interface. Smart pointers should only hold valid pointers. Denying the null state eliminates undefined behavior.
 
-We address the type safety problem by overhauling the object model. Safe C++ features a new kind of move: [_relocation_](#relocation-object-model), also called _destructive move_. The object model is called an _affine_ or a _linear_ type system. Unless explicitly initialized, objects start out _uninitialized_. They can't be used in this state. When you assign to an object, it becomes initialized. When you relocate from an object, it's value is moved and it's reset to uninitialized. If you relocate from an object inside control flow, it becomes _potentially uninitialized_, and its destructor is conditionally executed after reading a compiler-generated drop flag.
+We address the type safety problem by overhauling the object model. Safe C++ features a new kind of move: [_relocation_](#relocation-object-model), also called _destructive move_. The object model is called an _affine_ or a _linear_ type system. Unless explicitly initialized, objects start out _uninitialized_. They can't be used in this state. When you assign to an object, it becomes initialized. When you relocate from an object, its value is moved and it's reset to uninitialized. If you relocate from an object inside control flow, it becomes _potentially uninitialized_, and its destructor is conditionally executed after reading a compiler-generated drop flag.
 
 `std2::box` is our version of `unique_ptr`. It has no null state. There's no default constructor. Dereference it without risk of undefined behavior. If this design is so much safer, why doesn't C++ simply introduce its own fixed `unique_ptr` without a null state? Blame C++11 move semantics.
 
@@ -263,7 +263,7 @@ The compiler can only relocate local variables. How do we move objects that live
 
 The C++ Standard Library has an optional type, but it's not safe to use. The optional API is full of undefined behaviors: using `operator*` or `operator->` while the value is disengaged raises undefined behavior. `std::expected`, new to C++23, exhibits the same undefined behaviors for out-of-contract uses of its `operator*`, `operator->` and `error` APIs.
 
-If we were to represent the null state by wrapping the safe `std2::box` in an `std::optional`, that would be just as unsafe as using `std::unique_ptr`. The `operator->` is unsafe either way. We need a new _sum type_ that doesn't exhibit the union-like safety defects of `std::optional` and `std::expected`.
+If we were to represent the null state by wrapping the safe `std2::box` in a `std::optional`, that would be just as unsafe as using `std::unique_ptr`. The `operator->` is unsafe either way. We need a new _sum type_ that doesn't exhibit the union-like safety defects of `std::optional` and `std::expected`.
 
 ```cpp
 template<class T+>
@@ -337,7 +337,7 @@ Pattern matching and choice types aren't just a qualify-of-life improvement. The
 
 ### Thread safety
 
-A memory safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread may access it. C++ is not a thread safe language. Its synchronization objects, such as `std::mutex`, are opt-in. If a user reads shared mutable state from outside of a mutex, that's a potential data race. It's up to users to coordinate that the same synchronization objects are locked before accessing the same shared mutable state.
+A memory safe language should be robust against data races to shared mutable state. If one thread is writing to shared state, no other thread may access it. C++ is not a thread-safe language. Its synchronization objects, such as `std::mutex`, are opt-in. If a user reads shared mutable state from outside of a mutex, that's a potential data race. It's up to users to coordinate that the same synchronization objects are locked before accessing the same shared mutable state.
 
 Due to their non-deterministic nature, data race defects are notoriously difficult to debug. Safe C++ prevents them from occurring in the first place. Programs with potential data race bugs in the safe context are ill-formed at compile time.
 
@@ -414,13 +414,13 @@ Hello world - 🔥🔥🔥🔥🔥🔥🔥🔥🔥
 Hello world - 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
 ```
 
-We spawn ten threads which append a fire emoji to a shared string. The string is stored in an `std2::mutex` which is owned by an `arc`, which stands for "atomic reference count." The `arc` provides _shared ownership_ of the data. The `mutex` provides _shared access_ to it. C++ programmers often think that `std::shared_ptr` pointer provides safe shared access to objects. It does not. It only provides shared ownership.
+We spawn ten threads which append a fire emoji to a shared string. The string is stored in a `std2::mutex` which is owned by an `arc`, which stands for "atomic reference count." The `arc` provides _shared ownership_ of the data. The `mutex` provides _shared access_ to it. C++ programmers often think that `std::shared_ptr` pointer provides safe shared access to objects. It does not. It only provides shared ownership.
 
 `arc`'s accessor `operator->` returns const-qualified borrows to the owned data. You can't mutate through most const-qualified types. You can only mutate through const-qualified types that encapsulate `unsafe_cell`, such as `cell`, `ref_cell`, `mutex` and `shared_mutex`. This is how [interior mutability](#interior-mutability) implements shared mutable access. The safe standard library provides `mutex` and `shared_mutex` which satisfy the [`send` and `sync`](#send-and-sync) interfaces. Only types satisfying `send` may be copied through the `std2::thread` constructor.
 
-Inside the worker thread, we `lock` the mutex to initialize a lock guard object. The lock guard is an RAII type: on its construction the mutex is locked and on its destruction the mutex is unlocked. We call `borrow` on the lock guard to gain a mutable borrow to the string it contains. It's only correct to use the reference while the lock guard is in scope, that is, while the thread has the mutex locked. Now we have exclusive access to the string inside the mutex and append the fire emoji without risking a data race.
+Inside the worker thread, we `lock` the mutex to initialize a lock guard object. The lock guard is a RAII type: on its construction the mutex is locked and on its destruction the mutex is unlocked. We call `borrow` on the lock guard to gain a mutable borrow to the string it contains. It's only correct to use the reference while the lock guard is in scope, that is, while the thread has the mutex locked. Now we have exclusive access to the string inside the mutex and append the fire emoji without risking a data race.
 
-But the thread safety isn't yet demonstrated: the claim isn't that we _can_ write thread safe software; the claim is that it's _ill-formed_ to write thread unsafe software.
+But the thread safety isn't yet demonstrated: the claim isn't that we _can_ write thread-safe software; the claim is that it's _ill-formed_ to write thread unsafe software.
 
 Let's sabotage our own design. Uncomment the `drp lock_guard` line. The lock guard is destroyed and unlocks the mutex. The next statement prints the string outside of the mutex, which is a data race, because one of the other nine threads may at that instant be appending to the string.
 
@@ -439,7 +439,7 @@ safety: during safety checking of void entry_point(std2::arc<std2::mutex<std2::s
                     ^
 ```
 
-Fortunately the borrow checker refuses to compile this function. We're informed that our use of `s` in `println(*s)` depends on an expired loan, which is the loan on the lock guard that gave us the string borrow in `mut lock_guard.borrow()`. That loan was invalidated when we dropped the lock guard: dropping a place with a live borrow on it is a borrow checker error.
+Fortunately, the borrow checker refuses to compile this function. We're informed that our use of `s` in `println(*s)` depends on an expired loan, which is the loan on the lock guard that gave us the string borrow in `mut lock_guard.borrow()`. That loan was invalidated when we dropped the lock guard: dropping a place with a live borrow on it is a borrow checker error.
 
 This time uncomment `drp data` to destroy the thread's copy of the `arc` object. This decrements the ref count and potentially frees the string data. This is undesirable, as the subsequent statement prints that same string, and we don't want a use-after-free bug.
 
@@ -465,7 +465,7 @@ This is lifetime safety with an additional level of indirection compared to the 
 
 Safe operations that can't be checked for soundness with static analysis must be checked at runtime. An operation may return an error code, throw an exception or panic and abort. Panics terminate the program, which is far preferable from a security standpoint than entering undefined behavior.
 
-* Builtin arrays and slices panic on out-of-bounds subscripts.
+* Built-in arrays and slices panic on out-of-bounds subscripts.
 * Integer division panics when the divisor is zero or when the numerator is INT_MIN and the divisor is -1.
 * `std2::vector` panics on out-of-bounds subscripts.
 * `std2::ref_cell` panics when requesting a mutable borrow and the inner object is borrowed or when requesting a shared borrow and the inner object is mutably borrowed.
@@ -492,7 +492,7 @@ subscript is out-of-range of type int[4]
 Aborted (core dumped)
 ```
 
-The compiler emits panics for out-of-bounds subscripts on builtin arrays and slice types. The runtime can be elided with [unsafe subscripts](#unsafe-subscripts).
+The compiler emits panics for out-of-bounds subscripts on built-in arrays and slice types. The runtime can be elided with [unsafe subscripts](#unsafe-subscripts).
 
 [**subscript_vector.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/subscript_vector.cxx)
 ```cpp
@@ -516,7 +516,7 @@ vector subscript is out-of-bounds
 Aborted (core dumped)
 ```
 
-Out-of-contract use of user-defined types should panic with a similar message. Unlike Standard C++, our containers always perform bounds checking. As with builtin types, the runtime check can be elided with [unsafe subscripts](#unsafe-subscripts) or disabled for the entire translation unit with the `-no-panic` compiler switch. This is a drastic measure and is intended for profiling the effects of runtime checks.
+Out-of-contract use of user-defined types should panic with a similar message. Unlike Standard C++, our containers always perform bounds checking. As with built-in types, the runtime check can be elided with [unsafe subscripts](#unsafe-subscripts) or disabled for the entire translation unit with the `-no-panic` compiler switch. This is a drastic measure and is intended for profiling the effects of runtime checks.
 
 ```cpp
 template<typename T+>
@@ -732,7 +732,7 @@ int main() safe {
   // Requires unsafe type specifier because std::string's dtor is unsafe.
   std2::vector<unsafe std::string> vec { };
 
-  // Construct an std::string from a const char* (unsafe)
+  // Construct a std::string from a const char* (unsafe)
   // Pass by relocation (unsafe)
   mut vec.push_back("Hello unsafe type qualifier!");
 
@@ -774,7 +774,7 @@ int main() safe {
 }
 ```
 
-In this example, the unsafe `String` constructor is called in the safe `main` function. That's permitted because substitution of `unsafe String` into Vec's template parameter creates a `push_back` specialization with an `unsafe String` function parameter. Safe C++ allows unsafe constructors to initialize unsafe-qualified types in an safe context.
+In this example, the unsafe `String` constructor is called in the safe `main` function. That's permitted because substitution of `unsafe String` into Vec's template parameter creates a `push_back` specialization with an `unsafe String` function parameter. Safe C++ allows unsafe constructors to initialize unsafe-qualified types in a safe context.
 
 Permitting unsafe operations with unsafe qualifier specialization is less noisy and exposes less of the implementation than using conditional _unsafe-specifiers_ on the class template's member functions. More importantly, we want to keep the new vector's interface safe, even when it's specialized with unsafe types. This device allows member functions to remain safe without resorting to _unsafe-blocks_ in the implementations. There's a single use of the `unsafe` token, which makes for simple audits during code review.
 
@@ -853,7 +853,7 @@ To be more accommodating when mixing unsafe with safe code, the `unsafe` qualifi
 
 ### unsafe subscripts
 
-There's one more prominent use of the `unsafe` token: it suppresses runtime bounds checks in subscript operations on both builtin and user-defined types. For applications where nanoseconds matter, developers may want to forego runtime bounds checking. In Safe C++, this is straight forward. Just write `; unsafe` in your array, slice or vector subscript.
+There's one more prominent use of the `unsafe` token: it suppresses runtime bounds checks in subscript operations on both built-in and user-defined types. For applications where nanoseconds matter, developers may want to forego runtime bounds checking. In Safe C++, this is straight forward. Just write `; unsafe` in your array, slice or vector subscript.
 
 [**unsafe_bounds.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe_bounds.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/9xajqhrvc)
 ```cpp
@@ -1095,7 +1095,7 @@ impl vector<T> : make_iter {
 
 To opt into safe ranged-for iteration, containers implement the `std2::make_iter` interface. They can provide const iterators, mutable iterators or _consuming iterators_ which take ownership of the operand's data and destroy its container in the process.
 
-Because the _range-initializer_ of the loop is an lvalue of `vector` that's outside the mutable context, the const iterator overload of `vector<T>::iter` gets chosen. That returns an `std2::slice_iterator<T const>` into the vector's contents. Here's the first borrow: lifetime elision invents a lifetime parameter for the `self const^` parameter, which is also used for the named lifetime argument `/a` of the `slice_iterator` return type. As with the use-after-free example, the `vector<T>::iter` function declaration establishes an _outlives-constraint_: the lifetime on the `self const^` operand must outlive the lifetime on the result object.
+Because the _range-initializer_ of the loop is an lvalue of `vector` that's outside the mutable context, the const iterator overload of `vector<T>::iter` gets chosen. That returns a `std2::slice_iterator<T const>` into the vector's contents. Here's the first borrow: lifetime elision invents a lifetime parameter for the `self const^` parameter, which is also used for the named lifetime argument `/a` of the `slice_iterator` return type. As with the use-after-free example, the `vector<T>::iter` function declaration establishes an _outlives-constraint_: the lifetime on the `self const^` operand must outlive the lifetime on the result object.
 
 ```cpp
 template<class T>
@@ -2123,7 +2123,7 @@ struct Pair {
 Pair g { 10, 20 };
 
 int main() {
-  // Relocate from an std::tuple element.
+  // Relocate from a std::tuple element.
   auto tup = std::make_tuple(5, 1.619);
   int x = rel *get<0>(&tup);
 
@@ -2216,7 +2216,7 @@ Use `circle -print-mir` to dump the MIR of this program.
    20  InstEnd _4
 ```
 
-The assignment `t3.0.0.1` lowers to `_4.0.0.1`. This is a place name of a local variable. Importantly, it doesn't involve dereferences, unlike the result of an `std::get` call. It's an _owned place_ which the compiler is able to relocate out of.
+The assignment `t3.0.0.1` lowers to `_4.0.0.1`. This is a place name of a local variable. Importantly, it doesn't involve dereferences, unlike the result of a `std::get` call. It's an _owned place_ which the compiler is able to relocate out of.
 
 C++'s native array decays to pointers and doesn't support pass-by-value semantics. `std::array` encapsulates arrays to fix these problems and provides an `operator[]` API for consistent subscripting syntax. But `std::array` is broken for our purposes. Since `operator[]` returns a reference, the `std::array`'s elements are not _owned places_ and can't be relocated out of.
 
@@ -2224,7 +2224,7 @@ Safe C++ introduces a first-class pass-by-value array type `[T; N]` and a first-
 
 Slices have dynamic length and are _incomplete types_. You may form borrows, references or pointers to slices and access through those. These are called _fat pointers_ and are 16 bytes on 64-bit platforms. The data pointer is accompanied by a length field.
 
-The new array type, the slice type and the legacy builtin array type panic on out-of-bounds subscripts. They exhibit bounds safety in the new object model. Use [unsafe subscripts](#unsafe-subscripts) to suppress the runtime bounds check.
+The new array type, the slice type and the legacy built-in array type panic on out-of-bounds subscripts. They exhibit bounds safety in the new object model. Use [unsafe subscripts](#unsafe-subscripts) to suppress the runtime bounds check.
 
 Making `std::pair`, `std::tuple` and `std::array` magic types with native support for relocation is on the short list of language improvements. We hope to incorporate this functionality for the next revision of this proposal. In the meantime, the first-class replacement types provide us with a convenient path forward for developing the safe standard library.
 
@@ -2401,7 +2401,7 @@ int test(Primitive obj) noexcept safe {
 }
 ```
 
-A _match-expression_'s operand is an expression of class, choice, array, slice, arithmetic, builtin vector or builtin matrix type. The _match-specifier_ is populated with a set of _match-clauses_. Each _match-clause_ has a _pattern_ on the left, an optional _match-guard_ in the middle, and a _match-body_ after the `=>` token.
+A _match-expression_'s operand is an expression of class, choice, array, slice, arithmetic, built-in vector or built-in matrix type. The _match-specifier_ is populated with a set of _match-clauses_. Each _match-clause_ has a _pattern_ on the left, an optional _match-guard_ in the middle, and a _match-body_ after the `=>` token.
 
 A match is rich in the kind of patterns it supports:
 
@@ -2587,7 +2587,7 @@ class [[
 ]] arc;
 ```
 
-`std2::arc` is the atomic reference-counted pointer. If its inner type is both `send` and `sync`, then the `arc` specialization is also `send` and `sync`. Most types with _value semantics_, including builtin types, are `send` and `sync`. By the rules of _inherited mutability_, so are aggregate types built from `send` and `sync` subobjects. `std2::arc<int>` is `send`, permitting copy to other threads.
+`std2::arc` is the atomic reference-counted pointer. If its inner type is both `send` and `sync`, then the `arc` specialization is also `send` and `sync`. Most types with _value semantics_, including built-in types, are `send` and `sync`. By the rules of _inherited mutability_, so are aggregate types built from `send` and `sync` subobjects. `std2::arc<int>` is `send`, permitting copy to other threads.
 
 But `std2;:arc<int>` isn't an interesting case. `arc`'s interface only produces _const_ borrows to the owned value: you can't have a data race if you're only reading from something. `arc` is intended to be used with types that implement [_interior mutability_](#interior-mutability), permitting mutation through const references. `sync` characterizes the thread safety of hde deconfliction mechanisms of types with interior mutability. Is that deconfliction mechanism _single threaded_ (`sync`=false) or _multi-threaded_ (`sync`=true)?
 
@@ -2606,9 +2606,9 @@ class [[
 ]] mutex;
 ```
 
-`std2::mutex` is another candidate for use with `std2::arc`. This type is thread safe. As shown in the [thread safety](#thread-safety) example, it provides threads with exclusive access to its interior data using a synchronization object. The borrow checker prevents the reference to the inner data from being used outside of the mutex's lock. Therefore, `std2::mutex` is `sync` if its inner type is `send`. Why make it conditional on `send` when the mutex is already providing threads with exclusive access to the inner value? This provides protection for the rare type with thread affinity. A type is `send` if it can both be copied to a different thread _and used_ by a different thread.
+`std2::mutex` is another candidate for use with `std2::arc`. This type is thread-safe. As shown in the [thread safety](#thread-safety) example, it provides threads with exclusive access to its interior data using a synchronization object. The borrow checker prevents the reference to the inner data from being used outside of the mutex's lock. Therefore, `std2::mutex` is `sync` if its inner type is `send`. Why make it conditional on `send` when the mutex is already providing threads with exclusive access to the inner value? This provides protection for the rare type with thread affinity. A type is `send` if it can both be copied to a different thread _and used_ by a different thread.
 
-`std2::arc<std2::mutex<T>>` is `send` if `std2::mutex<T>` is `send` and `sync`. `std2::mutex<T>` is `send` and `sync` if `T` is `send`. Since most types are `send` by construction, we can safely mutate shared state over multiple threads as long as its wrapped in a `std2::mutex` and that's owned by an `std2::arc`. The `arc` provides shared ownership. The `mutex` provides shared mutation.
+`std2::arc<std2::mutex<T>>` is `send` if `std2::mutex<T>` is `send` and `sync`. `std2::mutex<T>` is `send` and `sync` if `T` is `send`. Since most types are `send` by construction, we can safely mutate shared state over multiple threads as long as its wrapped in a `std2::mutex` and that's owned by a `std2::arc`. The `arc` provides shared ownership. The `mutex` provides shared mutation.
 
 ```cpp
 class thread {
@@ -2631,11 +2631,11 @@ The `send` constraint against demonstrates the safety model's [theme of responsi
 
 `std2::thread` is designed defensively with the safety promise that it won't produce undefined behavior no matter how it's used. Can we fool `thread` into producing a data race? 
 
-**Pass a borrow to a value on the stack.** There's no guarantee that the thread will join before the stack object is destroyed. Is that a potential use-after-free? No, because the thread has an _outlives-constraint_ which checks that all function arguments outlive `/static`. An `std2::arc` doesn't have lifetime arguments (unless its inner type is a lifetime binder), so that checks out. But a shared or mutable borrow does have a lifetime argument, and if it refers to an object on the stack, it's not `/static`. Those are arguments are accepted by the _requires-clause_ but are rejected by the borrow checker.
+**Pass a borrow to a value on the stack.** There's no guarantee that the thread will join before the stack object is destroyed. Is that a potential use-after-free? No, because the thread has an _outlives-constraint_ which checks that all function arguments outlive `/static`. A `std2::arc` doesn't have lifetime arguments (unless its inner type is a lifetime binder), so that checks out. But a shared or mutable borrow does have a lifetime argument, and if it refers to an object on the stack, it's not `/static`. Those are arguments are accepted by the _requires-clause_ but are rejected by the borrow checker.
 
-**Pass a borrow to a global variable.** If the global's type is not `sync`, then a borrow to it is not `send`, and that's a constraint violation. If the global variable is mutable, that could cause a data race. Fortunately it's ill-formed to name mutable global objects in a [safe context](#the-safe-context). Otherwise, it's safe to share const global objects between threads.
+**Pass a borrow to a global variable.** If the global's type is not `sync`, then a borrow to it is not `send`, and that's a constraint violation. If the global variable is mutable, that could cause a data race. Fortunately, it's ill-formed to name mutable global objects in a [safe context](#the-safe-context). Otherwise, it's safe to share const global objects between threads.
 
-It's the responsibility of a safe library to think through all possible scenarios of use and prevent execution that could result in soundness defects. After all, the library author is a specialist in that domain. This is a friendlier system than Standard C++, which places the all the weight of writing thread safe code on the shoulders of users.
+It's the responsibility of a safe library to think through all possible scenarios of use and prevent execution that could result in soundness defects. After all, the library author is a specialist in that domain. This is a friendlier system than Standard C++, which places the all the weight of writing thread-safe code on the shoulders of users.
 
 ## Unresolved design issues
 
