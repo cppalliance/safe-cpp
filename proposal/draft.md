@@ -2791,25 +2791,25 @@ An earlier version of this work was presented to SG23 at the St Louis 2024 ISO m
 
 # FAQ
 
-Q. [What is the goal?](#goal)
-Q. [Will Safe-C++ break my code?](#Will-Safe-C-break-my-code)
-Q. [Why does this proposal introduce a whole new standard library (std2)?](Why-does-this-proposal-introduce-a-whole-new-standard-library-std2)
-Q. [Why do we need to borrow Rust's borrow checker?](Why do we need to borrow Rusts borrow checker)
-Q. [Why not use Hylo's approach?](Why not use Hylos approach)
-Q. [Why not use safety profiles?](Why not use safety profiles)
-Q. [Why do the safe language alternatives to unsafe c++ language constructs use Rust names rather than existing C++ names?](Why do the safe language alternatives to unsafe c language constructs use Rust names rather than existing C names)
-Q. [I do not like the proposed syntax, why is it so ugly?](I do not like the proposed syntax why is it so ugly)
+* [What is the goal?](#What-is-the-goal)
+* [Will Safe-C++ break my code?](#Will-Safe-C-break-my-code)
+* [Why does this proposal introduce a whole new standard library (std2)?](Why-does-this-proposal-introduce-a-whole-new-standard-library-std2)
+* [Why do we need to borrow Rust's borrow checker?](Why do we need to borrow Rusts borrow checker)
+* [Why not use Hylo's approach?](Why not use Hylos approach)
+* [Why not use safety profiles?](Why not use safety profiles)
+* [Why do the safe language alternatives to unsafe c++ language constructs use Rust names rather than existing C++ names?](Why do the safe language alternatives to unsafe c language constructs use Rust names rather than existing C names)
+* [I do not like the proposed syntax, why is it so ugly?](I do not like the proposed syntax why is it so ugly)
 Q. [Why is `std::*` missing from `std2`?](Why is std missing from std2)
-Q. [Won't `std2` lead to an extreme function coloring problem?](Won't std2 lead to an extreme function coloring problem)
-Q. [Are there runtime checks?](Are there runtime checks)
-Q. [There's promising research that could yield a solution that is both more simple and more elegant than rust-style borrow checking. Why not wait?](Theres promising research that could yield a solution that is both more simple and more elegant than rust-style borrow checking Why not wait)
-Q. [Why are lifetimes annotated using `/` rather than `'`?](Why are lifetimes annotated using rather than)
-Q. [Can Safe C++ make my program safer just by recompiling existing code?](Can Safe C make my program safer just by recompiling existing code)
-Q. [What is the difference between `cpy x` and `T(const T&)`?](What is the difference between cpy x and Tconst T)
-Q. [What is the difference between `drp x` and `~T()`?](What is the difference between drp x and T)
-Q. [What is the difference between `unsafe_cell` and `const_cast`?](What is the difference between unsafe_cell and const_cast)
+* [Won't `std2` lead to an extreme function coloring problem?](Won't std2 lead to an extreme function coloring problem)
+* [Are there runtime checks?](Are there runtime checks)
+* [There's promising research that could yield a solution that is both more simple and more elegant than rust-style borrow checking. Why not wait?](Theres promising research that could yield a solution that is both more simple and more elegant than rust-style borrow checking Why not wait)
+* [Why are lifetimes annotated using `/` rather than `'`?](Why are lifetimes annotated using rather than)
+* [Can Safe C++ make my program safer just by recompiling existing code?](Can Safe C make my program safer just by recompiling existing code)
+* [What is the difference between `cpy x` and `T(const T&)`?](What is the difference between cpy x and Tconst T)
+* [What is the difference between `drp x` and `~T()`?](What is the difference between drp x and T)
+* [What is the difference between `unsafe_cell` and `const_cast`?](What is the difference between unsafe_cell and const_cast)
 
-## What is the goal?
+### What is the goal?
 
 The goal is to add to C++ the ability to incrementally opt into zero-overhead memory safety without loss of expressiveness. This ability will enable developers to get rid of various classes of bugs that fall into four categories of safety : lifetime safety, type safety, thread safety and spatial safety. It will also address valid concerns put forward by the security community through the NSA, the CISA, the NCSI and the White house with regards to memory safe languages.
 
