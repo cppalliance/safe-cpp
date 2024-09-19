@@ -137,7 +137,7 @@ It's instructive to break the memory safety problem down into four categories. E
 
 ### Lifetime safety
 
-How do we ensure that dangling references are never used? There are two mainstream lifetime safety technologies: garbage collection and borrow checking. Garbage collection is simple to implement and use, but moves object allocations to the heap, making it incompatible with manual memory manegement. It keeps objects initialized as long as there are live references to them, making it incompatible with C++'s RAII[@raii] object model.
+How do we ensure that dangling references are never used? There are two proven and production-ready lifetime safety technologies: garbage collection and borrow checking. Garbage collection is simple to implement and use, but moves object allocations to the heap, making it incompatible with manual memory management. It keeps objects initialized as long as there are live references to them, making it incompatible with C++'s RAII[@raii] object model.
 
 Borrow checking is an advanced form of live analysis. It keeps track of the _live references_ at every point in the function, and errors when there's a _conflicting action_ on a place associated with a live reference. For example, writing to, moving or dropping an object with a live shared borrow will raise a borrow check error. Pushing to a vector with a live iterator will raise an iterator invalidation error. This technology is compatible with manual memory management and RAII, making it a good fit for C++.
 
@@ -813,7 +813,7 @@ cannot call unsafe constructor String::String(const char*) in safe context
 see declaration at unsafe4.cxx:10:3
 ```
 
-This code is ill-formed. It's permissible to invoke an unsafe constructor when copy-initializing into the `push_back` call, since its function parameter is `unsafe String`. Dut direct initialization of `String` is not allowed. The constructor chosen for direct initialization is unsafe, but the type it's initializing is not. The type is just `String`. The compiler is right to reject this program because the user is plainly calling an unsafe constructor in a safe context, without a mitigating _unsafe-block_ or unsafe qualifier.
+This code is ill-formed. It's permissible to invoke an unsafe constructor when copy-initializing into the `push_back` call, since its function parameter is `unsafe String`. But direct initialization of `String` is not allowed. The constructor chosen for direct initialization is unsafe, but the type it's initializing is not. The type is just `String`. The compiler is right to reject this program because the user is plainly calling an unsafe constructor in a safe context, without a mitigating _unsafe-block_ or unsafe qualifier.
 
 [**unsafe5.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/proposal/unsafe5.cxx)
 ```cpp
@@ -1390,7 +1390,7 @@ I've relabelled the example to show function points and region names of variable
 
 `'R1 : 'R0 @ P3` means that starting at P3, the 'R1 contains all points 'R0 does, along all control flow paths, as long as 'R0 is live. 'R1 = { 3, 4 }. Grow 'R2 the same way: 'R2 = { 7, 8, 9, 10, 11 }.
 
-Now we can hunt for contradictions. Visit each point in the function and consider, "is there a read, write, move, drop or other invalidating action on any of the loans in scope?" The only potential invalidating actions are the drops of `x` and `y` where they go out of scope. At P9, the loan `^y` is in scope, because P9 is an element of its region 'R2. This is a conflicting action, because the loan is also on the variable `y`. That raises a borrow checker error. There's also a drop at P10. P10 is in the region for `^y`, but that is not an invalidating action, because the loan is not on a place that overlaps with with `x`, the operand of the drop.
+Now we can hunt for contradictions. Visit each point in the function and consider, "is there a read, write, move, drop or other invalidating action on any of the loans in scope?" The only potential invalidating actions are the drops of `x` and `y` where they go out of scope. At P9, the loan `^y` is in scope, because P9 is an element of its region 'R2. This is a conflicting action, because the loan is also on the variable `y`. That raises a borrow checker error. There's also a drop at P10. P10 is in the region for `^y`, but that is not an invalidating action, because the loan is not on a place that overlaps with `x`, the operand of the drop.
 
 The law of exclusivity is enforced at this point. A new mutable loan is an invalidating action on loans that are live at an overlapping place. A new shared loan is an invalidating action on mutable loans that are live at an overlapping place. Additionally, storing to variables is always an invalidating action when there is any loan, shared or mutable, on an overlapping place.
 
@@ -1440,7 +1440,7 @@ Circle tries to identify all three of these points when forming borrow checker e
 
 The invariants that are tested are established with a network of lifetime constraints. It might not be the case that the invalidating action is obviously related to either the place of the loan or the use that extends the loan. More completely describing the chain of constraints could help users diagnose borrow checker errors. But there's a fine line between presenting an error like the one above, which is already pretty wordy, and overwhelming programmers with information.
 
-### Lifetime constraints on called functinos
+### Lifetime constraints on called functions
 
 Borrow checking is easiest to understand when applied to a single function. The function is lowered to a control flow graph, the compiler assigns regions to loans and borrow variables, emits lifetime constraints where there are assignments, iteratively grows regions until the constraints are solved, and walks the instructions, checking for invalidating actions on loans in scope. Within the definition of the function, there's nothing it can't analyze. The complexity arises when passing and receiving borrows through function calls.
 
@@ -2064,7 +2064,7 @@ In Rust, objects are _relocated by default_. Implicit relocation is too surprisi
 * `rel x` - relocate `x` into a new value. `x` is set as uninitialized.
 * `cpy x` - copy construct `x` into a new value. `x` remains initialized.
 
-In line with C++'s goals of _zero-cost abstractions_, we want to make it easy for users to choose the more efficient option between relocaton and copy. If the expression's type is trivially copyable and trivially destructible, it'll initialize a copy from an lvalue. Otherwise, the compiler prompts for a `rel` or `cpy` token to resolve the copy initialization. You're not going to accidentally hit the slow path or the mutable path. Opt into mutation. Opt into non-trivial copies.
+In line with C++'s goals of _zero-cost abstractions_, we want to make it easy for users to choose the more efficient option between relocation and copy. If the expression's type is trivially copyable and trivially destructible, it'll initialize a copy from an lvalue. Otherwise, the compiler prompts for a `rel` or `cpy` token to resolve the copy initialization. You're not going to accidentally hit the slow path or the mutable path. Opt into mutation. Opt into non-trivial copies.
 opy, or do you want to relocate?
 
 You've noticed the nonsense spellings for some of these keywords. Why not call them `relocate`, `copy` and `drop`? Alternative token spelling avoids shadowing these common identifiers and improves results when searching code or the web.
@@ -2235,7 +2235,7 @@ Safe C++ introduces a new special member function, the _relocation constructor_,
 * User defined - manually relocate the operand into the new object. This can be used for fixing internal addresses, like those used to implement sentinels in standard linked lists and maps.
 * `= trivial` - Trivially copyable types are already trivially relocatable. But other types may be trivially relocatable as well, like `box`, `unique_ptr`, `rc`, `arc` and `shared_ptr`.
 * `= default` - A defaulted or implicitly declared relocation constructor is implemented by the compiler with one of three strategies: types with safe destructors are trivially relocated; aggregate types use member-wise relocation; and other types are move-constructed into the new data, and the old operand is destroyed.
-* `= delete` - A deleted relocation constructor _pins_ a type. Objects of that type can't be relocated. A `rel-expression` is a SFINAE failure. Rust uses its `std::Pin`[@pin] pin type as a container for structs with with address-sensitive states. That's an option with Safe C++'s deleted relocation constructors. Or, users can write user-defined relocation constructors to update address-sensitive states.
+* `= delete` - A deleted relocation constructor _pins_ a type. Objects of that type can't be relocated. A `rel-expression` is a SFINAE failure. Rust uses its `std::Pin`[@pin] pin type as a container for structs with address-sensitive states. That's an option with Safe C++'s deleted relocation constructors. Or, users can write user-defined relocation constructors to update address-sensitive states.
 
 Relocation constructors are always noexcept. It's used to implement the drop-and-replace semantics of assignment expressions. If a relocation constructor was throwing, it might leave objects involved in drop-and-replace in illegal uninitialized states. An uncaught exception in a user-defined or defaulted relocation constructor will panic and terminate.
 
@@ -2643,7 +2643,7 @@ It's the responsibility of a safe library to think through all possible scenario
 
 C++ variadics don't convey lifetime constraints from a function's return type to its parameters. Calls like `make_unique` and `emplace_back` take parameters `Ts... args` and return an unrelated type `T`. This may trigger the borrow checker, because the implementation of the function will produce free regions with unrelated endpoints. It's not a soundness issue, but it is a serious usability issue.
 
-We need an _expression-outlives-constraint_, a programmatic version of _outlives-constrant_ `/(where a : b)`. It would consist of an _expression_ in an unevaluated context, which names the actual function parameters and harvests the lifetime constraints implied by those expressions. We should name function parameters rather than declvals of their types, because they may be borrow parameters with additional constraints than their template lifetime parameters have.
+We need an _expression-outlives-constraint_, a programmatic version of _outlives-constraint_ `/(where a : b)`. It would consist of an _expression_ in an unevaluated context, which names the actual function parameters and harvests the lifetime constraints implied by those expressions. We should name function parameters rather than declvals of their types, because they may be borrow parameters with additional constraints than their template lifetime parameters have.
 
 In order to name the function parameters, we'll need a trailing _expression-lifetime-constraint_ syntax. Something like,
 
@@ -2680,7 +2680,7 @@ Surprisingly, we can also support standard conversions from a `__unified` functi
 
 ### Non-static member functions with lifetimes
 
-At this point in development, lifetime parameters are not supported for non-static member functions where the enclosing class has lifetime parameters, including including template lifetime parameters. Use the `self` parameter to declare an explicit object parameter. Non-static member functions don't have full object parameter types, which makes it challenging for the compiler to attach lifetime arguments. As the project matures it's likely that this capability will be included.
+At this point in development, lifetime parameters are not supported for non-static member functions where the enclosing class has lifetime parameters, including template lifetime parameters. Use the `self` parameter to declare an explicit object parameter. Non-static member functions don't have full object parameter types, which makes it challenging for the compiler to attach lifetime arguments. As the project matures it's likely that this capability will be included.
 
 Constructors, destructors and the relocation constructor don't take explicit `self` parameters. But that's less problematic because the language won't form function pointers.
 
