@@ -2789,6 +2789,84 @@ Everything in this proposal took about 18 months to design and implement in Circ
 
 An earlier version of this work was presented to SG23 at the St Louis 2024 ISO meeting, with the closing poll "We should promise more committee time on borrow checking?" --- SF: 20, WF: 7, N: 1, WA: 0, SA: 0.
 
+# FAQ
+
+Q. [What is the goal?](#goal)
+Q. [Will Safe-C++ break my code?](#Will-Safe-C-break-my-code)
+Q. [Why does this proposal introduce a whole new standard library (std2)?](Why-does-this-proposal-introduce-a-whole-new-standard-library-std2)
+Q. [Why do we need to borrow Rust's borrow checker?](Why do we need to borrow Rusts borrow checker)
+Q. [Why not use Hylo's approach?](Why not use Hylos approach)
+Q. [Why not use safety profiles?](Why not use safety profiles)
+Q. [Why do the safe language alternatives to unsafe c++ language constructs use Rust names rather than existing C++ names?](Why do the safe language alternatives to unsafe c language constructs use Rust names rather than existing C names)
+Q. [I do not like the proposed syntax, why is it so ugly?](I do not like the proposed syntax why is it so ugly)
+Q. [Why is `std::*` missing from `std2`?](Why is std missing from std2)
+Q. [Won't `std2` lead to an extreme function coloring problem?](Won't std2 lead to an extreme function coloring problem)
+Q. [Are there runtime checks?](Are there runtime checks)
+Q. [There's promising research that could yield a solution that is both more simple and more elegant than rust-style borrow checking. Why not wait?](Theres promising research that could yield a solution that is both more simple and more elegant than rust-style borrow checking Why not wait)
+Q. [Why are lifetimes annotated using `/` rather than `'`?](Why are lifetimes annotated using rather than)
+Q. [Can Safe C++ make my program safer just by recompiling existing code?](Can Safe C make my program safer just by recompiling existing code)
+Q. [What is the difference between `cpy x` and `T(const T&)`?](What is the difference between cpy x and Tconst T)
+Q. [What is the difference between `drp x` and `~T()`?](What is the difference between drp x and T)
+Q. [What is the difference between `unsafe_cell` and `const_cast`?](What is the difference between unsafe_cell and const_cast)
+
+## What is the goal?
+
+The goal is to add to C++ the ability to incrementally opt into zero-overhead memory safety without loss of expressiveness. This ability will enable developers to get rid of various classes of bugs that fall into four categories of safety : lifetime safety, type safety, thread safety and spatial safety. It will also address valid concerns put forward by the security community through the NSA, the CISA, the NCSI and the White house with regards to memory safe languages.
+
+## Will Safe-C++ break my code?
+
+No. Safe-C++ requires explicit opt-in by developers. And even after opting in, Safe-C++ is designed to facilitate incremental adoption within large codebases.
+
+## Why does this proposal introduce a whole new standard library (std2)?
+
+The existing STL is not memory safe. Making it memory safe would require changes to the API which is a non-starter with regards to the goal of making existing code stay the same.
+
+## Why do we need to borrow Rust's borrow checker?
+
+The borrow checker is the best fit that is production-ready to meet our goals. It is a compile time solution that leads to zero overhead. It is a mature and proven technology. It is the safest path to guarantee a successful outcome.
+
+## Why not use Hylo's approach?
+
+Hylo's approach uses a borrow checker. Mutable Value Semantics (MVS) then eliminates the need for explicit lifetimes, but that is still a work in progress and is not considered production-ready.
+
+## Why not use safety profiles?
+
+Safety profiles is still a work in progress. The lifetime safety profile is the one furthest along. But it still falls well short of what borrow checking can provide. It only adresses one of the four categories of memory safety that this proposal aims to achieve and even within that single category, it doesn't address all potential issues (i.e.: it cannot catch all iterator invalidation cases).
+
+## Why do the safe language alternatives to unsafe c++ language constructs use Rust names rather than existing C++ names?
+
+The safe language alternatives are used in very different ways compared to their unsafe counterparts. For example, while `union` looks like a `struct` that has a single active member, a `choice` can only be interrogated by using a match-expression, guaranteeing safe access to its content.
+
+## I do not like the proposed syntax, why is it so ugly?
+
+Bikeshedding isn't a priority at this stage. The current syntax is the one used by the reference implementation so far.
+
+## Why is `std::*` missing from `std2`?
+
+This proposal is a healthy beginning but it’s not comprehensive treatment.
+
+## Won't `std2` lead to an extreme function coloring problem?
+
+It won't be: `safe` code can wrap unsafe calls within `unsafe` blocks and `unsafe` code can call `safe` code. Same goes for `std2` and `std` library components.
+
+## Are there runtime checks?
+
+Yes, there are dynamic bound checks for spatial safety.
+
+## There's promising research that could yield a solution that is both more simple and more elegant than rust-style borrow checking. Why not wait?
+
+The security community and regulators are actively pushing developers towards memory safe languages with official guidance since 2022. Does C++ stay on the do-not-use list or does C++ become a memory safe language?
+
+## Why are lifetimes annotated using `/` rather than `'`?
+
+C supports multi-character literals. This cursed feature, in which literals like 'abcd' evaluate to constants of type int, makes lexing Rust-style lifetime arguments very messy.
+
+
+## Can Safe C++ make my program safer just by recompiling existing code?
+## What is the difference between `cpy x` and `T(const T&)`?
+## What is the difference between `drp x` and `~T()`?
+## What is the difference between `unsafe_cell` and `const_cast`?
+
 ---
 references:
   - id: nsa-guidance
