@@ -2792,7 +2792,7 @@ An earlier version of this work was presented to SG23 at the St Louis 2024 ISO m
 # FAQ
 
 * [What is the goal?](#what-is-the-goal)
-* [Will Safe-C++ break my code?](#will-safe-c-break-my-code)
+* [Will Safe C++ break my code?](#will-safe-c-break-my-code)
 * [Why does this proposal introduce a whole new standard library (std2)?](#why-does-this-proposal-introduce-a-whole-new-standard-library-std2)
 * [Why do we need to borrow Rust's borrow checker?](#why-do-we-need-to-borrow-rusts-borrow-checker)
 * [Why not use Hylo's approach?](#why-not-use-hylos-approach)
@@ -2813,9 +2813,9 @@ An earlier version of this work was presented to SG23 at the St Louis 2024 ISO m
 
 The goal is to add to C++ the ability to incrementally opt into zero-overhead memory safety without loss of expressiveness. This ability will enable developers to get rid of various classes of bugs that fall into four categories of safety : lifetime safety, type safety, thread safety and spatial safety. It will also address valid concerns put forward by the security community through the NSA, the CISA, the NCSI and the White house with regards to memory safe languages.
 
-### Will Safe-C++ break my code?
+### Will Safe C++ break my code?
 
-No. Safe-C++ requires explicit opt-in by developers. And even after opting in, Safe-C++ is designed to facilitate incremental adoption within large codebases.
+No. Safe C++ requires explicit opt-in by developers. And even after opting in, Safe C++ is designed to facilitate incremental adoption within large codebases.
 
 ### Why does this proposal introduce a whole new standard library (std2)?
 
