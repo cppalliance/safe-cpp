@@ -109,6 +109,7 @@ add_test(NAME "safecxx-verify-headers" COMMAND "${CMAKE_COMMAND}" --build ${CMAK
 safe_cxx_compile_fail_test(string_view1 "use of sv depends on expired loan")
 safe_cxx_compile_fail_test(box_incomplete "class incomplete is incomplete")
 safe_cxx_compile_fail_test(box1 "cannot convert prvalue int to std2::box<int>")
+safe_cxx_compile_fail_test(box2 "call to deleted borrow constructor")
 safe_cxx_compile_fail_test(arc1 "cannot convert prvalue int to std2::arc<int>")
 safe_cxx_compile_fail_test(rc1 "cannot convert prvalue int to std2::rc<int>")
 safe_cxx_compile_fail_test(unsafe_cell1 "cannot convert prvalue std2::box<int> to std2::unsafe_cell<std2::box<int>>")

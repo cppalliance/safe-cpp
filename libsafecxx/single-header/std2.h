@@ -827,6 +827,8 @@ public:
   {
   }
 
+  box(box const^) = delete;
+
   [[unsafe::drop_only(T)]]
   ~box() safe {
     delete p_;
