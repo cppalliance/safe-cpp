@@ -121,6 +121,8 @@ safe_cxx_compile_fail_test(cell_box_uaf "drop of s2 between its shared borrow an
 safe_cxx_compile_fail_test(manually_drop1 "cannot convert prvalue std2::box<int> to std2::manually_drop<std2::box<int>>")
 safe_cxx_compile_fail_test(throw1 "s constrained to live as long as static")
 
+safe_cxx_compile_fail_test(box_thread "call to deleted borrow constructor")
+
 safe_cxx_compile_fail_test(vector1 "use of strs depends on expired loan")
 safe_cxx_compile_fail_test(vector2 "use of it depends on expired loan")
 safe_cxx_compile_fail_test(mutex1 "cannot convert prvalue int to std2::mutex<int>")
