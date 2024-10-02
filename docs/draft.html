@@ -4338,13 +4338,13 @@ an object. Types with a deconfliction strategy use
 <code class="sourceCode cpp">unsafe_cell</code> to safely strip the
 const off shared borrows, allowing users to mutate the protected
 resource.</p>
-<p>Safe C++ and Rust and conflate exclusive access with mutable borrows
-and shared access with const borrows. It’s is an economical choice,
-because one type qualifier,
+<p>Safe C++ and Rust conflate exclusive access with mutable borrows and
+shared access with const borrows. It’s is an economical choice, because
+one type qualifier,
 <code class="sourceCode cpp"><span class="kw">const</span></code> or
 <code class="sourceCode cpp">mut</code>, also determines exclusivity.
 But the cast-away-const model of interior mutability is an awkward
-consequence. But this design is not the only way: The Ante language<span class="citation" data-cites="ante">[<a href="https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability" role="doc-biblioref">ante</a>]</span> experiments with separate
+consequence. This design may not be the only way: The Ante language<span class="citation" data-cites="ante">[<a href="https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability" role="doc-biblioref">ante</a>]</span> experiments with separate
 <code class="sourceCode cpp">own mut</code> and
 <code class="sourceCode cpp">shared mut</code> qualifiers. That’s really
 attractive, because you’re never mutating something through a const
