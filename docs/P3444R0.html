@@ -898,7 +898,9 @@ calls involving references generate <em>lifetime constraints</em>. The
 compiler <em>solves the constraint equation</em> to find the liveness of
 each <em>loan</em>. All instructions in the MIR are scanned for
 <em>conflicting actions</em> with any of the loans in scope at that
-point. Conflicting actions raise borrow checker errors.</p>
+point. Examples of conflicting actions are stores to places with live
+shared borrows or loads from places with live mutable borrows.
+Conflicting actions raise borrow checker errors.</p>
 <p>The Hylo<span class="citation" data-cites="hylo">[<a href="https://2023.splashcon.org/details/iwaco-2023-papers/5/Borrow-checking-Hylo" role="doc-biblioref">hylo</a>]</span> model is largely equivalent to
 this model and it requires borrow checking technology.
 <code class="sourceCode cpp">let</code> and
@@ -928,7 +930,7 @@ runs to the end. Local state that’s live over the yield point must live
 in a <em>coroutine frame</em> so that it’s available to the continuation
 function. These <code class="sourceCode cpp">Array</code> subscripts
 don’t have instructions after the yield, so the continuation function is
-empty and hopefully elided by the optimizer.</p>
+empty and hopefully optimized away.</p>
 <div class="sourceCode" id="cb13"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">&gt;</span></span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> Vec <span class="op">{</span></span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> T<span class="op">%</span> <span class="kw">operator</span><span class="op">[](</span><span class="dt">size_t</span> idx<span class="op">)</span> <span class="kw">const</span> <span class="op">%</span> safe;</span>
@@ -973,8 +975,8 @@ types can be copied and shared between threads.</li>
 <li><strong>Runtime checks</strong> - The compiler automatically emits
 runtime bounds checks on array and slice subscripts. It emits checks for
 integer divide-by-zero and INT_MIN / -1, which are undefined behavior.
-Conforming safe library functions must also implement panics to prevent
-out-of-bounds access to heap allocations.</li>
+Conforming safe library functions must panic to prevent out-of-bounds
+access to heap allocations.</li>
 </ol>
 <p>Most critically, the <em>safe-specifier</em> is added to a function’s
 type. Inside a safe function, only safe operations may be used, unless
@@ -1019,8 +1021,8 @@ mutex and returns a safe reference to the data within. The continuation
 unlocks the mutex. The reference to the mutex is kept in the coroutine
 frame. But this still reduces to supporting structs with reference data
 members. In this case it’s not a user-defined type, but a
-compiler-defined coroutine frame. I feel that the coroutine solution is
-an unidiomatic fit for C++ for several reasons: static allocation of the
+compiler-defined coroutine frame. The coroutine solution is an
+unidiomatic fit for C++ for several reasons: static allocation of the
 coroutine frame requires exposing the definition of the coroutine to the
 caller, which breaks C++’s approach to modularity; the continuation is
 called immediately after the last use of the yielded reference, which
@@ -1045,7 +1047,7 @@ reasonable starting point is to declare a class as having <em>safe
 reference semantics</em>. <code class="sourceCode cpp"><span class="kw">class</span> name <span class="op">%</span>;</code>
 is a possible syntax. Inside these classes, you can declare data members
 and base classes with safe reference semantics: that includes both safe
-reference and other classes with safe reference semantics.</p>
+references and other classes with safe reference semantics.</p>
 <div class="sourceCode" id="cb14"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> lock_guard <span class="op">%</span> <span class="op">{</span></span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Permitted because the containing class has safe reference semantics.</span></span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  std2<span class="op">::</span>mutex<span class="op">%</span> mutex;</span>
