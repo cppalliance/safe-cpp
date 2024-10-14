@@ -76,7 +76,7 @@ Exclusivity is a program-wide invariant. It doesn't hinge on the safeness of a f
 
 "Valid" borrow and safe reference inputs don't mutably alias. This is something a function can just _assume_; it doesn't need to check and there's no way to check. Borrow checking upholds exclusivity even for unsafe functions (when compiled under the `[safety]` feature). There are other assumptions C++ programmers already make about the validity of inputs: for instance, references never hold null addresses. Non-valid inputs are implicated in undefined behavior. 
 
-By the parsimony principal you may suggest "rather than adding a new safe reference type, just enforce exclusivity on lvalue- and rvalue-references when compiled under the `[safety]` feature." But that makes the soundness problem worse. New code will _assume_ legacy references don't mutably alias, but existing code doesn't uphold that invariant because it was written without even knowing about it.
+With a desire to simplify, you may suggest "rather than adding a new safe reference type, just enforce exclusivity on lvalue- and rvalue-references when compiled under the `[safety]` feature." But that makes the soundness problem worse. New code will _assume_ legacy references don't mutably alias, but existing code doesn't uphold that invariant because it was written without considering exclusivity.
 
 If safe code calls legacy code that returns a struct with a pair of references, do those references alias? Of course they may alias, but the parsimonious treatment claims that mutable references don't alias under the `[safety]` feature. We've already stumbled on a soundness bug.
 
@@ -388,6 +388,8 @@ The presented design is as far as I could go to address the goal of "memory safe
 
 Let's consider RAII types with reference semantics. An example is `std::lock_guard`, which keeps a reference to a mutex. When the `lock_guard` goes out of scope its destructor calls `unlock` on the mutex. This is a challenge for safe references, because safe reference data members aren't supported. Normally those would require lifetime parameters on the containing class. 
 
+Robust support for user-defined types with reference data members isn't just a convenience in a safe C++ system. It's a necessary part of _interior mutability_, the core design pattern for implementing shared ownership of mutable state (think safe versions of `shared_ptr`).
+
 What are some options for RAII reference semantics?
 
 * Coroutines. This is the Hylo strategy. The ramp function locks a mutex and returns a safe reference to the data within. The continuation unlocks the mutex. The reference to the mutex is kept in the coroutine frame. But this still reduces to supporting structs with reference data members. In this case it's not a user-defined type, but a compiler-defined coroutine frame. I feel that the coroutine solution is an unidiomatic fit for C++ for several reasons: static allocation of the coroutine frame requires exposing the definition of the coroutine to the caller, which breaks C++'s approach to modularity; the continuation is called immediately after the last use of the yielded reference, which runs counter to expectation that cleanup runs at the end of the enclosing scope; and since the continuation is called implicitly, there's nothing textual on the caller side to indicate an unlock.
@@ -501,7 +503,7 @@ Finally, adoption of this feature brings a major benefit even if you personally 
 references:
   - id: safecpp
     citation-label: safecpp
-    title: Safe C++
+    title: P3390 -- Safe C++
     URL: https://safecpp.org/draft.html
 
   - id: second-class

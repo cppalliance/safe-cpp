@@ -571,13 +571,13 @@ for unsafe functions (when compiled under the <code class="sourceCode cpp"><span
 feature). There are other assumptions C++ programmers already make about
 the validity of inputs: for instance, references never hold null
 addresses. Non-valid inputs are implicated in undefined behavior.</p>
-<p>By the parsimony principal you may suggest “rather than adding a new
+<p>With a desire to simplify, you may suggest “rather than adding a new
 safe reference type, just enforce exclusivity on lvalue- and
 rvalue-references when compiled under the <code class="sourceCode cpp"><span class="op">[</span>safety<span class="op">]</span></code>
 feature.” But that makes the soundness problem worse. New code will
 <em>assume</em> legacy references don’t mutably alias, but existing code
-doesn’t uphold that invariant because it was written without even
-knowing about it.</p>
+doesn’t uphold that invariant because it was written without considering
+exclusivity.</p>
 <p>If safe code calls legacy code that returns a struct with a pair of
 references, do those references alias? Of course they may alias, but the
 parsimonious treatment claims that mutable references don’t alias under
@@ -1007,6 +1007,11 @@ destructor calls <code class="sourceCode cpp">unlock</code> on the
 mutex. This is a challenge for safe references, because safe reference
 data members aren’t supported. Normally those would require lifetime
 parameters on the containing class.</p>
+<p>Robust support for user-defined types with reference data members
+isn’t just a convenience in a safe C++ system. It’s a necessary part of
+<em>interior mutability</em>, the core design pattern for implementing
+shared ownership of mutable state (think safe versions of
+<code class="sourceCode cpp">shared_ptr</code>).</p>
 <p>What are some options for RAII reference semantics?</p>
 <ul>
 <li>Coroutines. This is the Hylo strategy. The ramp function locks a
@@ -1268,7 +1273,6 @@ and, importantly, lifetime parameters, reduces the friction of
 interfacing the two languages. The easier it is to interoperate with
 Rust, the more options and freedom companies have to fulfill with their
 security mandate.<span class="citation" data-cites="rust-interop">[<a href="https://security.googleblog.com/2024/02/improving-interoperability-between-rust-and-c.html" role="doc-biblioref">rust-interop</a>]</span></p>
-<p>An up-to-date draft of this document is maintained at <a href="https://www.safe-cpp.org/draft-lifetimes.html">safe-cpp.org/draft-lifetimes.html</a>.</p>
 <h1 data-number="6" id="bibliography"><span class="header-section-number">6</span> References<a href="#bibliography" class="self-link"></a></h1>
 <div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="1" role="doc-bibliography">
 <div id="ref-android" class="csl-entry" role="doc-biblioentry">
@@ -1301,7 +1305,7 @@ Semantics. <a href="https://www.jot.fm/issues/issue_2022_02/article2.pdf"><div c
 Design. <a href="https://blog.google/technology/safety-security/tackling-cybersecurity-vulnerabilities-through-secure-by-design/"><div class="csl-block">https://blog.google/technology/safety-security/tackling-cybersecurity-vulnerabilities-through-secure-by-design/</div></a>
 </div>
 <div id="ref-safecpp" class="csl-entry" role="doc-biblioentry">
-[safecpp] Safe C++. <a href="https://safecpp.org/draft.html"><div class="csl-block">https://safecpp.org/draft.html</div></a>
+[safecpp] P3390 – Safe C++. <a href="https://safecpp.org/draft.html"><div class="csl-block">https://safecpp.org/draft.html</div></a>
 </div>
 <div id="ref-second-class" class="csl-entry" role="doc-biblioentry">
 [second-class] Second-Class References. <a href="https://borretti.me/article/second-class-references"><div class="csl-block">https://borretti.me/article/second-class-references</div></a>
