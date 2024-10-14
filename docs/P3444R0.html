@@ -449,7 +449,19 @@ Lifetime Parameters</h1>
 </table>
 </header>
 <div style="clear:both">
-<h1 data-number="1" id="safe-references"><span class="header-section-number">1</span> Safe references<a href="#safe-references" class="self-link"></a></h1>
+<h1 data-number="1" id="abstract"><span class="header-section-number">1</span> Abstract<a href="#abstract" class="self-link"></a></h1>
+<p>This proposal describes the implementation of a memory-safe reference
+type that does not use lifetime annotations. The goal of the proposal is
+to:</p>
+<ol type="1">
+<li>Explore the viability of memory safety without lifetime
+parameters.</li>
+<li>Explain the infeasibility of making legacy lvalue and rvalue
+references memory safe.</li>
+<li>Address common objections to safety models that use lifetime
+annotations.</li>
+</ol>
+<h1 data-number="2" id="safe-references"><span class="header-section-number">2</span> Safe references<a href="#safe-references" class="self-link"></a></h1>
 <p>“Safe C++”<span class="citation" data-cites="safecpp">[<a href="https://safecpp.org/draft.html" role="doc-biblioref">safecpp</a>]</span> introduced a comprehensive
 design for compile-time memory safety in C++. The borrow checking model
 in Safe C++ requires lifetime parameters, a feature that increases
@@ -535,7 +547,7 @@ non-static member function with the
 <em>ref-qualifier</em>, the implicit object parameter outlives the
 invented lifetime. In turn, this invented lifetime outlives the returned
 safe reference.</p>
-<h2 data-number="1.1" id="exclusivity"><span class="header-section-number">1.1</span> Exclusivity<a href="#exclusivity" class="self-link"></a></h2>
+<h2 data-number="2.1" id="exclusivity"><span class="header-section-number">2.1</span> Exclusivity<a href="#exclusivity" class="self-link"></a></h2>
 <ul>
 <li><code class="sourceCode cpp">T<span class="op">%</span></code> is a
 <em>mutable safe reference</em>. It cannot alias other references to
@@ -706,7 +718,7 @@ Going the other way is unsafe: the precondition of the
 <em>unsafe-block</em> is that the legacy references <em>do not
 alias</em> and <em>do not dangle</em>:
 <code class="sourceCode cpp"><span class="op">%*</span>x</code>.</p>
-<h2 data-number="1.2" id="constraint-rules"><span class="header-section-number">1.2</span> Constraint rules<a href="#constraint-rules" class="self-link"></a></h2>
+<h2 data-number="2.2" id="constraint-rules"><span class="header-section-number">2.2</span> Constraint rules<a href="#constraint-rules" class="self-link"></a></h2>
 <p>This proposal implements two sets of constraint rules. Free functions
 constrain return references by the shortest of the argument lifetimes.
 Non-static member functions constrain return references by the implicit
@@ -891,7 +903,7 @@ annotations to constrain the returned reference by both the
 free function constraint rules. The program fails borrow checking when
 the returned reference <code class="sourceCode cpp">value2</code> is
 used after the expiration of its key temporary.</p>
-<h1 data-number="2" id="second-class-references"><span class="header-section-number">2</span> Second-class references<a href="#second-class-references" class="self-link"></a></h1>
+<h1 data-number="3" id="second-class-references"><span class="header-section-number">3</span> Second-class references<a href="#second-class-references" class="self-link"></a></h1>
 <p>References can be taxonimized into two classes:<span class="citation" data-cites="second-class">[<a href="https://borretti.me/article/second-class-references" role="doc-biblioref">second-class</a>]</span></p>
 <ul>
 <li>First-class references can pass data into functions, be returned
@@ -989,7 +1001,7 @@ pound.</p>
 adding simplified safe references was an easy extension. If the
 community is able to fill in our gaps in knowledge around this sort of
 reference, the compiler could accommodate those advances as well.</p>
-<h1 data-number="3" id="other-aspects-of-safety"><span class="header-section-number">3</span> Other aspects of safety<a href="#other-aspects-of-safety" class="self-link"></a></h1>
+<h1 data-number="4" id="other-aspects-of-safety"><span class="header-section-number">4</span> Other aspects of safety<a href="#other-aspects-of-safety" class="self-link"></a></h1>
 <p>As detailed in the Safe C++<span class="citation" data-cites="safecpp">[<a href="https://safecpp.org/draft.html" role="doc-biblioref">safecpp</a>]</span> proposal, there are four
 categories of memory safety:</p>
 <ol type="1">
@@ -1023,7 +1035,7 @@ out most of the vulnerabilities in old code. As demonstrated by the
 recent Android study on memory safety<span class="citation" data-cites="android">[<a href="https://security.googleblog.com/2024/09/eliminating-memory-safety-vulnerabilities-Android.html?m=1" role="doc-biblioref">android</a>]</span>, the benefits of rewriting are
 often not worth the costs. What we have to prioritize is the transition
 to safe coding practices<span class="citation" data-cites="safe-coding">[<a href="https://blog.google/technology/safety-security/tackling-cybersecurity-vulnerabilities-through-secure-by-design/" role="doc-biblioref">safe-coding</a>]</span> for new code.</p>
-<h1 data-number="4" id="achieving-first-class-references"><span class="header-section-number">4</span> Achieving first-class
+<h1 data-number="5" id="achieving-first-class-references"><span class="header-section-number">5</span> Achieving first-class
 references<a href="#achieving-first-class-references" class="self-link"></a></h1>
 <p>The presented design is as far as I could go to address the goal of
 “memory safety without lifetime parameters.” But safe references aren’t
@@ -1217,7 +1229,7 @@ assign the same lifetime to all four lifetime binders and clobber the
 <code class="sourceCode cpp">string_view</code> lifetimes, causing a
 borrow checker failure further from the source and leaving the developer
 without the possibility of a fix.</p>
-<h1 data-number="5" id="lifetime-parameters"><span class="header-section-number">5</span> Lifetime parameters<a href="#lifetime-parameters" class="self-link"></a></h1>
+<h1 data-number="6" id="lifetime-parameters"><span class="header-section-number">6</span> Lifetime parameters<a href="#lifetime-parameters" class="self-link"></a></h1>
 <p>If there’s a community-wide research effort among compiler experts to
 evolve safe references it may be possible to get them into a state to
 support the abstractions most important for C++. But soundness reasoning
@@ -1310,7 +1322,7 @@ and, importantly, lifetime parameters, reduces the friction of
 interfacing the two languages. The easier it is to interoperate with
 Rust, the more options and freedom companies have to fulfill with their
 security mandate.<span class="citation" data-cites="rust-interop">[<a href="https://security.googleblog.com/2024/02/improving-interoperability-between-rust-and-c.html" role="doc-biblioref">rust-interop</a>]</span></p>
-<h1 data-number="6" id="bibliography"><span class="header-section-number">6</span> References<a href="#bibliography" class="self-link"></a></h1>
+<h1 data-number="7" id="bibliography"><span class="header-section-number">7</span> References<a href="#bibliography" class="self-link"></a></h1>
 <div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="1" role="doc-bibliography">
 <div id="ref-android" class="csl-entry" role="doc-biblioentry">
 [android] Eliminating Memory Safety Vulnerabilites at the Source. <a href="https://security.googleblog.com/2024/09/eliminating-memory-safety-vulnerabilities-Android.html?m=1"><div class="csl-block">https://security.googleblog.com/2024/09/eliminating-memory-safety-vulnerabilities-Android.html?m=1</div></a>

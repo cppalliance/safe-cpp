@@ -9,6 +9,14 @@ author:
 toc: false
 ---
 
+# Abstract
+
+This proposal describes the implementation of a memory-safe reference type that does not use lifetime annotations. The goal of the proposal is to:
+
+1. Explore the viability of memory safety without lifetime parameters.
+2. Explain the infeasibility of making legacy lvalue and rvalue references memory safe.
+3. Address common objections to safety models that use lifetime annotations.
+
 # Safe references
 
 "Safe C++"[@safecpp] introduced a comprehensive design for compile-time memory safety in C++. The borrow checking model in Safe C++ requires lifetime parameters, a feature that increases expressiveness but complicates the language's type system. This proposal describes an alternative style of borrow checking, guaranteeing lifetime safety without the involvement of lifetime annotations.
