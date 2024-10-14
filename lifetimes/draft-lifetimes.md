@@ -175,7 +175,7 @@ void f(int% x, int% y) safe {
 }
 ```
 
-While safe references and legacy references are different types, they're inter-convertible. Converting a safe reference to legacy reference can be done safely, because it doesn't involve any preconditions. Function `f` converts a safe reference `x` to an lvalue reference with a dereference and borrow: `&*x`. Going the other way is unsafe: the precondition of the _unsafe-block_ is that the legacy references _do not alias_ and _do not dangle_: `%*x`.
+While safe references and legacy references are different types, they're inter-convertible. Converting a safe reference to legacy reference can be done safely, because it doesn't involve any preconditions. Function `f` converts a safe reference `x` to an lvalue reference with a dereference and reference-of: `&*x`. Going the other way is unsafe: the precondition of the _unsafe-block_ is that the legacy references _do not alias_ and _do not dangle_: `%*x`.
 
 ## Constraint rules
 

@@ -700,7 +700,7 @@ they’re inter-convertible. Converting a safe reference to legacy
 reference can be done safely, because it doesn’t involve any
 preconditions. Function <code class="sourceCode cpp">f</code> converts a
 safe reference <code class="sourceCode cpp">x</code> to an lvalue
-reference with a dereference and borrow:
+reference with a dereference and reference-of:
 <code class="sourceCode cpp"><span class="op">&amp;*</span>x</code>.
 Going the other way is unsafe: the precondition of the
 <em>unsafe-block</em> is that the legacy references <em>do not
