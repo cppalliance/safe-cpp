@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang xml:lang>
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="mpark/wg21" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="dcterms.date" content="2024-10-15" />
+  <title>Memory safety without lifetime parameters</title>
+  <style>
+      code{white-space: pre-wrap;}
+      span.smallcaps{font-variant: small-caps;}
+      span.underline{text-decoration: underline;}
+      div.column{display: inline-block; vertical-align: top; width: 50%;}
+      div.csl-block{margin-left: 1.5em;}
+      ul.task-list{list-style: none;}
+      pre > code.sourceCode { white-space: pre; position: relative; }
+      pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+      pre > code.sourceCode > span:empty { height: 1.2em; }
+      .sourceCode { overflow: visible; }
+      code.sourceCode > span { color: inherit; text-decoration: inherit; }
+      div.sourceCode { margin: 1em 0; }
+      pre.sourceCode { margin: 0; }
+      @media screen {
+      div.sourceCode { overflow: auto; }
+      }
+      @media print {
+      pre > code.sourceCode { white-space: pre-wrap; }
+      pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+      }
+      pre.numberSource code
+        { counter-reset: source-line 0; }
+      pre.numberSource code > span
+        { position: relative; left: -4em; counter-increment: source-line; }
+      pre.numberSource code > span > a:first-child::before
+        { content: counter(source-line);
+          position: relative; left: -1em; text-align: right; vertical-align: baseline;
+          border: none; display: inline-block;
+          -webkit-touch-callout: none; -webkit-user-select: none;
+          -khtml-user-select: none; -moz-user-select: none;
+          -ms-user-select: none; user-select: none;
+          padding: 0 4px; width: 4em;
+          color: #aaaaaa;
+        }
+      pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+      div.sourceCode
+        {  background-color: #f6f8fa; }
+      @media screen {
+      pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+      }
+      code span { } /* Normal */
+      code span.al { color: #ff0000; } /* Alert */
+      code span.an { } /* Annotation */
+      code span.at { } /* Attribute */
+      code span.bn { color: #9f6807; } /* BaseN */
+      code span.bu { color: #9f6807; } /* BuiltIn */
+      code span.cf { color: #00607c; } /* ControlFlow */
+      code span.ch { color: #9f6807; } /* Char */
+      code span.cn { } /* Constant */
+      code span.co { color: #008000; font-style: italic; } /* Comment */
+      code span.cv { color: #008000; font-style: italic; } /* CommentVar */
+      code span.do { color: #008000; } /* Documentation */
+      code span.dt { color: #00607c; } /* DataType */
+      code span.dv { color: #9f6807; } /* DecVal */
+      code span.er { color: #ff0000; font-weight: bold; } /* Error */
+      code span.ex { } /* Extension */
+      code span.fl { color: #9f6807; } /* Float */
+      code span.fu { } /* Function */
+      code span.im { } /* Import */
+      code span.in { color: #008000; } /* Information */
+      code span.kw { color: #00607c; } /* Keyword */
+      code span.op { color: #af1915; } /* Operator */
+      code span.ot { } /* Other */
+      code span.pp { color: #6f4e37; } /* Preprocessor */
+      code span.re { } /* RegionMarker */
+      code span.sc { color: #9f6807; } /* SpecialChar */
+      code span.ss { color: #9f6807; } /* SpecialString */
+      code span.st { color: #9f6807; } /* String */
+      code span.va { } /* Variable */
+      code span.vs { color: #9f6807; } /* VerbatimString */
+      code span.wa { color: #008000; font-weight: bold; } /* Warning */
+      code.diff {color: #898887}
+      code.diff span.va {color: #006e28}
+      code.diff span.st {color: #bf0303}
+  </style>
+  <style type="text/css">
+body {
+margin: 5em;
+font-family: serif;
+
+hyphens: auto;
+line-height: 1.35;
+text-align: justify;
+}
+@media screen and (max-width: 30em) {
+body {
+margin: 1.5em;
+}
+}
+div.wrapper {
+max-width: 60em;
+margin: auto;
+}
+ul {
+list-style-type: none;
+padding-left: 2em;
+margin-top: -0.2em;
+margin-bottom: -0.2em;
+}
+a {
+text-decoration: none;
+color: #4183C4;
+}
+a.hidden_link {
+text-decoration: none;
+color: inherit;
+}
+li {
+margin-top: 0.6em;
+margin-bottom: 0.6em;
+}
+h1, h2, h3, h4 {
+position: relative;
+line-height: 1;
+}
+a.self-link {
+position: absolute;
+top: 0;
+left: calc(-1 * (3.5rem - 26px));
+width: calc(3.5rem - 26px);
+height: 2em;
+text-align: center;
+border: none;
+transition: opacity .2s;
+opacity: .5;
+font-family: sans-serif;
+font-weight: normal;
+font-size: 83%;
+}
+a.self-link:hover { opacity: 1; }
+a.self-link::before { content: "§"; }
+ul > li:before {
+content: "\2014";
+position: absolute;
+margin-left: -1.5em;
+}
+:target { background-color: #C9FBC9; }
+:target .codeblock { background-color: #C9FBC9; }
+:target ul { background-color: #C9FBC9; }
+.abbr_ref { float: right; }
+.folded_abbr_ref { float: right; }
+:target .folded_abbr_ref { display: none; }
+:target .unfolded_abbr_ref { float: right; display: inherit; }
+.unfolded_abbr_ref { display: none; }
+.secnum { display: inline-block; min-width: 35pt; }
+.header-section-number { display: inline-block; min-width: 35pt; }
+.annexnum { display: block; }
+div.sourceLinkParent {
+float: right;
+}
+a.sourceLink {
+position: absolute;
+opacity: 0;
+margin-left: 10pt;
+}
+a.sourceLink:hover {
+opacity: 1;
+}
+a.itemDeclLink {
+position: absolute;
+font-size: 75%;
+text-align: right;
+width: 5em;
+opacity: 0;
+}
+a.itemDeclLink:hover { opacity: 1; }
+span.marginalizedparent {
+position: relative;
+left: -5em;
+}
+li span.marginalizedparent { left: -7em; }
+li ul > li span.marginalizedparent { left: -9em; }
+li ul > li ul > li span.marginalizedparent { left: -11em; }
+li ul > li ul > li ul > li span.marginalizedparent { left: -13em; }
+div.footnoteNumberParent {
+position: relative;
+left: -4.7em;
+}
+a.marginalized {
+position: absolute;
+font-size: 75%;
+text-align: right;
+width: 5em;
+}
+a.enumerated_item_num {
+position: relative;
+left: -3.5em;
+display: inline-block;
+margin-right: -3em;
+text-align: right;
+width: 3em;
+}
+div.para { margin-bottom: 0.6em; margin-top: 0.6em; text-align: justify; }
+div.section { text-align: justify; }
+div.sentence { display: inline; }
+span.indexparent {
+display: inline;
+position: relative;
+float: right;
+right: -1em;
+}
+a.index {
+position: absolute;
+display: none;
+}
+a.index:before { content: "⟵"; }
+
+a.index:target {
+display: inline;
+}
+.indexitems {
+margin-left: 2em;
+text-indent: -2em;
+}
+div.itemdescr {
+margin-left: 3em;
+}
+.bnf {
+font-family: serif;
+margin-left: 40pt;
+margin-top: 0.5em;
+margin-bottom: 0.5em;
+}
+.ncbnf {
+font-family: serif;
+margin-top: 0.5em;
+margin-bottom: 0.5em;
+margin-left: 40pt;
+}
+.ncsimplebnf {
+font-family: serif;
+font-style: italic;
+margin-top: 0.5em;
+margin-bottom: 0.5em;
+margin-left: 40pt;
+background: inherit; 
+}
+span.textnormal {
+font-style: normal;
+font-family: serif;
+white-space: normal;
+display: inline-block;
+}
+span.rlap {
+display: inline-block;
+width: 0px;
+}
+span.descr { font-style: normal; font-family: serif; }
+span.grammarterm { font-style: italic; }
+span.term { font-style: italic; }
+span.terminal { font-family: monospace; font-style: normal; }
+span.nonterminal { font-style: italic; }
+span.tcode { font-family: monospace; font-style: normal; }
+span.textbf { font-weight: bold; }
+span.textsc { font-variant: small-caps; }
+a.nontermdef { font-style: italic; font-family: serif; }
+span.emph { font-style: italic; }
+span.techterm { font-style: italic; }
+span.mathit { font-style: italic; }
+span.mathsf { font-family: sans-serif; }
+span.mathrm { font-family: serif; font-style: normal; }
+span.textrm { font-family: serif; }
+span.textsl { font-style: italic; }
+span.mathtt { font-family: monospace; font-style: normal; }
+span.mbox { font-family: serif; font-style: normal; }
+span.ungap { display: inline-block; width: 2pt; }
+span.textit { font-style: italic; }
+span.texttt { font-family: monospace; }
+span.tcode_in_codeblock { font-family: monospace; font-style: normal; }
+span.phantom { color: white; }
+
+span.math { font-style: normal; }
+span.mathblock {
+display: block;
+margin-left: auto;
+margin-right: auto;
+margin-top: 1.2em;
+margin-bottom: 1.2em;
+text-align: center;
+}
+span.mathalpha {
+font-style: italic;
+}
+span.synopsis {
+font-weight: bold;
+margin-top: 0.5em;
+display: block;
+}
+span.definition {
+font-weight: bold;
+display: block;
+}
+.codeblock {
+margin-left: 1.2em;
+line-height: 127%;
+}
+.outputblock {
+margin-left: 1.2em;
+line-height: 127%;
+}
+div.itemdecl {
+margin-top: 2ex;
+}
+code.itemdeclcode {
+white-space: pre;
+display: block;
+}
+span.textsuperscript {
+vertical-align: super;
+font-size: smaller;
+line-height: 0;
+}
+.footnotenum { vertical-align: super; font-size: smaller; line-height: 0; }
+.footnote {
+font-size: small;
+margin-left: 2em;
+margin-right: 2em;
+margin-top: 0.6em;
+margin-bottom: 0.6em;
+}
+div.minipage {
+display: inline-block;
+margin-right: 3em;
+}
+div.numberedTable {
+text-align: center;
+margin: 2em;
+}
+div.figure {
+text-align: center;
+margin: 2em;
+}
+table {
+border: 1px solid black;
+border-collapse: collapse;
+margin-left: auto;
+margin-right: auto;
+margin-top: 0.8em;
+text-align: left;
+hyphens: none; 
+}
+td, th {
+padding-left: 1em;
+padding-right: 1em;
+vertical-align: top;
+}
+td.empty {
+padding: 0px;
+padding-left: 1px;
+}
+td.left {
+text-align: left;
+}
+td.right {
+text-align: right;
+}
+td.center {
+text-align: center;
+}
+td.justify {
+text-align: justify;
+}
+td.border {
+border-left: 1px solid black;
+}
+tr.rowsep, td.cline {
+border-top: 1px solid black;
+}
+tr.even, tr.odd {
+border-bottom: 1px solid black;
+}
+tr.capsep {
+border-top: 3px solid black;
+border-top-style: double;
+}
+tr.header {
+border-bottom: 3px solid black;
+border-bottom-style: double;
+}
+th {
+border-bottom: 1px solid black;
+}
+span.centry {
+font-weight: bold;
+}
+div.table {
+display: block;
+margin-left: auto;
+margin-right: auto;
+text-align: center;
+width: 90%;
+}
+span.indented {
+display: block;
+margin-left: 2em;
+margin-bottom: 1em;
+margin-top: 1em;
+}
+ol.enumeratea { list-style-type: none; background: inherit; }
+ol.enumerate { list-style-type: none; background: inherit; }
+
+code.sourceCode > span { display: inline; }
+</style>
+  <link href="data:image/x-icon;base64,AAABAAIAEBAAAAEAIABoBAAAJgAAACAgAAABACAAqBAAAI4EAAAoAAAAEAAAACAAAAABACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////AIJEAACCRAAAgkQAAIJEAACCRAAAgkQAVoJEAN6CRADegkQAWIJEAACCRAAAgkQAAIJEAACCRAAA////AP///wCCRAAAgkQAAIJEAACCRAAsgkQAvoJEAP+CRAD/gkQA/4JEAP+CRADAgkQALoJEAACCRAAAgkQAAP///wD///8AgkQAAIJEABSCRACSgkQA/IJEAP99PQD/dzMA/3czAP99PQD/gkQA/4JEAPyCRACUgkQAFIJEAAD///8A////AHw+AFiBQwDqgkQA/4BBAP9/PxP/uZd6/9rJtf/bybX/upd7/39AFP+AQQD/gkQA/4FDAOqAQgBc////AP///wDKklv4jlEa/3o7AP+PWC//8+3o///////////////////////z7un/kFox/35AAP+GRwD/mVYA+v///wD///8A0Zpk+NmibP+0d0T/8evj///////+/fv/1sKz/9bCs//9/fr//////+/m2/+NRwL/nloA/5xYAPj///8A////ANKaZPjRmGH/5cKh////////////k149/3UwAP91MQD/lmQ//86rhv+USg3/m1YA/5hSAP+bVgD4////AP///wDSmmT4zpJY/+/bx///////8+TV/8mLT/+TVx//gkIA/5lVAP+VTAD/x6B//7aEVv/JpH7/s39J+P///wD///8A0ppk+M6SWP/u2sf///////Pj1f/Nj1T/2KFs/8mOUv+eWhD/lEsA/8aee/+0glT/x6F7/7J8Rvj///8A////ANKaZPjRmGH/48Cf///////+/v7/2qt//82PVP/OkFX/37KJ/86siv+USg7/mVQA/5hRAP+bVgD4////AP///wDSmmT40ppk/9CVXP/69O////////7+/v/x4M//8d/P//7+/f//////9u7n/6tnJf+XUgD/nFgA+P///wD///8A0ppk+NKaZP/RmWL/1qNy//r07///////////////////////+vXw/9akdP/Wnmn/y5FY/6JfFvj///8A////ANKaZFTSmmTo0ppk/9GYYv/Ql1//5cWm//Hg0P/x4ND/5cWm/9GXYP/RmGH/0ppk/9KaZOjVnmpY////AP///wDSmmQA0ppkEtKaZI7SmmT60ppk/9CWX//OkVb/zpFW/9CWX//SmmT/0ppk/NKaZJDSmmQS0ppkAP///wD///8A0ppkANKaZADSmmQA0ppkKtKaZLrSmmT/0ppk/9KaZP/SmmT/0ppkvNKaZCrSmmQA0ppkANKaZAD///8A////ANKaZADSmmQA0ppkANKaZADSmmQA0ppkUtKaZNzSmmTc0ppkVNKaZADSmmQA0ppkANKaZADSmmQA////AP5/AAD4HwAA4AcAAMADAACAAQAAgAEAAIABAACAAQAAgAEAAIABAACAAQAAgAEAAMADAADgBwAA+B8AAP5/AAAoAAAAIAAAAEAAAAABACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////AP///wCCRAAAgkQAAIJEAACCRAAAgkQAAIJEAACCRAAAgkQAAIJEAACCRAAAgkQAAIJEAAyCRACMgkQA6oJEAOqCRACQgkQAEIJEAACCRAAAgkQAAIJEAACCRAAAgkQAAIJEAACCRAAAgkQAAIJEAACCRAAA////AP///wD///8A////AIJEAACCRAAAgkQAAIJEAACCRAAAgkQAAIJEAACCRAAAgkQAAIJEAACCRABigkQA5oJEAP+CRAD/gkQA/4JEAP+CRADqgkQAZoJEAACCRAAAgkQAAIJEAACCRAAAgkQAAIJEAACCRAAAgkQAAIJEAAD///8A////AP///wD///8AgkQAAIJEAACCRAAAgkQAAIJEAACCRAAAgkQAAIJEAACCRAA4gkQAwoJEAP+CRAD/gkQA/4JEAP+CRAD/gkQA/4JEAP+CRAD/gkQAxIJEADyCRAAAgkQAAIJEAACCRAAAgkQAAIJEAACCRAAAgkQAAP///wD///8A////AP///wCCRAAAgkQAAIJEAACCRAAAgkQAAIJEAACCRAAWgkQAmIJEAP+CRAD/gkQA/4JEAP+CRAD/gkQA/4JEAP+CRAD/gkQA/4JEAP+CRAD/gkQA/4JEAJyCRAAYgkQAAIJEAACCRAAAgkQAAIJEAACCRAAA////AP///wD///8A////AIJEAACCRAAAgkQAAIJEAACCRAAAgkQAdIJEAPCCRAD/gkQA/4JEAP+CRAD/gkQA/4JEAP+CRAD/gkQA/4JEAP+CRAD/gkQA/4JEAP+CRAD/gkQA/4JEAPSCRAB4gkQAAIJEAACCRAAAgkQAAIJEAAD///8A////AP///wD///8AgkQAAIJEAACCRAAAgkQASoJEANKCRAD/gkQA/4JEAP+CRAD/g0YA/39AAP9zLgD/bSQA/2shAP9rIQD/bSQA/3MuAP9/PwD/g0YA/4JEAP+CRAD/gkQA/4JEAP+CRADUgkQAToJEAACCRAAAgkQAAP///wD///8A////AP///wB+PwAAgkUAIoJEAKiCRAD/gkQA/4JEAP+CRAD/hEcA/4BBAP9sIwD/dTAA/5RfKv+viF7/vp56/76ee/+wiF7/lWAr/3YxAP9sIwD/f0AA/4RHAP+CRAD/gkQA/4JEAP+CRAD/gkQArIJEACaBQwAA////AP///wD///8A////AIBCAEBzNAD6f0EA/4NFAP+CRAD/gkQA/4VIAP92MwD/bSUA/6N1Tv/ezsL/////////////////////////////////38/D/6V3Uv9uJgD/dTEA/4VJAP+CRAD/gkQA/4JEAP+BQwD/fUAA/4FDAEj///8A////AP///wD///8AzJRd5qBlKf91NgD/dDUA/4JEAP+FSQD/cy4A/3YyAP/PuKP//////////////////////////////////////////////////////9K7qP94NQD/ciwA/4VJAP+CRAD/fkEA/35BAP+LSwD/mlYA6v///wD///8A////AP///wDdpnL/4qx3/8KJUv+PUhf/cTMA/3AsAP90LgD/4dK+/////////////////////////////////////////////////////////////////+TYxf91MAD/dTIA/31CAP+GRwD/llQA/6FcAP+gWwD8////AP///wD///8A////ANGZY/LSm2X/4ap3/92mcP+wdT3/byQA/8mwj////////////////////////////////////////////////////////////////////////////+LYxv9zLgP/jUoA/59bAP+hXAD/nFgA/5xYAPL///8A////AP///wD///8A0ppk8tKaZP/RmWL/1p9q/9ubXv/XqXj////////////////////////////7+fD/vZyG/6BxS/+gcUr/vJuE//r37f//////////////////////3MOr/5dQBf+dVQD/nVkA/5xYAP+cWAD/nFgA8v///wD///8A////AP///wDSmmTy0ppk/9KaZP/SmWP/yohJ//jo2P//////////////////////4NTG/4JDFf9lGAD/bSQA/20kAP9kGAD/fz8S/+Xb0f//////5NG9/6txN/+LOgD/m1QA/51aAP+cWAD/m1cA/5xYAP+cWADy////AP///wD///8A////ANKaZPLSmmT/0ppk/8+TWf/Unmv//v37//////////////////////+TWRr/VwsA/35AAP+ERgD/g0UA/4JGAP9lHgD/kFga/8KXX/+TRwD/jT4A/49CAP+VTQD/n10A/5xYAP+OQQD/lk4A/55cAPL///8A////AP///wD///8A0ppk8tKaZP/SmmT/y4tO/92yiP//////////////////////8NnE/8eCQP+rcTT/ez0A/3IyAP98PgD/gEMA/5FSAP+USwD/jj8A/5lUAP+JNwD/yqV2/694Mf+HNQD/jkAA/82rf/+laBj/jT4A8v///wD///8A////AP///wDSmmTy0ppk/9KaZP/LiUr/4byY///////////////////////gupX/0I5P/+Wuev/Lklz/l1sj/308AP+QSwD/ol0A/59aAP+aVQD/k0oA/8yoh///////+fXv/6pwO//Lp3v///////Pr4f+oay7y////AP///wD///8A////ANKaZPLSmmT/0ppk/8uJSv/hvJj//////////////////////+G7l//Jhkb/0ppk/96nc//fqXX/x4xO/6dkFP+QSQD/llEA/5xXAP+USgD/yaOA///////38uv/qG05/8ijdv//////8efb/6ZpLPL///8A////AP///wD///8A0ppk8tKaZP/SmmT/zIxO/9yxh///////////////////////7dbA/8iEQf/Sm2X/0Zlj/9ScZv/eqHf/2KJv/7yAQf+XTgD/iToA/5lSAP+JNgD/yKFv/611LP+HNQD/jT8A/8qmeP+kZRT/jT4A8v///wD///8A////AP///wDSmmTy0ppk/9KaZP/Pk1n/1J5q//78+//////////////////+/fv/1aFv/8iEQv/Tm2b/0ppl/9GZY//Wn2z/1pZc/9eldf/Bl2b/kUcA/4w9AP+OQAD/lUwA/59eAP+cWQD/jT8A/5ZOAP+eXADy////AP///wD///8A////ANKaZPLSmmT/0ppk/9KZY//KiEn/8d/P///////////////////////47+f/05tm/8iCP//KiEj/yohJ/8eCP//RmGH//vfy///////n1sP/rXQ7/4k4AP+TTAD/nVoA/5xYAP+cVwD/nFgA/5xYAPL///8A////AP///wD///8A0ppk8tKaZP/SmmT/0ptl/8uLTf/aq37////////////////////////////+/fz/6c2y/961jv/etY7/6Myx//78+v//////////////////////3MWv/5xXD/+ORAD/mFQA/51ZAP+cWAD/nFgA8v///wD///8A////AP///wDSmmTy0ppk/9KaZP/SmmT/0ppk/8mFRP/s1b//////////////////////////////////////////////////////////////////////////////+PD/0JFU/7NzMv+WUQD/kUsA/5tXAP+dWQDy////AP///wD///8A////ANKaZP/SmmT/0ppk/9KaZP/Sm2X/z5NZ/8yMT//z5NX/////////////////////////////////////////////////////////////////9Ofa/8yNUP/UmGH/36p5/8yTWv+qaSD/kksA/5ROAPz///8A////AP///wD///8A0ppk5NKaZP/SmmT/0ppk/9KaZP/TnGf/zY9T/82OUv/t1sD//////////////////////////////////////////////////////+7Yw//OkFX/zI5R/9OcZ//SmmP/26V0/9ymdf/BhUf/ol8R6P///wD///8A////AP///wDSmmQ80ppk9tKaZP/SmmT/0ppk/9KaZP/TnGj/zpFW/8qJSv/dson/8uHS//////////////////////////////////Lj0//etIv/y4lL/86QVf/TnGj/0ppk/9KaZP/RmWP/05xn/9ymdfjUnWdC////AP///wD///8A////ANKaZADSmmQc0ppkotKaZP/SmmT/0ppk/9KaZP/Tm2b/0Zli/8qJSf/NjlH/16Z3/+G8mP/myKr/5siq/+G8mP/Xp3f/zY5S/8qISf/RmGH/05tm/9KaZP/SmmT/0ppk/9KaZP/SmmSm0pljINWdaQD///8A////AP///wD///8A0ppkANKaZADSmmQA0ppkQtKaZMrSmmT/0ppk/9KaZP/SmmT/0ptl/9GYYf/Nj1P/y4lL/8qISP/KiEj/y4lK/82PU//RmGH/0ptl/9KaZP/SmmT/0ppk/9KaZP/SmmTO0ppkRtKaZADSmmQA0ppkAP///wD///8A////AP///wDSmmQA0ppkANKaZADSmmQA0ppkANKaZGzSmmTu0ppk/9KaZP/SmmT/0ppk/9KaZP/SmmT/0ppk/9KaZP/SmmT/0ppk/9KaZP/SmmT/0ppk/9KaZP/SmmTw0ppkcNKaZADSmmQA0ppkANKaZADSmmQA////AP///wD///8A////ANKaZADSmmQA0ppkANKaZADSmmQA0ppkANKaZBLSmmSQ0ppk/9KaZP/SmmT/0ppk/9KaZP/SmmT/0ppk/9KaZP/SmmT/0ppk/9KaZP/SmmT/0ppklNKaZBTSmmQA0ppkANKaZADSmmQA0ppkANKaZAD///8A////AP///wD///8A0ppkANKaZADSmmQA0ppkANKaZADSmmQA0ppkANKaZADSmmQy0ppkutKaZP/SmmT/0ppk/9KaZP/SmmT/0ppk/9KaZP/SmmT/0ppkvtKaZDbSmmQA0ppkANKaZADSmmQA0ppkANKaZADSmmQA0ppkAP///wD///8A////AP///wDSmmQA0ppkANKaZADSmmQA0ppkANKaZADSmmQA0ppkANKaZADSmmQA0ppkXNKaZODSmmT/0ppk/9KaZP/SmmT/0ppk5NKaZGDSmmQA0ppkANKaZADSmmQA0ppkANKaZADSmmQA0ppkANKaZADSmmQA////AP///wD///8A////ANKaZADSmmQA0ppkANKaZADSmmQA0ppkANKaZADSmmQA0ppkANKaZADSmmQA0ppkBtKaZIbSmmTo0ppk6tKaZIrSmmQK0ppkANKaZADSmmQA0ppkANKaZADSmmQA0ppkANKaZADSmmQA0ppkANKaZAD///8A////AP/8P///+B///+AH//+AAf//AAD//AAAP/AAAA/gAAAHwAAAA8AAAAPAAAADwAAAA8AAAAPAAAADwAAAA8AAAAPAAAADwAAAA8AAAAPAAAADwAAAA8AAAAPAAAADwAAAA+AAAAfwAAAP/AAAP/8AAP//gAH//+AH///4H////D//" rel="icon" />
+  
+  <!--[if lt IE 9]>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
+  <![endif]-->
+</head>
+<body>
+<div class="wrapper">
+<header id="title-block-header">
+<h1 class="title" style="text-align:center">Memory safety without
+lifetime parameters</h1>
+<table style="border:none;float:right">
+  <tr>
+    <td>Document #:</td>
+    <td>DXXXX</td>
+  </tr>
+  <tr>
+    <td>Date:</td>
+    <td>2024-10-15</td>
+  </tr>
+  <tr>
+    <td style="vertical-align:top">Project:</td>
+    <td>Programming Language C++</td>
+  </tr>
+  <tr>
+    <td style="vertical-align:top">Audience:</td>
+    <td>
+      SG23<br>
+    </td>
+  </tr>
+  <tr>
+    <td style="vertical-align:top">Reply-to:</td>
+    <td>
+      Sean Baxter<br>&lt;<a href="mailto:seanbax.circle@gmail.com" class="email">seanbax.circle@gmail.com</a>&gt;<br>
+    </td>
+  </tr>
+</table>
+</header>
+<div style="clear:both">
+<h1 data-number="1" id="safe-references"><span class="header-section-number">1</span> Safe references<a href="#safe-references" class="self-link"></a></h1>
+<p>“Safe C++”<span class="citation" data-cites="safecpp">[<a href="https://safecpp.org/draft.html" role="doc-biblioref">safecpp</a>]</span> introduced a comprehensive
+design for compile-time memory safety in C++. The borrow checking model
+in Safe C++ requires lifetime parameters, a feature that increases
+expressiveness but complicates the language’s type system. This proposal
+describes an alternative style of borrow checking, guaranteeing lifetime
+safety without the involvement of lifetime annotations.</p>
+<p>First let’s recap how lifetime parameters are declared and used.</p>
+<p><a href="https://github.com/cppalliance/safe-cpp/blob/master/lifetimes/lifetimes1.cxx"><strong>lifetimes1.cxx</strong></a>
+– <a href="https://godbolt.org/z/5s9qG1h4E">(Compiler Explorer)</a></p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">// Function parameters have different lifetime parameters. </span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co">// Return type is constrained by x&#39;s lifetime.</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="kw">auto</span> f1<span class="op">/(</span>a, b<span class="op">)(</span><span class="dt">int</span><span class="op">^/</span>a x, <span class="dt">int</span><span class="op">^/</span>b y, <span class="dt">bool</span> pred<span class="op">)</span> safe <span class="op">-&gt;</span> <span class="dt">int</span><span class="op">^/</span>a <span class="op">{</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Error:</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="co">// function auto f1/(a, b)(int^/a, int^/b) -&gt; int^/a returns</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">// object with lifetime b, but b doesn&#39;t outlive a</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">// return y;</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> pred <span class="op">?</span> x <span class="op">:</span> y;</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co">// Function parameters have a common lifetime parameter.</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="kw">auto</span> f2<span class="op">/(</span>a<span class="op">)(</span><span class="dt">int</span><span class="op">^/</span>a x, <span class="dt">int</span><span class="op">^/</span>a y, <span class="dt">bool</span> pred<span class="op">)</span> safe <span class="op">-&gt;</span> <span class="dt">int</span><span class="op">^/</span>a <span class="op">{</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Ok</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> pred <span class="op">?</span> x <span class="op">:</span> y;</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="co">// Error:</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="co">// cannot use lifetime elision for return type int^ </span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="kw">auto</span> f3<span class="op">(</span><span class="dt">int</span><span class="op">^</span> x, <span class="dt">int</span><span class="op">^</span> y<span class="op">)</span> safe <span class="op">-&gt;</span> <span class="dt">int</span><span class="op">^</span>;</span></code></pre></div>
+<p>In Safe C++, occurrences of the borrow type
+<code class="sourceCode cpp">T<span class="op">^</span></code> in
+function declarations and in data members require specialization with
+<em>lifetime arguments</em>. Lifetime arguments name
+<em>lifetime-parameters</em> declared as part of the function
+declaration. Borrow types without lifetime arguments have <em>unbound
+lifetimes</em> and borrows with lifetime arguments have <em>bound
+lifetimes</em>. These are treated as different entities by the
+language’s type system, and there are subtle rules on how bound
+lifetimes decay to unbound lifetimes and how unbound lifetimes become
+bound. Lifetime annotations greatly improve the capability of safe
+references, but extend an already complicated type system.</p>
+<p>The above code declares functions
+<code class="sourceCode cpp">f1</code>,
+<code class="sourceCode cpp">f2</code> and
+<code class="sourceCode cpp">f3</code> with
+<em>lifetime-parameter-lists</em>. Borrows in function return types must
+be constrained by the lifetimes of one or more function parameters.
+Failure to match lifetime arguments between function parameters and
+return types will cause a borrow checker failure.
+<code class="sourceCode cpp">f1</code> fails to borrow check because the
+returned parameter <code class="sourceCode cpp">y</code> does not
+outlive the lifetime
+<code class="sourceCode cpp"><span class="op">/</span>a</code> on the
+return type.</p>
+<p>Elision rules make lifetime annotations implicit in some cases. But
+elision can fail, requiring users to intervene with annotations. In the
+example above, the declaration of <code class="sourceCode cpp">f3</code>
+fails because the elision rules cannot determine the lifetime argument
+on the returned borrow.</p>
+<p><a href="https://github.com/cppalliance/safe-cpp/blob/master/lifetimes/lifetimes2.cxx"><strong>lifetimes2.cxx</strong></a>
+– <a href="https://godbolt.org/z/G6TWx83M9">(Compiler Explorer)</a></p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co">// New elision rules:</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">// All parameters are constrained by a common lifetime.</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">// The common lifetime constrains the return type.</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span><span class="op">%</span> f4<span class="op">(</span><span class="dt">int</span><span class="op">%</span> x, <span class="dt">int</span><span class="op">%</span> y, <span class="dt">bool</span> pred<span class="op">)</span> safe <span class="op">{</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Can return either x or y, because they outlive the common lifetime</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">// and the common lifetime outlives the result object.</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> pred <span class="op">?</span> x <span class="op">:</span> y;</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>This proposal introduces a new <em>safe reference</em> marked by the
+reference declarator
+<code class="sourceCode cpp">T<span class="op">%</span></code>. Safe
+references do not take lifetime arguments and there is no notion of
+<em>bound</em> or <em>unbound</em> lifetimes. The lifetime
+parameterization is determined by the formation of the function type.
+For a free function, all function parameters outlive a single invented
+lifetime that extends through the duration of the function call. For a
+non-static member function with the
+<code class="sourceCode cpp"><span class="op">%</span></code>
+<em>ref-qualifier</em>, the implicit object parameter outlives the
+invented lifetime. In turn, this invented lifetime outlives the returned
+safe reference.</p>
+<h2 data-number="1.1" id="exclusivity"><span class="header-section-number">1.1</span> Exclusivity<a href="#exclusivity" class="self-link"></a></h2>
+<ul>
+<li><code class="sourceCode cpp">T<span class="op">%</span></code> is a
+<em>mutable safe reference</em>. It cannot alias other references to
+overlapping places.</li>
+<li><code class="sourceCode cpp"><span class="kw">const</span> T<span class="op">%</span></code>
+is a <em>shared safe reference</em>. It may alias shared safe references
+to overlapping places, but may never overlap a mutable reference.</li>
+</ul>
+<p>If lifetime safety can be guaranteed without lifetime parameters, why
+involve a new reference type
+<code class="sourceCode cpp">T<span class="op">%</span></code> at all?
+Why not perform this form of borrow checking on the existing lvalue- and
+rvalue-references
+<code class="sourceCode cpp">T<span class="op">&amp;</span></code> and
+<code class="sourceCode cpp">T<span class="op">&amp;&amp;</span></code>?
+The answer is that safe references enforce <em>exclusivity</em> and
+legacy references do not. There may be one mutable reference to a place,
+or any number of shared (constant) references, but not both at the same
+time. This is the universal invariant of borrow checking. Borrow
+checking legacy reference types would break all existing code, because
+that code was written without upholding the exclusivity invariant.</p>
+<p>Exclusivity is a program-wide invariant. It doesn’t hinge on the
+safeness of a function.</p>
+<ul>
+<li>A safe function is sound for all valid inputs.</li>
+<li>An unsafe function has preconditions and may be unsound for some
+valid inputs.</li>
+</ul>
+<p>“Valid” borrow and safe reference inputs don’t mutably alias. This is
+something a function can just <em>assume</em>; it doesn’t need to check
+and there’s no way to check. Borrow checking upholds exclusivity even
+for unsafe functions (when compiled under the <code class="sourceCode cpp"><span class="op">[</span>safety<span class="op">]</span></code>
+feature). There are other assumptions C++ programmers already make about
+the validity of inputs: for instance, references never hold null
+addresses. Non-valid inputs are implicated in undefined behavior.</p>
+<p>By the parsimony principal you may suggest “rather than adding a new
+safe reference type, just enforce exclusivity on lvalue- and
+rvalue-references when compiled under the <code class="sourceCode cpp"><span class="op">[</span>safety<span class="op">]</span></code>
+feature.” But that makes the soundness problem worse. New code will
+<em>assume</em> legacy references don’t mutably alias, but existing code
+doesn’t uphold that invariant because it was written without even
+knowing about it.</p>
+<p>If safe code calls legacy code that returns a struct with a pair of
+references, do those references alias? Of course they may alias, but the
+parsimonious treatment claims that mutable references don’t alias under
+the <code class="sourceCode cpp"><span class="op">[</span>safety<span class="op">]</span></code>
+feature. We’ve already stumbled on a soundness bug.</p>
+<p>Coming from the other direction, it may be necessary to form aliasing
+references just to use the APIs for existing code. Consider a function
+that takes an lvalue reference to a container and an lvalue reference to
+one of its elements. If safe code can’t even form aliased lvalue
+references, it wouldn’t be able to use that API at all.</p>
+<p>Exclusivity is a program-wide invariant on safe references. We need
+separate safe and unsafe reference types for both soundness and
+expressiveness.</p>
+<p><a href="https://github.com/cppalliance/safe-cpp/blob/master/lifetimes/vector1.cxx"><strong>vector1.cxx</strong></a>
+– <a href="https://godbolt.org/z/KTEWEdEsM">(Compiler Explorer)</a></p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;vector&gt;</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> f1<span class="op">(</span>std<span class="op">::</span>vector<span class="op">&lt;</span><span class="dt">float</span><span class="op">&gt;&amp;</span> vec, <span class="dt">float</span><span class="op">&amp;</span> x<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Do vec and x alias? If so, the push_back may invalidate x.</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  vec<span class="op">.</span>push_back<span class="op">(</span><span class="dv">6</span><span class="op">)</span>;</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Potential UB: x may have been invalidated by the push_back.</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  x <span class="op">=</span> <span class="dv">6</span>;</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>  std<span class="op">::</span>vector<span class="op">&lt;</span><span class="dt">float</span><span class="op">&gt;</span> vec <span class="op">{</span> <span class="fl">1.0</span><span class="bu">f</span> <span class="op">}</span>;</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Legacy references permit aliasing.</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>  f1<span class="op">(</span>vec, vec<span class="op">[</span><span class="dv">0</span><span class="op">])</span>;</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>This example demonstrates how perilous mutable aliasing in C++ is. In
+<code class="sourceCode cpp">f1</code>, the compiler doesn’t know if
+<code class="sourceCode cpp">vec</code> and
+<code class="sourceCode cpp">x</code> alias. Pushing to the vector may
+cause a buffer resize and copy its data into a new allocation,
+invalidating existing references or pointers into the container. As C++
+doesn’t enforce exclusivity on legacy references, the code in
+<code class="sourceCode cpp">main</code> is legal, even though it leads
+to a use-after-free defect.</p>
+<p><a href="https://github.com/cppalliance/safe-cpp/blob/master/lifetimes/vector2.cxx"><strong>vector2.cxx</strong></a>
+– <a href="https://godbolt.org/z/ETenGYK8n">(Compiler Explorer)</a></p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;cstdint&gt;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">&gt;</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Vec <span class="op">{</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> push_back<span class="op">(</span>T value<span class="op">)</span> <span class="op">%</span> safe;</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> T<span class="op">%</span> <span class="kw">operator</span><span class="op">[](</span><span class="dt">size_t</span> idx<span class="op">)</span> <span class="kw">const</span> <span class="op">%</span> safe;</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>        T<span class="op">%</span> <span class="kw">operator</span><span class="op">[](</span><span class="dt">size_t</span> idx<span class="op">)</span>       <span class="op">%</span> safe;</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> f2<span class="op">(</span>Vec<span class="op">&lt;</span><span class="dt">float</span><span class="op">&gt;%</span> vec, <span class="dt">float</span><span class="op">%</span> x<span class="op">)</span> safe <span class="op">{</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Does push_back potentially invalidate x? </span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>  <span class="co">// No! Exclusivity prevents vec and x from aliasing.</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  vec<span class="op">.</span>push_back<span class="op">(</span><span class="dv">7</span><span class="op">)</span>;</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Okay to store to x, because it doesn&#39;t point into vec&#39;s data.</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>x <span class="op">=</span> <span class="dv">7</span>;</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> safe <span class="op">{</span></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>  Vec<span class="op">&lt;</span><span class="dt">float</span><span class="op">&gt;</span> vec <span class="op">{</span> <span class="op">}</span>;</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>  mut vec<span class="op">.</span>push_back<span class="op">(</span><span class="dv">1</span><span class="op">)</span>;</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Ill-formed: mutable borrow of vec between its mutable borrow and its use</span></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>  f2<span class="op">(</span>mut vec, mut vec<span class="op">[</span><span class="dv">0</span><span class="op">])</span>;</span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode default"><code class="sourceCode default"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>$ circle vector2.cxx</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>safety: during safety checking of int main() safe</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  borrow checking: vector2.cxx:27:19</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    f2(mut vec, mut vec[0]); </span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>                    ^</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  mutable borrow of vec between its mutable borrow and its use</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  loan created at vector2.cxx:27:10</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    f2(mut vec, mut vec[0]); </span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>           ^</span></code></pre></div>
+<p>Rewrite the example using our simplified safe references. In
+<code class="sourceCode cpp">main</code>, the user attempts to pass a
+safe reference to <code class="sourceCode cpp">vec</code> and a safe
+reference to one of its elements. This violates exclusivity, causing the
+program to be ill-formed.</p>
+<p>Mutable safe references are prohibited from aliasing. Exclusivity is
+enforced by the same MIR analysis that polices Safe C++’s more general
+borrow type
+<code class="sourceCode cpp">T<span class="op">^</span></code>. While
+enforcing exclusivity involves more complicated tooling, it simplifies
+reasoning about your functions. Since safe reference parameters don’t
+alias, users don’t even have to think about aliasing bugs. You’re free
+to store to references without worrying about iterator invalidation or
+other side effects leading to use-after-free defects.</p>
+<h2 data-number="1.2" id="constraint-rules"><span class="header-section-number">1.2</span> Constraint rules<a href="#constraint-rules" class="self-link"></a></h2>
+<p>This proposal implements two sets of constraint rules. Free functions
+constrain return references by the shortest of the argument lifetimes.
+Non-static member functions constrain return references by the implicit
+object lifetime.</p>
+<p><a href="https://github.com/cppalliance/safe-cpp/blob/master/lifetimes/lifetimes3.cxx"><strong>lifetimes3.cxx</strong></a>
+– <a href="https://godbolt.org/z/Yb6EoMMb6">(Compiler Explorer)</a></p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> f1<span class="op">(</span><span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> x, <span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> y, <span class="dt">bool</span> pred<span class="op">)</span> safe <span class="op">{</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The return reference is constrained by all reference parameters: x and y.</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> pred <span class="op">?</span> x <span class="op">:</span> y;</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> Obj <span class="op">{</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> f2<span class="op">(</span><span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> arg<span class="op">)</span> <span class="kw">const</span> <span class="op">%</span> safe <span class="op">{</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Non-static member functions are constrained by the implicit </span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">// object lifetime.</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    <span class="co">// It&#39;s OK to return `x`, because self outlives the return.</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="op">%</span>x;</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> f3<span class="op">(</span><span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> arg<span class="op">)</span> <span class="kw">const</span> <span class="op">%</span> safe <span class="op">{</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Error: arg does not outlive the return reference.</span></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> arg;</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> f4<span class="op">(</span><span class="kw">const</span> self<span class="op">%</span>, <span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> arg<span class="op">)</span> safe <span class="op">{</span></span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>    <span class="co">// OK - f4 is a free function with an explicit self parameter.</span></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> arg;</span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> x;</span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> x <span class="op">=</span> <span class="dv">1</span>, y <span class="op">=</span> <span class="dv">2</span>;</span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>  f1<span class="op">(</span>x, y, <span class="kw">true</span><span class="op">)</span>; <span class="co">// OK</span></span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>  Obj obj <span class="op">{</span> <span class="op">}</span>;</span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>  obj<span class="op">.</span>f2<span class="op">(</span>x<span class="op">)</span>;  <span class="co">// OK</span></span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>  obj<span class="op">.</span>f3<span class="op">(</span>x<span class="op">)</span>;  <span class="co">// Error</span></span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a>  obj<span class="op">.</span>f4<span class="op">(</span>x<span class="op">)</span>;  <span class="co">// OK.</span></span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode default"><code class="sourceCode default"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>$ circle lifetimes3.cxx </span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>safety: during safety checking of const int% Obj::f3(const int%) const % safe</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  error: lifetimes3.cxx:18:12</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>      return arg; </span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>             ^</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  function const int% Obj::f3(const int%) const % safe returns object with lifetime SCC-ref-1, but SCC-ref-1 doesn&#39;t outlive SCC-ref-0</span></code></pre></div>
+<p>The definitions of free function
+<code class="sourceCode cpp">f1</code> and non-static member function
+<code class="sourceCode cpp">f2</code> compile, because they return
+function parameters that constrain the return type: the returned
+parameter <em>outlives</em> the returned reference. The non-static
+member function <code class="sourceCode cpp">f3</code> fails to compile,
+because the returned parameter <em>does not outlive</em> the the return
+type. In a non-static member function, only the implicit object
+parameter outlives the return type.
+<code class="sourceCode cpp">f4</code> returns a function parameter but
+compiles; it uses the explicit object syntax to gain the ergonomics of a
+non-static member function, but retains the constraint rules of a free
+function.</p>
+<p><a href="https://github.com/cppalliance/safe-cpp/blob/master/lifetimes/vector3.cxx"><strong>vector3.cxx</strong></a>
+– <a href="https://godbolt.org/z/KEr1chMac">(Compiler Explorer)</a></p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> Key, <span class="kw">typename</span> Value<span class="op">&gt;</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Map <span class="op">{</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Non-static member functions do not constrain the result object to</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="co">// the function parameters.</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">auto</span> get1<span class="op">(</span><span class="kw">const</span> Key<span class="op">%</span> key<span class="op">)</span> <span class="op">%</span> safe <span class="op">-&gt;</span> Value<span class="op">%</span>;</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Free function do constrain the result object to the function parameters.</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  <span class="kw">auto</span> get2<span class="op">(</span>self<span class="op">%</span>, <span class="kw">const</span> Key<span class="op">%</span> key<span class="op">)</span> safe <span class="op">-&gt;</span> Value<span class="op">%</span>;</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> safe <span class="op">{</span></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>  Map<span class="op">&lt;</span><span class="dt">float</span>, <span class="dt">long</span><span class="op">&gt;</span> map <span class="op">{</span> <span class="op">}</span>;</span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Bind the key reference to a materialized temporary.</span></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The temporary expires at the end of this statement.</span></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>  <span class="dt">long</span><span class="op">%</span> value1 <span class="op">=</span> mut map<span class="op">.</span>get1<span class="op">(</span><span class="fl">3.14</span><span class="bu">f</span><span class="op">)</span>;</span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>  <span class="co">// We can still access value, because it&#39;s not constrained on the </span></span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>  <span class="co">// key argument.</span></span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>value1 <span class="op">=</span> <span class="dv">1001</span>;</span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The call to get2 constrains the returned reference to the lifetime</span></span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>  <span class="co">// of the key temporary.</span></span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>  <span class="dt">long</span><span class="op">%</span> value2 <span class="op">=</span> mut map<span class="op">.</span>get2<span class="op">(</span><span class="fl">1.6186</span><span class="bu">f</span><span class="op">)</span>;</span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>  <span class="co">// This is ill-formed, because get2&#39;s key argument is out of scope.</span></span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>value2 <span class="op">=</span> <span class="dv">1002</span>;</span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode default"><code class="sourceCode default"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>$ circle vector3.cxx </span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>safety: during safety checking of int main() safe</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  borrow checking: vector3.cxx:30:4</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    *value2 = 1002; </span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>     ^</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  use of value2 depends on expired loan</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  drop of temporary object float between its shared borrow and its use</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  loan created at vector3.cxx:27:31</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    long% value2 = mut map.get2(1.6186f); </span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>                                ^</span></code></pre></div>
+<p>The constraint rules for non-static member functions reflect the idea
+that resources are owned by class objects. Consider a map data structure
+that associates values with keys. The map may be specialized a key type
+that’s expensive to copy, such as a string or another map. We don’t want
+to compel the user to pass the key by value, because that may require
+copying this expensive type. Naturally, we pass by const reference.</p>
+<p>However, the accessor only needs the key inside the body of the
+function. Once it locates the value, it should return a reference to
+that, unconstrained by the lifetime of the key argument. Consider
+passing a materialized temporary for a key: it goes out of scope at the
+end of the full expression. <code class="sourceCode cpp">get1</code>
+uses the non-static member function constraint rules. The caller can use
+the returned reference even after the key temporary goes out of scope.
+<code class="sourceCode cpp">get2</code> uses the free function
+constraint rules, which constrains the return type to all of its
+function parameters. This leaves the program ill-formed when the
+returned reference is used after the expiration of the key
+temporary.</p>
+<p>In this model, lifetime constraints are not generally programmable,
+but that design still provides a degree of freedom in the form of
+non-static member functions.</p>
+<p><a href="https://github.com/cppalliance/safe-cpp/blob/master/lifetimes/vector4.cxx"><strong>vector4.cxx</strong></a>
+– <a href="https://godbolt.org/z/hdMr5G3j1">(Compiler Explorer)</a></p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> Key, <span class="kw">typename</span> Value<span class="op">&gt;</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Map <span class="op">{</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Lifetime elision rules constrain the return by self.</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">auto</span> get1<span class="op">(</span>self<span class="op">^</span>, <span class="kw">const</span> Key<span class="op">^</span> key<span class="op">)</span> safe <span class="op">-&gt;</span> Value<span class="op">^</span>;</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Use explicit parameterizations for alternate constraints.</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>  <span class="kw">auto</span> get2<span class="op">/(</span>a<span class="op">)(</span>self<span class="op">^/</span>a, <span class="kw">const</span> Key<span class="op">^/</span>a key<span class="op">)</span> safe <span class="op">-&gt;</span> Value<span class="op">^/</span>a;</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> safe <span class="op">{</span></span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>  Map<span class="op">&lt;</span><span class="dt">float</span>, <span class="dt">long</span><span class="op">&gt;</span> map <span class="op">{</span> <span class="op">}</span>;</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Bind the key reference to a materialized temporary.</span></span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The temporary expires at the end of this statement.</span></span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>  <span class="dt">long</span><span class="op">^</span> value1 <span class="op">=</span> mut map<span class="op">.</span>get1<span class="op">(</span><span class="fl">3.14</span><span class="bu">f</span><span class="op">)</span>;</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>  <span class="co">// We can still access value, because it&#39;s not constrained on the </span></span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a>  <span class="co">// key argument.</span></span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>value1 <span class="op">=</span> <span class="dv">1001</span>;</span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The call to get2 constrains the returned reference to the lifetime</span></span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>  <span class="co">// of the key temporary.</span></span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>  <span class="dt">long</span><span class="op">^</span> value2 <span class="op">=</span> mut map<span class="op">.</span>get2<span class="op">(</span><span class="fl">1.6186</span><span class="bu">f</span><span class="op">)</span>;</span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a>  <span class="co">// This is ill-formed, because get2&#39;s key argument is out of scope.</span></span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>value2 <span class="op">=</span> <span class="dv">1002</span>;</span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode default"><code class="sourceCode default"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>$ circle vector4.cxx </span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>safety: during safety checking of int main() safe</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  borrow checking: vector4.cxx:29:4</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    *value2 = 1002; </span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>     ^</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>  use of value2 depends on expired loan</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  drop of temporary object float between its shared borrow and its use</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  loan created at vector4.cxx:26:31</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>    long^ value2 = mut map.get2(1.6186f); </span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>                                ^</span></code></pre></div>
+<p>The general borrow type
+<code class="sourceCode cpp">T<span class="op">^</span></code> has
+programmable constraints. The map above declares accessor functions.
+<code class="sourceCode cpp">get1</code> relies on lifetime elision to
+constrain the result object by the
+<code class="sourceCode cpp">self</code> parameter. This is equivalent
+to the non-static member function constraint rule. We can call
+<code class="sourceCode cpp">get1</code> and use the returned reference
+even after the key temporary goes out of scope.</p>
+<p><code class="sourceCode cpp">get2</code> includes lifetime
+annotations to constrain the returned reference by both the
+<code class="sourceCode cpp">self</code> and
+<code class="sourceCode cpp">key</code> parameters. This is like the
+free function constraint rules. The program fails borrow checking when
+the returned reference <code class="sourceCode cpp">value2</code> is
+used after the expiration of its key temporary.</p>
+<h1 data-number="2" id="second-class-references"><span class="header-section-number">2</span> Second-class references<a href="#second-class-references" class="self-link"></a></h1>
+<p>References can be taxonimized into two classes:<span class="citation" data-cites="second-class">[<a href="https://borretti.me/article/second-class-references" role="doc-biblioref">second-class</a>]</span></p>
+<ul>
+<li>First-class references can pass data into functions, be returned
+from functions, made into objects and be stored in structures.</li>
+<li>Second-class references can pass data into functions but cannot be
+returned from functions, made into objects or stored in structures.</li>
+</ul>
+<p><em>Parameter-passing directives</em> like
+<code class="sourceCode cpp">in</code> and
+<code class="sourceCode cpp">inout</code> are equivalent to second-class
+references. The <em>mutable value semantics</em><span class="citation" data-cites="mutable-value-semantics">[<a href="https://www.jot.fm/issues/issue_2022_02/article2.pdf" role="doc-biblioref">mutable-value-semantics</a>]</span> model uses
+parameter-passing directives to pass objects to functions by reference
+without involving the complexity of a borrow checker.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> func<span class="op">(</span>Vec<span class="op">&lt;</span><span class="dt">float</span><span class="op">&gt;%</span> vec, <span class="dt">float</span><span class="op">%</span> x<span class="op">)</span> safe;</span></code></pre></div>
+<p>In this fragment, the reference parameters
+<code class="sourceCode cpp">vec</code> and
+<code class="sourceCode cpp">x</code> serve as <em>second-class
+references</em>. The compiler can achieve memory safety without
+involving the complexity of borrow checking. Both references point at
+data that outlives the duration of the call to
+<code class="sourceCode cpp">func</code>. Exclusivity is enforced at the
+point of the call, which prevents
+<code class="sourceCode cpp">vec</code> and
+<code class="sourceCode cpp">x</code> from aliasing. Since
+<code class="sourceCode cpp">vec</code> and
+<code class="sourceCode cpp">x</code> don’t alias, resizing or clearing
+<code class="sourceCode cpp">vec</code> cannot invalidate the
+<code class="sourceCode cpp">x</code> reference.</p>
+<p>The safe references presented here are more powerful than
+second-class references. While they don’t support all the capabilities
+of borrows, they can be returned from functions and made into objects.
+The compiler must implement borrow checking to support this additional
+capability.</p>
+<p>Borrow checking operates on a function lowering called mid-level IR
+(MIR). A fresh region variable is provisioned for each local variable
+with a safe reference type. Dataflow analysis populates each region
+variable with the liveness of its reference. Assignments and function
+calls involving references generate <em>lifetime constraints</em>. The
+compiler <em>solves the constraint equation</em> to find the liveness of
+each <em>loan</em>. All instructions in the MIR are scanned for
+<em>conflicting actions</em> with any of the loans in scope at that
+point. Conflicting actions raise borrow checker errors.</p>
+<p>The Hylo<span class="citation" data-cites="hylo">[<a href="https://2023.splashcon.org/details/iwaco-2023-papers/5/Borrow-checking-Hylo" role="doc-biblioref">hylo</a>]</span> model is largely equivalent to
+this model and it requires borrow checking technology.
+<code class="sourceCode cpp">let</code> and
+<code class="sourceCode cpp">inout</code> parameter directives use
+mutable value semantics to ensure memory safety for objects passed by
+reference into functions. But Hylo also supports returning references in
+the form of subscripts:</p>
+<p><a href="https://github.com/hylo-lang/hylo/blob/main/StandardLibrary/Sources/Array.hylo"><strong>Array.hylo</strong></a></p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode swift"><code class="sourceCode swift"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> conformance Array<span class="op">:</span> Collection <span class="op">{</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  <span class="op">...</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">public</span> subscript<span class="op">(</span>_ position<span class="op">:</span> Int<span class="op">):</span> Element <span class="op">{</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> {</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>      <span class="va">precondition</span><span class="op">((</span>position <span class="op">&gt;=</span> <span class="dv">0</span><span class="op">)</span> <span class="op">&amp;&amp;</span> <span class="op">(</span>position <span class="op">&lt;</span> count<span class="op">()),</span> <span class="st">&quot;position is out of bounds&quot;</span><span class="op">)</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>      yield pointer_to_element<span class="op">(</span>at<span class="op">:</span> position<span class="op">).</span>unsafe<span class="op">[]</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">inout</span> <span class="op">{</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>      precondition<span class="op">((</span>position <span class="op">&gt;=</span> <span class="dv">0</span><span class="op">)</span> <span class="op">&amp;&amp;</span> <span class="op">(</span>position <span class="op">&lt;</span> count<span class="op">()),</span> <span class="st">&quot;position is out of bounds&quot;</span><span class="op">)</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>      yield <span class="op">&amp;(</span>pointer_to_element<span class="op">(</span>at<span class="op">:</span> position<span class="op">).</span>unsafe<span class="op">[])</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>Subscripts are reference-returning <em>coroutines</em>. Coroutines
+with a single yield point are split into two normal functions: a ramp
+function that starts at the top and returns the expression of the yield
+statement, and a continuation function which resumes after the yield and
+runs to the end. Local state that’s live over the yield point must live
+in a <em>coroutine frame</em> so that it’s available to the continuation
+function. These <code class="sourceCode cpp">Array</code> subscripts
+don’t have instructions after the yield, so the continuation function is
+empty and hopefully elided by the optimizer.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">&gt;</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> Vec <span class="op">{</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> T<span class="op">%</span> <span class="kw">operator</span><span class="op">[](</span><span class="dt">size_t</span> idx<span class="op">)</span> <span class="kw">const</span> <span class="op">%</span> safe;</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>        T<span class="op">%</span> <span class="kw">operator</span><span class="op">[](</span><span class="dt">size_t</span> idx<span class="op">)</span>       <span class="op">%</span> safe;</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
+<p>The Hylo <code class="sourceCode cpp">Array</code> subscripts are
+lowered to reference-returning ramp functions exactly like their C++
+<code class="sourceCode cpp">Vec</code> counterparts. For both
+languages, the borrow checker relates lifetimes through the function
+arguments and out the result object. This isn’t the simple safety of
+second-class references/mutable value semantics. This is full-fat live
+analysis.</p>
+<p>Safe references without lifetime annotations shields users from
+dealing with a new degree of freedom, but it doesn’t simplify the static
+analysis that upholds lifetime safety. To prevent use-after-free
+defects, compilers must still lower functions to mid-level IR, compute
+non-lexical lifetimes<span class="citation" data-cites="nll">[<a href="https://rust-lang.github.io/rfcs/2094-nll.html" role="doc-biblioref">nll</a>]</span> and solve the constraint equation.
+When it comes to returning references, in for a penny, in for a
+pound.</p>
+<p>Since Circle has already made the investment in borrow checking,
+adding simplified safe references was an easy extension. If the
+community is able to fill in our gaps in knowledge around this sort of
+reference, the compiler could accommodate those advances as well.</p>
+<h1 data-number="3" id="other-aspects-of-safety"><span class="header-section-number">3</span> Other aspects of safety<a href="#other-aspects-of-safety" class="self-link"></a></h1>
+<p>As detailed in the Safe C++<span class="citation" data-cites="safecpp">[<a href="https://safecpp.org/draft.html" role="doc-biblioref">safecpp</a>]</span> proposal, there are four
+categories of memory safety:</p>
+<ol type="1">
+<li><strong>Lifetime safety</strong> - This proposal advances a simpler
+form of safe references that provides safety against use-after-free
+defects. The feature is complementary with borrow types
+<code class="sourceCode cpp">T<span class="op">^</span></code> that take
+lifetime arguments. Both types can be used in the same translation unit,
+and even the same function, without conflict.</li>
+<li><strong>Type safety</strong> - Relocation must replace move
+semantics to eliminate unsafe null pointer exposure. Choice types and
+pattern matching must be included for safe modeling of optional
+types.</li>
+<li><strong>Thread safety</strong> - The
+<code class="sourceCode cpp">send</code> and
+<code class="sourceCode cpp">sync</code> interfaces account for which
+types can be copied and shared between threads.</li>
+<li><strong>Runtime checks</strong> - The compiler automatically emits
+runtime bounds checks on array and slice subscripts. It emits checks for
+integer divide-by-zero and INT_MIN / -1, which are undefined behavior.
+Conforming safe library functions must also implement panics to prevent
+out-of-bounds access to heap allocations.</li>
+</ol>
+<p>Most critically, the <em>safe-specifier</em> is added to a function’s
+type. Inside a safe function, only safe operations may be used, unless
+escaped by an <em>unsafe-block</em>.</p>
+<p>C++ must adopt a new standard library with a safe API, which observes
+all four categories of safety. We need new tooling. <em>But it’s not the
+case that we have to rewrite all C++ code</em>. Time has already shaken
+out most of the vulnerabilities in old code. As demonstrated by the
+recent Android study on memory safety<span class="citation" data-cites="android">[<a href="https://security.googleblog.com/2024/09/eliminating-memory-safety-vulnerabilities-Android.html?m=1" role="doc-biblioref">android</a>]</span>, the benefits of rewriting are
+often not worth the costs. What we have to prioritize is the transition
+to safe coding practices<span class="citation" data-cites="safe-coding">[<a href="https://blog.google/technology/safety-security/tackling-cybersecurity-vulnerabilities-through-secure-by-design/" role="doc-biblioref">safe-coding</a>]</span> for new code.</p>
+<h1 data-number="4" id="achieving-first-class-references"><span class="header-section-number">4</span> Achieving first-class
+references<a href="#achieving-first-class-references" class="self-link"></a></h1>
+<p>The presented design is as far as I could go to address the goal of
+“memory safety without lifetime parameters.” But safe references aren’t
+yet powerful enough to replace all the unsafe mechanisms necessary for
+productivity in C++. We need support for safe versions of idioms that
+are central to the C++ experience, such as:</p>
+<ul>
+<li>Iterators.</li>
+<li>Views like <code class="sourceCode cpp">string_view</code> and
+<code class="sourceCode cpp">span</code>.</li>
+<li>RAII types with reference semantics.</li>
+</ul>
+<p>Let’s consider RAII types with reference semantics. An example is
+<code class="sourceCode cpp">std<span class="op">::</span>lock_guard</code>,
+which keeps a reference to a mutex. When the
+<code class="sourceCode cpp">lock_guard</code> goes out of scope its
+destructor calls <code class="sourceCode cpp">unlock</code> on the
+mutex. This is a challenge for safe references, because safe reference
+data members aren’t supported. Normally those would require lifetime
+parameters on the containing class.</p>
+<p>What are some options for RAII reference semantics?</p>
+<ul>
+<li>Coroutines. This is the Hylo strategy. The ramp function locks a
+mutex and returns a safe reference to the data within. The continuation
+unlocks the mutex. The reference to the mutex is kept in the coroutine
+frame. But this still reduces to supporting structs with reference data
+members. In this case it’s not a user-defined type, but a
+compiler-defined coroutine frame. I feel that the coroutine solution is
+an unidiomatic fit for C++ for several reasons: static allocation of the
+coroutine frame requires exposing the definition of the coroutine to the
+caller, which breaks C++’s approach to modularity; the continuation is
+called immediately after the last use of the yielded reference, which
+runs counter to expectation that cleanup runs at the end of the
+enclosing scope; and since the continuation is called implicitly,
+there’s nothing textual on the caller side to indicate an unlock.</li>
+<li>Defer expressions. Some garbage-collected languages include
+<em>defer</em> expressions, which run after some condition is met. We
+could defer a call to the mutex unlock until the end of the enclosing
+lexical scope. This has the benefit of being explicit to the caller and
+not requiring computation of a coroutine frame. But it introduces a
+fundamental new control flow mechanism to the language with
+applicability that almost perfectly overlaps with destructors.</li>
+<li>Destructors. This is the idiomatic C++ choice. A local object is
+destroyed when it goes out of scope (or is dropped, with the Safe C++
+<code class="sourceCode cpp">drop</code> keyword). The destructor calls
+the mutex unlock.</li>
+</ul>
+<p>It makes sense to strengthen safe references to support current RAII
+practice. How do we support safe references as data members? A
+reasonable starting point is to declare a class as having <em>safe
+reference semantics</em>. <code class="sourceCode cpp"><span class="kw">class</span> name <span class="op">%</span>;</code>
+is a possible syntax. Inside these classes, you can declare data members
+and base classes with safe reference semantics: that includes both safe
+reference and other classes with safe reference semantics.</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> lock_guard <span class="op">%</span> <span class="op">{</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Permitted because the containing class has safe reference semantics.</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  std2<span class="op">::</span>mutex<span class="op">%</span> mutex;</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  <span class="op">~</span>lock_guard<span class="op">()</span> safe <span class="op">{</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    mutex<span class="op">.</span>unlock<span class="op">()</span>;</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
+<p>The constraint rules can apply to the new
+<code class="sourceCode cpp">lock_guard</code> class exactly as it
+applies to safe references. Returning a
+<code class="sourceCode cpp">lock_guard</code> constraints its lifetime
+by the lifetimes of the function arguments. Transitively, the lifetimes
+of the data members are constrained by the lifetime of the containing
+class.</p>
+<p>Unfortunately, we run into problems immediately upon declaring member
+functions that take safe reference objects or safe reference parameter
+types.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> string_view <span class="op">%</span>;</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">&gt;</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> info <span class="op">%</span> <span class="op">{</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Has reference semantics, but that&#39;s okay because the containing class does.</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>  string_view sv;</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> swap<span class="op">(</span>info<span class="op">%</span> rhs<span class="op">)</span> <span class="op">%</span> safe;</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
+<p>Consider an <code class="sourceCode cpp">info</code> class that has
+<em>safe reference semantics</em> and keeps a
+<code class="sourceCode cpp">string_view</code> as a data member. The
+<code class="sourceCode cpp">string_view</code> also has reference
+semantics, so it constrains the underlying string that owns the data.
+Declare a non-static member function that binds the implicit object with
+the <code class="sourceCode cpp"><span class="op">%</span></code>
+<em>ref-qualifier</em> and also takes an
+<code class="sourceCode cpp">info</code> by safe reference. This is
+uncharted water. The implicit object type
+<code class="sourceCode cpp">info</code> has reference semantics, yet
+we’re taking a reference to that with
+<code class="sourceCode cpp">swap</code> call. We’re also taking a
+reference to <code class="sourceCode cpp">info</code> in the function
+parameter. How do we deal with references to references? The existing
+constraint rules only invent a single lifetime: if we used those, we’d
+be clobbering the lifetime of the inner
+<code class="sourceCode cpp">string_view</code> member.</p>
+<p>There’s a big weakness with the safe reference type
+<code class="sourceCode cpp">T<span class="op">%</span></code>: it’s
+under-specified when dealing with references to references. We need a
+fix that respects the lifetimes on the class’s data members.</p>
+<p><a href="https://github.com/cppalliance/safe-cpp/blob/master/lifetimes/lifetimes5.cxx"><strong>lifetimes5.cxx</strong></a>
+– <a href="https://godbolt.org/z/Gj7zoq343">(Compiler Explorer)</a></p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> string_view<span class="op">/(</span>a<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Keep a borrow to a slice over the string data.</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> <span class="op">[</span><span class="dt">char</span>; dyn<span class="op">]^/</span>a p_;</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> info<span class="op">/(</span>a<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The handle has lifetime /a.</span></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>  string_view<span class="op">/</span>a sv;</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> swap<span class="op">(</span>self<span class="op">^</span>, info<span class="op">^</span> rhs<span class="op">)</span> safe <span class="op">{</span></span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>    string_view temp <span class="op">=</span> self<span class="op">-&gt;</span>sv;</span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>    self<span class="op">-&gt;</span>sv <span class="op">=</span> rhs<span class="op">-&gt;</span>sv;</span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>    rhs<span class="op">-&gt;</span>sv <span class="op">=</span> temp;</span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span>
+<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> func<span class="op">/(</span>a<span class="op">)(</span>info<span class="op">/</span>a<span class="op">^</span> lhs, info<span class="op">/</span>a<span class="op">^</span> rhs<span class="op">)</span> safe <span class="op">{</span></span>
+<span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a>  lhs<span class="op">.</span>swap<span class="op">(</span>rhs<span class="op">)</span>;</span>
+<span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb16-24"><a href="#cb16-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-25"><a href="#cb16-25" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> func2<span class="op">(</span>info<span class="op">^</span> lhs, info<span class="op">^</span> rhs<span class="op">)</span> safe <span class="op">{</span></span>
+<span id="cb16-26"><a href="#cb16-26" aria-hidden="true" tabindex="-1"></a>  lhs<span class="op">.</span>swap<span class="op">(</span>rhs<span class="op">)</span>;</span>
+<span id="cb16-27"><a href="#cb16-27" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>Rust and Safe C++ have a way to keep the lifetime of the
+<code class="sourceCode cpp">string_view</code> member distinct from the
+lifetimes of the <code class="sourceCode cpp">self</code> and
+<code class="sourceCode cpp">rhs</code> references: lifetime parameters.
+<code class="sourceCode cpp">func</code> assumes that the
+<code class="sourceCode cpp">string_view</code>s of its parameters come
+from sources with overlapping lifetimes, so it declares a lifetime
+parameter <code class="sourceCode cpp"><span class="op">/</span>a</code>
+that’s common to both parameters. The lifetimes on the two references
+are created implicitly by elision, as they don’t have to be related in
+the <code class="sourceCode cpp">swap</code> call.
+<code class="sourceCode cpp">func</code> compiles and doesn’t clobber
+the lifetimes of the contained
+<code class="sourceCode cpp">string_view</code>s.</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode default"><code class="sourceCode default"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>safety: during safety checking of void func2(info^, info^) safe</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  error: lifetimes5.cxx:26:12</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    lhs.swap(rhs); </span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>             ^</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>  function void func2(info^, info^) safe returns object with lifetime #0, but #0 doesn&#39;t outlive #2</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>  error: lifetimes5.cxx:26:3</span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    lhs.swap(rhs); </span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>    ^</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>  function void func2(info^, info^) safe returns object with lifetime #2, but #2 doesn&#39;t outlive #0</span></code></pre></div>
+<p>Compiling <code class="sourceCode cpp">func2</code> raises borrow
+checker errors. Instead of providing explicit lifetime annotations that
+relate the lifetimes of the <code class="sourceCode cpp">lhs</code> and
+<code class="sourceCode cpp">rhs</code>
+<code class="sourceCode cpp">info</code> types, lifetime elision create
+four distinct lifetimes:
+<code class="sourceCode cpp"><span class="pp">#0</span></code> for the
+<code class="sourceCode cpp">lhs</code>
+<code class="sourceCode cpp">info</code>,
+<code class="sourceCode cpp"><span class="pp">#1</span></code> for the
+<code class="sourceCode cpp">lhs</code>
+<code class="sourceCode cpp">info<span class="op">^</span></code>,
+<code class="sourceCode cpp"><span class="pp">#2</span></code> for the
+<code class="sourceCode cpp">rhs</code>
+<code class="sourceCode cpp">info</code> and
+<code class="sourceCode cpp"><span class="pp">#3</span></code> for the
+<code class="sourceCode cpp">rhs</code>
+<code class="sourceCode cpp">info<span class="op">^</span></code>. The
+<code class="sourceCode cpp">lhs<span class="op">.</span>swap<span class="op">(</span>rhs<span class="op">)</span></code>
+call relates the lifetimes of the operands through the common lifetime
+<code class="sourceCode cpp"><span class="op">/</span>a</code>. But
+these lifetimes aren’t related! The compiler has no information whether
+<code class="sourceCode cpp"><span class="pp">#0</span></code> outlives
+<code class="sourceCode cpp"><span class="pp">#2</span></code> or vice
+versa. Since the lifetimes aren’t related in
+<code class="sourceCode cpp">func2</code>’s declaration, the program is
+rejected as ill-formed.</p>
+<p>This contrasts with the safe reference constraint rules, which would
+assign the same lifetime to all four lifetime binders and clobber the
+<code class="sourceCode cpp">string_view</code> lifetimes, causing a
+borrow checker failure further from the source and leaving the developer
+without the possibility of a fix.</p>
+<h1 data-number="5" id="lifetime-parameters"><span class="header-section-number">5</span> Lifetime parameters<a href="#lifetime-parameters" class="self-link"></a></h1>
+<p>If there’s a community-wide research effort among compiler experts to
+evolve safe references it may be possible to get them into a state to
+support the abstractions most important for C++. But soundness reasoning
+is very subtle work. As you increase the indirection capabilty of safe
+references, you invite networks of dependencies of implied constraints
+and variances. This increases complexity for the compiler implementation
+and puts a mental burden on the authors of unsafe code to properly
+uphold the invariants assumed by safe references. A research project
+must produce <em>soundness doctrine</em>, which is essential guidance on
+how to interface safe and unsafe systems while upholding the soundness
+invariants of the program.</p>
+<p>But we don’t have to do the research. There’s already a solution
+that’s been deployed in a successful production toolchain for a decade:
+<em>lifetime parameters</em> as used in Rust. The soundness doctrine for
+writing unsafe code that upholds the invariants established by lifetime
+parameters is described in the Rustnomicon<span class="citation" data-cites="rustnomicon">[<a href="https://doc.rust-lang.org/nomicon/intro.html" role="doc-biblioref">rustnomicon</a>]</span>.</p>
+<p>This is the only known viable solution for first-class safe
+references without garbage collection. It’s a critical lifeline that
+addresses an existential problem facing C++. By adopting lifetime
+parameters, C++ can achieve safety parity with the security community’s
+favored languages.</p>
+<p>Consider common objections to Rust’s lifetime-annotation flavor of
+borrow checking:</p>
+<ol type="1">
+<li><strong>You need heavy annotations.</strong> This concern is
+misplaced. Are you intrigued by mutable value semantics,
+parameter-passing directives or second-class references? Borrow checking
+gives you those, without ever having to write lifetime arguments. If
+your function only uses references as parameters, elision implicitly
+annotates them in a way that can’t fail. You only have to involve
+lifetime arguments when going beyond the capabilities of second-class
+references or mutable value semantics. More advanced usages such as the
+implementation of iterators, views and RAII wrappers with reference
+semantics are where annotations most often appear, because those designs
+deal with multiple levels of references.</li>
+<li><strong>Borrow checking doesn’t permit patterns such as
+self-references.</strong> It’s true that checked references are less
+flexible than unsafe references or pointers, but this objection is at
+odds with the claim that lifetime parameters are too burdensome.
+Lifetime parameters <em>increase</em> the expressiveness of safe
+references. Additionally, they can reference things important to C++
+users that a garbage collection can’t, such as variables on the stack.
+Do we want more expressive references at the cost of annotations, or do
+we want to get rid of lifetime parameters to make a simpler language?
+Those are opposite goals.</li>
+<li><strong>Borrow checking with lifetimes is too different from normal
+C++.</strong> Borrow checking is the safety technology most similar to
+current C++ practice. This model replaces unchecked references with
+checked references. Other safety models get rid of reference types
+entirely or replace them with garbage collection which is incompatible
+with C++’s manual memory management and RAII. The design philosophy of
+borrow checking is to take normal references but constrain them to uses
+that can be checked for soundness by the compiler.</li>
+</ol>
+<p>It’s not surprising that the C++ community hasn’t discovered a better
+way to approach safe references than the lifetime parameter model. After
+all, there isn’t a well-funded effort to advance C++ language-level
+lifetime safety. But there is in the Rust community. Rust has made
+valuable improvements to its lifetime safety design. Lots of effort goes
+into making borrow checking more permissive: The integration of
+mid-level IR and non-lexical lifetimes in 2016 revitalized the
+toolchain. Polonius<span class="citation" data-cites="polonius">[<a href="https://smallcultfollowing.com/babysteps/blog/2023/09/22/polonius-part-1/" role="doc-biblioref">polonius</a>]</span> approaches dataflow analysis
+from the opposite direction, hoping to shake loose more improvements.
+Ideas like view types<span class="citation" data-cites="view-types">[<a href="https://smallcultfollowing.com/babysteps/blog/2021/11/05/view-types/" role="doc-biblioref">view-types</a>]</span> and the sentinel
+pattern<span class="citation" data-cites="sentinel-pattern">[<a href="https://smallcultfollowing.com/babysteps/blog/2018/11/10/after-nll-moving-from-borrowed-data-and-the-sentinel-pattern/" role="doc-biblioref">sentinel-pattern</a>]</span> are being
+investigated. But all this activity has not discovered a mechanism
+that’s superior to lifetime parameters for specifying constraints. If
+something had been discovered, it would be integrated into the Rust
+language and I’d be proposing to adopt <em>that</em> into C++. For now,
+lifetime parameters are the best solution that the world has to
+offer.</p>
+<p>The US government and major players in tech including Google<span class="citation" data-cites="secure-by-design">[<a href="https://research.google/pubs/secure-by-design-googles-perspective-on-memory-safety/" role="doc-biblioref">secure-by-design</a>]</span> and Microsoft<span class="citation" data-cites="ms-vulnerabilities">[<a href="https://msrc.microsoft.com/blog/2019/07/we-need-a-safer-systems-programming-language\" role="doc-biblioref">ms-vulnerabilities</a>]</span> are telling industry
+to transition to memory-safe languages because C++ is too unsafe to use.
+There’s already a proven safety technology compatible with C++’s goals
+of performance and manual memory management. If the C++ community
+rejects this robust safety solution on the grounds of slightly
+inconvenient lifetime annotations, and allows C++ to limp forward as a
+memory-unsafe language, can it still claim to care about software
+quality? If the lifetime model is good enough for a Rust, a safe
+language that is enjoying snowballing investment in industry, why is it
+it not good enough for C++?</p>
+<p>Finally, adoption of this feature brings a major benefit even if you
+personally want to get off C++: It’s critical for <strong>improving
+C++/Rust interop</strong>. Your C++ project is generating revenue and
+there’s scant economic incentive to rewrite it. But there is an
+incentive to pivot to a memory-safe language for new development,
+because new code is how vulnerabilities get introduced.<span class="citation" data-cites="android">[<a href="https://security.googleblog.com/2024/09/eliminating-memory-safety-vulnerabilities-Android.html?m=1" role="doc-biblioref">android</a>]</span> Bringing C++ closer to Rust
+with the inclusion of <em>safe-specifier</em>, relocation, choice types,
+and, importantly, lifetime parameters, reduces the friction of
+interfacing the two languages. The easier it is to interoperate with
+Rust, the more options and freedom companies have to fulfill with their
+security mandate.<span class="citation" data-cites="rust-interop">[<a href="https://security.googleblog.com/2024/02/improving-interoperability-between-rust-and-c.html" role="doc-biblioref">rust-interop</a>]</span></p>
+<h1 data-number="6" id="bibliography"><span class="header-section-number">6</span> References<a href="#bibliography" class="self-link"></a></h1>
+<div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="1" role="doc-bibliography">
+<div id="ref-android" class="csl-entry" role="doc-biblioentry">
+[android] Eliminating Memory Safety Vulnerabilites at the Source. <a href="https://security.googleblog.com/2024/09/eliminating-memory-safety-vulnerabilities-Android.html?m=1"><div class="csl-block">https://security.googleblog.com/2024/09/eliminating-memory-safety-vulnerabilities-Android.html?m=1</div></a>
+</div>
+<div id="ref-hylo" class="csl-entry" role="doc-biblioentry">
+[hylo] Borrow checking Hylo. <a href="https://2023.splashcon.org/details/iwaco-2023-papers/5/Borrow-checking-Hylo"><div class="csl-block">https://2023.splashcon.org/details/iwaco-2023-papers/5/Borrow-checking-Hylo</div></a>
+</div>
+<div id="ref-ms-vulnerabilities" class="csl-entry" role="doc-biblioentry">
+[ms-vulnerabilities] We need a safer systems programming language. <a href="https://msrc.microsoft.com/blog/2019/07/we-need-a-safer-systems-programming-language\"><div class="csl-block">https://msrc.microsoft.com/blog/2019/07/we-need-a-safer-systems-programming-language\</div></a>
+</div>
+<div id="ref-mutable-value-semantics" class="csl-entry" role="doc-biblioentry">
+[mutable-value-semantics] Implementation Strategies for Mutable Value
+Semantics. <a href="https://www.jot.fm/issues/issue_2022_02/article2.pdf"><div class="csl-block">https://www.jot.fm/issues/issue_2022_02/article2.pdf</div></a>
+</div>
+<div id="ref-nll" class="csl-entry" role="doc-biblioentry">
+[nll] The Rust RFC Book - Non-lexical lifetimes. <a href="https://rust-lang.github.io/rfcs/2094-nll.html"><div class="csl-block">https://rust-lang.github.io/rfcs/2094-nll.html</div></a>
+</div>
+<div id="ref-polonius" class="csl-entry" role="doc-biblioentry">
+[polonius] Polonius revisited. <a href="https://smallcultfollowing.com/babysteps/blog/2023/09/22/polonius-part-1/"><div class="csl-block">https://smallcultfollowing.com/babysteps/blog/2023/09/22/polonius-part-1/</div></a>
+</div>
+<div id="ref-rust-interop" class="csl-entry" role="doc-biblioentry">
+[rust-interop] Improving Interoperability Between Rust and C++. <a href="https://security.googleblog.com/2024/02/improving-interoperability-between-rust-and-c.html"><div class="csl-block">https://security.googleblog.com/2024/02/improving-interoperability-between-rust-and-c.html</div></a>
+</div>
+<div id="ref-rustnomicon" class="csl-entry" role="doc-biblioentry">
+[rustnomicon] Rustnomicon – The Dark Arts of Unsafe Rust. <a href="https://doc.rust-lang.org/nomicon/intro.html"><div class="csl-block">https://doc.rust-lang.org/nomicon/intro.html</div></a>
+</div>
+<div id="ref-safe-coding" class="csl-entry" role="doc-biblioentry">
+[safe-coding] Tackling cybersecurity vulnerabilities through Secure by
+Design. <a href="https://blog.google/technology/safety-security/tackling-cybersecurity-vulnerabilities-through-secure-by-design/"><div class="csl-block">https://blog.google/technology/safety-security/tackling-cybersecurity-vulnerabilities-through-secure-by-design/</div></a>
+</div>
+<div id="ref-safecpp" class="csl-entry" role="doc-biblioentry">
+[safecpp] Safe C++. <a href="https://safecpp.org/draft.html"><div class="csl-block">https://safecpp.org/draft.html</div></a>
+</div>
+<div id="ref-second-class" class="csl-entry" role="doc-biblioentry">
+[second-class] Second-Class References. <a href="https://borretti.me/article/second-class-references"><div class="csl-block">https://borretti.me/article/second-class-references</div></a>
+</div>
+<div id="ref-secure-by-design" class="csl-entry" role="doc-biblioentry">
+[secure-by-design] Secure by Design : Google’s Perspective on Memory
+Safety. <a href="https://research.google/pubs/secure-by-design-googles-perspective-on-memory-safety/"><div class="csl-block">https://research.google/pubs/secure-by-design-googles-perspective-on-memory-safety/</div></a>
+</div>
+<div id="ref-sentinel-pattern" class="csl-entry" role="doc-biblioentry">
+[sentinel-pattern] After NLL: Moving from borrowed data and the sentinel
+pattern. <a href="https://smallcultfollowing.com/babysteps/blog/2018/11/10/after-nll-moving-from-borrowed-data-and-the-sentinel-pattern/"><div class="csl-block">https://smallcultfollowing.com/babysteps/blog/2018/11/10/after-nll-moving-from-borrowed-data-and-the-sentinel-pattern/</div></a>
+</div>
+<div id="ref-view-types" class="csl-entry" role="doc-biblioentry">
+[view-types] View types for Rust. <a href="https://smallcultfollowing.com/babysteps/blog/2021/11/05/view-types/"><div class="csl-block">https://smallcultfollowing.com/babysteps/blog/2021/11/05/view-types/</div></a>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>
