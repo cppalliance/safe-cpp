@@ -584,10 +584,14 @@ parsimonious treatment claims that mutable references don’t alias under
 the <code class="sourceCode cpp"><span class="op">[</span>safety<span class="op">]</span></code>
 feature. We’ve already stumbled on a soundness bug.</p>
 <p>Coming from the other direction, it may be necessary to form aliasing
-references just to use the APIs for existing code. Consider a function
-that takes an lvalue reference to a container and an lvalue reference to
-one of its elements. If safe code can’t even form aliased lvalue
-references, it wouldn’t be able to use that API at all.</p>
+references just to use the APIs for existing code. Consider a call to
+<code class="sourceCode cpp">vec<span class="op">.</span>push_back<span class="op">(</span>vec<span class="op">[</span><span class="dv">0</span><span class="op">])</span></code>.
+This is <em>impossible to express</em> without mutable aliasing: we form
+a mutable lvalue reference to <code class="sourceCode cpp">vec</code>
+and a const lvalue reference to one of
+<code class="sourceCode cpp">vec</code>’s elements. If safe code can’t
+even form aliased lvalue references, it won’t be able to use this API at
+all.</p>
 <p>Exclusivity is a program-wide invariant on safe references. We need
 separate safe and unsafe reference types for both soundness and
 expressiveness.</p>
