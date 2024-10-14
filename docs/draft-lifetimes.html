@@ -5,7 +5,7 @@
   <meta name="generator" content="mpark/wg21" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <meta name="dcterms.date" content="2024-10-15" />
-  <title>Memory safety without lifetime parameters</title>
+  <title>Memory Safety without Lifetime Parameters</title>
   <style>
       code{white-space: pre-wrap;}
       span.smallcaps{font-variant: small-caps;}
@@ -419,8 +419,8 @@ code.sourceCode > span { display: inline; }
 <body>
 <div class="wrapper">
 <header id="title-block-header">
-<h1 class="title" style="text-align:center">Memory safety without
-lifetime parameters</h1>
+<h1 class="title" style="text-align:center">Memory Safety without
+Lifetime Parameters</h1>
 <table style="border:none;float:right">
   <tr>
     <td>Document #:</td>
@@ -571,23 +571,27 @@ for unsafe functions (when compiled under the <code class="sourceCode cpp"><span
 feature). There are other assumptions C++ programmers already make about
 the validity of inputs: for instance, references never hold null
 addresses. Non-valid inputs are implicated in undefined behavior.</p>
-<p>By the parsimony principal you may suggest “rather than adding a new
+<p>With a desire to simplify, you may suggest “rather than adding a new
 safe reference type, just enforce exclusivity on lvalue- and
 rvalue-references when compiled under the <code class="sourceCode cpp"><span class="op">[</span>safety<span class="op">]</span></code>
 feature.” But that makes the soundness problem worse. New code will
 <em>assume</em> legacy references don’t mutably alias, but existing code
-doesn’t uphold that invariant because it was written without even
-knowing about it.</p>
+doesn’t uphold that invariant because it was written without considering
+exclusivity.</p>
 <p>If safe code calls legacy code that returns a struct with a pair of
 references, do those references alias? Of course they may alias, but the
 parsimonious treatment claims that mutable references don’t alias under
 the <code class="sourceCode cpp"><span class="op">[</span>safety<span class="op">]</span></code>
 feature. We’ve already stumbled on a soundness bug.</p>
 <p>Coming from the other direction, it may be necessary to form aliasing
-references just to use the APIs for existing code. Consider a function
-that takes an lvalue reference to a container and an lvalue reference to
-one of its elements. If safe code can’t even form aliased lvalue
-references, it wouldn’t be able to use that API at all.</p>
+references just to use the APIs for existing code. Consider a call to
+<code class="sourceCode cpp">vec<span class="op">.</span>push_back<span class="op">(</span>vec<span class="op">[</span><span class="dv">0</span><span class="op">])</span></code>.
+This is <em>impossible to express</em> without mutable aliasing: we form
+a mutable lvalue reference to <code class="sourceCode cpp">vec</code>
+and a const lvalue reference to one of
+<code class="sourceCode cpp">vec</code>’s elements. If safe code can’t
+even form aliased lvalue references, it won’t be able to use this API at
+all.</p>
 <p>Exclusivity is a program-wide invariant on safe references. We need
 separate safe and unsafe reference types for both soundness and
 expressiveness.</p>
@@ -671,6 +675,37 @@ reasoning about your functions. Since safe reference parameters don’t
 alias, users don’t even have to think about aliasing bugs. You’re free
 to store to references without worrying about iterator invalidation or
 other side effects leading to use-after-free defects.</p>
+<p><a href="https://github.com/cppalliance/safe-cpp/blob/master/lifetimes/exclusive1.cxx"><strong>exclusive1.cxx</strong></a>
+– <a href="https://godbolt.org/z/xEh9arYK4">(Compiler Explorer)</a></p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> f<span class="op">(</span><span class="dt">int</span><span class="op">%</span> x, <span class="dt">int</span><span class="op">%</span> y<span class="op">)</span> safe;</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> g<span class="op">(</span><span class="dt">int</span><span class="op">&amp;</span> x, <span class="dt">int</span><span class="op">&amp;</span> y<span class="op">)</span> safe <span class="op">{</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  unsafe <span class="op">{</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Enter an unsafe block to dereference legacy references.</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    <span class="co">// The precondition to the unsafe-block is that the legacy</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    <span class="co">// references *do not alias* and *do not dangle*.</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    f<span class="op">(%*</span>x, <span class="op">%*</span>y<span class="op">)</span>;</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> f<span class="op">(</span><span class="dt">int</span><span class="op">%</span> x, <span class="dt">int</span><span class="op">%</span> y<span class="op">)</span> safe <span class="op">{</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>  <span class="co">// We can demote safe references to legacy references without </span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>  <span class="co">// an unsafe block. The are no preconditions to enforce.</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>  g<span class="op">(&amp;*</span>x, <span class="op">&amp;*</span>y<span class="op">)</span>;</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>While safe references and legacy references are different types,
+they’re inter-convertible. Converting a safe reference to legacy
+reference can be done safely, because it doesn’t involve any
+preconditions. Function <code class="sourceCode cpp">f</code> converts a
+safe reference <code class="sourceCode cpp">x</code> to an lvalue
+reference with a dereference and borrow:
+<code class="sourceCode cpp"><span class="op">&amp;*</span>x</code>.
+Going the other way is unsafe: the precondition of the
+<em>unsafe-block</em> is that the legacy references <em>do not
+alias</em> and <em>do not dangle</em>:
+<code class="sourceCode cpp"><span class="op">%*</span>x</code>.</p>
 <h2 data-number="1.2" id="constraint-rules"><span class="header-section-number">1.2</span> Constraint rules<a href="#constraint-rules" class="self-link"></a></h2>
 <p>This proposal implements two sets of constraint rules. Free functions
 constrain return references by the shortest of the argument lifetimes.
@@ -678,49 +713,49 @@ Non-static member functions constrain return references by the implicit
 object lifetime.</p>
 <p><a href="https://github.com/cppalliance/safe-cpp/blob/master/lifetimes/lifetimes3.cxx"><strong>lifetimes3.cxx</strong></a>
 – <a href="https://godbolt.org/z/Yb6EoMMb6">(Compiler Explorer)</a></p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> f1<span class="op">(</span><span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> x, <span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> y, <span class="dt">bool</span> pred<span class="op">)</span> safe <span class="op">{</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The return reference is constrained by all reference parameters: x and y.</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> pred <span class="op">?</span> x <span class="op">:</span> y;</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> Obj <span class="op">{</span></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> f2<span class="op">(</span><span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> arg<span class="op">)</span> <span class="kw">const</span> <span class="op">%</span> safe <span class="op">{</span></span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Non-static member functions are constrained by the implicit </span></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">// object lifetime.</span></span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    <span class="co">// It&#39;s OK to return `x`, because self outlives the return.</span></span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="op">%</span>x;</span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> f3<span class="op">(</span><span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> arg<span class="op">)</span> <span class="kw">const</span> <span class="op">%</span> safe <span class="op">{</span></span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Error: arg does not outlive the return reference.</span></span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> arg;</span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> f4<span class="op">(</span><span class="kw">const</span> self<span class="op">%</span>, <span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> arg<span class="op">)</span> safe <span class="op">{</span></span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>    <span class="co">// OK - f4 is a free function with an explicit self parameter.</span></span>
-<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> arg;</span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> x;</span>
-<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span>
-<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
-<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> x <span class="op">=</span> <span class="dv">1</span>, y <span class="op">=</span> <span class="dv">2</span>;</span>
-<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>  f1<span class="op">(</span>x, y, <span class="kw">true</span><span class="op">)</span>; <span class="co">// OK</span></span>
-<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>  Obj obj <span class="op">{</span> <span class="op">}</span>;</span>
-<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>  obj<span class="op">.</span>f2<span class="op">(</span>x<span class="op">)</span>;  <span class="co">// OK</span></span>
-<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>  obj<span class="op">.</span>f3<span class="op">(</span>x<span class="op">)</span>;  <span class="co">// Error</span></span>
-<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a>  obj<span class="op">.</span>f4<span class="op">(</span>x<span class="op">)</span>;  <span class="co">// OK.</span></span>
-<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
-<div class="sourceCode" id="cb7"><pre class="sourceCode default"><code class="sourceCode default"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>$ circle lifetimes3.cxx </span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>safety: during safety checking of const int% Obj::f3(const int%) const % safe</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  error: lifetimes3.cxx:18:12</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>      return arg; </span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>             ^</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  function const int% Obj::f3(const int%) const % safe returns object with lifetime SCC-ref-1, but SCC-ref-1 doesn&#39;t outlive SCC-ref-0</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> f1<span class="op">(</span><span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> x, <span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> y, <span class="dt">bool</span> pred<span class="op">)</span> safe <span class="op">{</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The return reference is constrained by all reference parameters: x and y.</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> pred <span class="op">?</span> x <span class="op">:</span> y;</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> Obj <span class="op">{</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> f2<span class="op">(</span><span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> arg<span class="op">)</span> <span class="kw">const</span> <span class="op">%</span> safe <span class="op">{</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Non-static member functions are constrained by the implicit </span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">// object lifetime.</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    <span class="co">// It&#39;s OK to return `x`, because self outlives the return.</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="op">%</span>x;</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> f3<span class="op">(</span><span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> arg<span class="op">)</span> <span class="kw">const</span> <span class="op">%</span> safe <span class="op">{</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Error: arg does not outlive the return reference.</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> arg;</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> f4<span class="op">(</span><span class="kw">const</span> self<span class="op">%</span>, <span class="kw">const</span> <span class="dt">int</span><span class="op">%</span> arg<span class="op">)</span> safe <span class="op">{</span></span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>    <span class="co">// OK - f4 is a free function with an explicit self parameter.</span></span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> arg;</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> x;</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> x <span class="op">=</span> <span class="dv">1</span>, y <span class="op">=</span> <span class="dv">2</span>;</span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>  f1<span class="op">(</span>x, y, <span class="kw">true</span><span class="op">)</span>; <span class="co">// OK</span></span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>  Obj obj <span class="op">{</span> <span class="op">}</span>;</span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>  obj<span class="op">.</span>f2<span class="op">(</span>x<span class="op">)</span>;  <span class="co">// OK</span></span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>  obj<span class="op">.</span>f3<span class="op">(</span>x<span class="op">)</span>;  <span class="co">// Error</span></span>
+<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a>  obj<span class="op">.</span>f4<span class="op">(</span>x<span class="op">)</span>;  <span class="co">// OK.</span></span>
+<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode default"><code class="sourceCode default"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>$ circle lifetimes3.cxx </span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>safety: during safety checking of const int% Obj::f3(const int%) const % safe</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  error: lifetimes3.cxx:18:12</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>      return arg; </span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>             ^</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  function const int% Obj::f3(const int%) const % safe returns object with lifetime SCC-ref-1, but SCC-ref-1 doesn&#39;t outlive SCC-ref-0</span></code></pre></div>
 <p>The definitions of free function
 <code class="sourceCode cpp">f1</code> and non-static member function
 <code class="sourceCode cpp">f2</code> compile, because they return
@@ -736,47 +771,47 @@ non-static member function, but retains the constraint rules of a free
 function.</p>
 <p><a href="https://github.com/cppalliance/safe-cpp/blob/master/lifetimes/vector3.cxx"><strong>vector3.cxx</strong></a>
 – <a href="https://godbolt.org/z/KEr1chMac">(Compiler Explorer)</a></p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> Key, <span class="kw">typename</span> Value<span class="op">&gt;</span></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Map <span class="op">{</span></span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Non-static member functions do not constrain the result object to</span></span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="co">// the function parameters.</span></span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">auto</span> get1<span class="op">(</span><span class="kw">const</span> Key<span class="op">%</span> key<span class="op">)</span> <span class="op">%</span> safe <span class="op">-&gt;</span> Value<span class="op">%</span>;</span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Free function do constrain the result object to the function parameters.</span></span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  <span class="kw">auto</span> get2<span class="op">(</span>self<span class="op">%</span>, <span class="kw">const</span> Key<span class="op">%</span> key<span class="op">)</span> safe <span class="op">-&gt;</span> Value<span class="op">%</span>;</span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span>
-<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> safe <span class="op">{</span></span>
-<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>  Map<span class="op">&lt;</span><span class="dt">float</span>, <span class="dt">long</span><span class="op">&gt;</span> map <span class="op">{</span> <span class="op">}</span>;</span>
-<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Bind the key reference to a materialized temporary.</span></span>
-<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The temporary expires at the end of this statement.</span></span>
-<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>  <span class="dt">long</span><span class="op">%</span> value1 <span class="op">=</span> mut map<span class="op">.</span>get1<span class="op">(</span><span class="fl">3.14</span><span class="bu">f</span><span class="op">)</span>;</span>
-<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>  <span class="co">// We can still access value, because it&#39;s not constrained on the </span></span>
-<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>  <span class="co">// key argument.</span></span>
-<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>value1 <span class="op">=</span> <span class="dv">1001</span>;</span>
-<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The call to get2 constrains the returned reference to the lifetime</span></span>
-<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>  <span class="co">// of the key temporary.</span></span>
-<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>  <span class="dt">long</span><span class="op">%</span> value2 <span class="op">=</span> mut map<span class="op">.</span>get2<span class="op">(</span><span class="fl">1.6186</span><span class="bu">f</span><span class="op">)</span>;</span>
-<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>  <span class="co">// This is ill-formed, because get2&#39;s key argument is out of scope.</span></span>
-<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>value2 <span class="op">=</span> <span class="dv">1002</span>;</span>
-<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
-<div class="sourceCode" id="cb9"><pre class="sourceCode default"><code class="sourceCode default"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>$ circle vector3.cxx </span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>safety: during safety checking of int main() safe</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  borrow checking: vector3.cxx:30:4</span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    *value2 = 1002; </span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>     ^</span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  use of value2 depends on expired loan</span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  drop of temporary object float between its shared borrow and its use</span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  loan created at vector3.cxx:27:31</span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    long% value2 = mut map.get2(1.6186f); </span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>                                ^</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> Key, <span class="kw">typename</span> Value<span class="op">&gt;</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Map <span class="op">{</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Non-static member functions do not constrain the result object to</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="co">// the function parameters.</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">auto</span> get1<span class="op">(</span><span class="kw">const</span> Key<span class="op">%</span> key<span class="op">)</span> <span class="op">%</span> safe <span class="op">-&gt;</span> Value<span class="op">%</span>;</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Free function do constrain the result object to the function parameters.</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  <span class="kw">auto</span> get2<span class="op">(</span>self<span class="op">%</span>, <span class="kw">const</span> Key<span class="op">%</span> key<span class="op">)</span> safe <span class="op">-&gt;</span> Value<span class="op">%</span>;</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> safe <span class="op">{</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>  Map<span class="op">&lt;</span><span class="dt">float</span>, <span class="dt">long</span><span class="op">&gt;</span> map <span class="op">{</span> <span class="op">}</span>;</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Bind the key reference to a materialized temporary.</span></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The temporary expires at the end of this statement.</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>  <span class="dt">long</span><span class="op">%</span> value1 <span class="op">=</span> mut map<span class="op">.</span>get1<span class="op">(</span><span class="fl">3.14</span><span class="bu">f</span><span class="op">)</span>;</span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>  <span class="co">// We can still access value, because it&#39;s not constrained on the </span></span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>  <span class="co">// key argument.</span></span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>value1 <span class="op">=</span> <span class="dv">1001</span>;</span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The call to get2 constrains the returned reference to the lifetime</span></span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>  <span class="co">// of the key temporary.</span></span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>  <span class="dt">long</span><span class="op">%</span> value2 <span class="op">=</span> mut map<span class="op">.</span>get2<span class="op">(</span><span class="fl">1.6186</span><span class="bu">f</span><span class="op">)</span>;</span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>  <span class="co">// This is ill-formed, because get2&#39;s key argument is out of scope.</span></span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>value2 <span class="op">=</span> <span class="dv">1002</span>;</span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode default"><code class="sourceCode default"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>$ circle vector3.cxx </span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>safety: during safety checking of int main() safe</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  borrow checking: vector3.cxx:30:4</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    *value2 = 1002; </span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>     ^</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  use of value2 depends on expired loan</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  drop of temporary object float between its shared borrow and its use</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>  loan created at vector3.cxx:27:31</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    long% value2 = mut map.get2(1.6186f); </span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>                                ^</span></code></pre></div>
 <p>The constraint rules for non-static member functions reflect the idea
 that resources are owned by class objects. Consider a map data structure
 that associates values with keys. The map may be specialized a key type
@@ -800,46 +835,46 @@ but that design still provides a degree of freedom in the form of
 non-static member functions.</p>
 <p><a href="https://github.com/cppalliance/safe-cpp/blob/master/lifetimes/vector4.cxx"><strong>vector4.cxx</strong></a>
 – <a href="https://godbolt.org/z/hdMr5G3j1">(Compiler Explorer)</a></p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> Key, <span class="kw">typename</span> Value<span class="op">&gt;</span></span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Map <span class="op">{</span></span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Lifetime elision rules constrain the return by self.</span></span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">auto</span> get1<span class="op">(</span>self<span class="op">^</span>, <span class="kw">const</span> Key<span class="op">^</span> key<span class="op">)</span> safe <span class="op">-&gt;</span> Value<span class="op">^</span>;</span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Use explicit parameterizations for alternate constraints.</span></span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>  <span class="kw">auto</span> get2<span class="op">/(</span>a<span class="op">)(</span>self<span class="op">^/</span>a, <span class="kw">const</span> Key<span class="op">^/</span>a key<span class="op">)</span> safe <span class="op">-&gt;</span> Value<span class="op">^/</span>a;</span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span>
-<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> safe <span class="op">{</span></span>
-<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>  Map<span class="op">&lt;</span><span class="dt">float</span>, <span class="dt">long</span><span class="op">&gt;</span> map <span class="op">{</span> <span class="op">}</span>;</span>
-<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Bind the key reference to a materialized temporary.</span></span>
-<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The temporary expires at the end of this statement.</span></span>
-<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>  <span class="dt">long</span><span class="op">^</span> value1 <span class="op">=</span> mut map<span class="op">.</span>get1<span class="op">(</span><span class="fl">3.14</span><span class="bu">f</span><span class="op">)</span>;</span>
-<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>  <span class="co">// We can still access value, because it&#39;s not constrained on the </span></span>
-<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a>  <span class="co">// key argument.</span></span>
-<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>value1 <span class="op">=</span> <span class="dv">1001</span>;</span>
-<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The call to get2 constrains the returned reference to the lifetime</span></span>
-<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>  <span class="co">// of the key temporary.</span></span>
-<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>  <span class="dt">long</span><span class="op">^</span> value2 <span class="op">=</span> mut map<span class="op">.</span>get2<span class="op">(</span><span class="fl">1.6186</span><span class="bu">f</span><span class="op">)</span>;</span>
-<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a>  <span class="co">// This is ill-formed, because get2&#39;s key argument is out of scope.</span></span>
-<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>value2 <span class="op">=</span> <span class="dv">1002</span>;</span>
-<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
-<div class="sourceCode" id="cb11"><pre class="sourceCode default"><code class="sourceCode default"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>$ circle vector4.cxx </span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>safety: during safety checking of int main() safe</span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  borrow checking: vector4.cxx:29:4</span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    *value2 = 1002; </span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>     ^</span>
-<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>  use of value2 depends on expired loan</span>
-<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  drop of temporary object float between its shared borrow and its use</span>
-<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  loan created at vector4.cxx:26:31</span>
-<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>    long^ value2 = mut map.get2(1.6186f); </span>
-<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>                                ^</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> Key, <span class="kw">typename</span> Value<span class="op">&gt;</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Map <span class="op">{</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Lifetime elision rules constrain the return by self.</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">auto</span> get1<span class="op">(</span>self<span class="op">^</span>, <span class="kw">const</span> Key<span class="op">^</span> key<span class="op">)</span> safe <span class="op">-&gt;</span> Value<span class="op">^</span>;</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Use explicit parameterizations for alternate constraints.</span></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>  <span class="kw">auto</span> get2<span class="op">/(</span>a<span class="op">)(</span>self<span class="op">^/</span>a, <span class="kw">const</span> Key<span class="op">^/</span>a key<span class="op">)</span> safe <span class="op">-&gt;</span> Value<span class="op">^/</span>a;</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> safe <span class="op">{</span></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>  Map<span class="op">&lt;</span><span class="dt">float</span>, <span class="dt">long</span><span class="op">&gt;</span> map <span class="op">{</span> <span class="op">}</span>;</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Bind the key reference to a materialized temporary.</span></span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The temporary expires at the end of this statement.</span></span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>  <span class="dt">long</span><span class="op">^</span> value1 <span class="op">=</span> mut map<span class="op">.</span>get1<span class="op">(</span><span class="fl">3.14</span><span class="bu">f</span><span class="op">)</span>;</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>  <span class="co">// We can still access value, because it&#39;s not constrained on the </span></span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>  <span class="co">// key argument.</span></span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>value1 <span class="op">=</span> <span class="dv">1001</span>;</span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The call to get2 constrains the returned reference to the lifetime</span></span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>  <span class="co">// of the key temporary.</span></span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>  <span class="dt">long</span><span class="op">^</span> value2 <span class="op">=</span> mut map<span class="op">.</span>get2<span class="op">(</span><span class="fl">1.6186</span><span class="bu">f</span><span class="op">)</span>;</span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>  <span class="co">// This is ill-formed, because get2&#39;s key argument is out of scope.</span></span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>value2 <span class="op">=</span> <span class="dv">1002</span>;</span>
+<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode default"><code class="sourceCode default"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>$ circle vector4.cxx </span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>safety: during safety checking of int main() safe</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  borrow checking: vector4.cxx:29:4</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    *value2 = 1002; </span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>     ^</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  use of value2 depends on expired loan</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  drop of temporary object float between its shared borrow and its use</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  loan created at vector4.cxx:26:31</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    long^ value2 = mut map.get2(1.6186f); </span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>                                ^</span></code></pre></div>
 <p>The general borrow type
 <code class="sourceCode cpp">T<span class="op">^</span></code> has
 programmable constraints. The map above declares accessor functions.
@@ -870,7 +905,7 @@ returned from functions, made into objects or stored in structures.</li>
 references. The <em>mutable value semantics</em><span class="citation" data-cites="mutable-value-semantics">[<a href="https://www.jot.fm/issues/issue_2022_02/article2.pdf" role="doc-biblioref">mutable-value-semantics</a>]</span> model uses
 parameter-passing directives to pass objects to functions by reference
 without involving the complexity of a borrow checker.</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> func<span class="op">(</span>Vec<span class="op">&lt;</span><span class="dt">float</span><span class="op">&gt;%</span> vec, <span class="dt">float</span><span class="op">%</span> x<span class="op">)</span> safe;</span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> func<span class="op">(</span>Vec<span class="op">&lt;</span><span class="dt">float</span><span class="op">&gt;%</span> vec, <span class="dt">float</span><span class="op">%</span> x<span class="op">)</span> safe;</span></code></pre></div>
 <p>In this fragment, the reference parameters
 <code class="sourceCode cpp">vec</code> and
 <code class="sourceCode cpp">x</code> serve as <em>second-class
@@ -898,7 +933,9 @@ calls involving references generate <em>lifetime constraints</em>. The
 compiler <em>solves the constraint equation</em> to find the liveness of
 each <em>loan</em>. All instructions in the MIR are scanned for
 <em>conflicting actions</em> with any of the loans in scope at that
-point. Conflicting actions raise borrow checker errors.</p>
+point. Examples of conflicting actions are stores to places with live
+shared borrows or loads from places with live mutable borrows.
+Conflicting actions raise borrow checker errors.</p>
 <p>The Hylo<span class="citation" data-cites="hylo">[<a href="https://2023.splashcon.org/details/iwaco-2023-papers/5/Borrow-checking-Hylo" role="doc-biblioref">hylo</a>]</span> model is largely equivalent to
 this model and it requires borrow checking technology.
 <code class="sourceCode cpp">let</code> and
@@ -928,12 +965,12 @@ runs to the end. Local state that’s live over the yield point must live
 in a <em>coroutine frame</em> so that it’s available to the continuation
 function. These <code class="sourceCode cpp">Array</code> subscripts
 don’t have instructions after the yield, so the continuation function is
-empty and hopefully elided by the optimizer.</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">&gt;</span></span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> Vec <span class="op">{</span></span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> T<span class="op">%</span> <span class="kw">operator</span><span class="op">[](</span><span class="dt">size_t</span> idx<span class="op">)</span> <span class="kw">const</span> <span class="op">%</span> safe;</span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>        T<span class="op">%</span> <span class="kw">operator</span><span class="op">[](</span><span class="dt">size_t</span> idx<span class="op">)</span>       <span class="op">%</span> safe;</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
+empty and hopefully optimized away.</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">&gt;</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> Vec <span class="op">{</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> T<span class="op">%</span> <span class="kw">operator</span><span class="op">[](</span><span class="dt">size_t</span> idx<span class="op">)</span> <span class="kw">const</span> <span class="op">%</span> safe;</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>        T<span class="op">%</span> <span class="kw">operator</span><span class="op">[](</span><span class="dt">size_t</span> idx<span class="op">)</span>       <span class="op">%</span> safe;</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
 <p>The Hylo <code class="sourceCode cpp">Array</code> subscripts are
 lowered to reference-returning ramp functions exactly like their C++
 <code class="sourceCode cpp">Vec</code> counterparts. For both
@@ -973,8 +1010,8 @@ types can be copied and shared between threads.</li>
 <li><strong>Runtime checks</strong> - The compiler automatically emits
 runtime bounds checks on array and slice subscripts. It emits checks for
 integer divide-by-zero and INT_MIN / -1, which are undefined behavior.
-Conforming safe library functions must also implement panics to prevent
-out-of-bounds access to heap allocations.</li>
+Conforming safe library functions must panic to prevent out-of-bounds
+access to heap allocations.</li>
 </ol>
 <p>Most critically, the <em>safe-specifier</em> is added to a function’s
 type. Inside a safe function, only safe operations may be used, unless
@@ -1007,32 +1044,37 @@ destructor calls <code class="sourceCode cpp">unlock</code> on the
 mutex. This is a challenge for safe references, because safe reference
 data members aren’t supported. Normally those would require lifetime
 parameters on the containing class.</p>
+<p>Robust support for user-defined types with reference data members
+isn’t just a convenience in a safe C++ system. It’s a necessary part of
+<em>interior mutability</em>, the core design pattern for implementing
+shared ownership of mutable state (think safe versions of
+<code class="sourceCode cpp">shared_ptr</code>).</p>
 <p>What are some options for RAII reference semantics?</p>
 <ul>
-<li>Coroutines. This is the Hylo strategy. The ramp function locks a
-mutex and returns a safe reference to the data within. The continuation
-unlocks the mutex. The reference to the mutex is kept in the coroutine
-frame. But this still reduces to supporting structs with reference data
-members. In this case it’s not a user-defined type, but a
-compiler-defined coroutine frame. I feel that the coroutine solution is
-an unidiomatic fit for C++ for several reasons: static allocation of the
+<li><strong>Coroutines</strong>. This is the Hylo strategy. The ramp
+function locks a mutex and returns a safe reference to the data within.
+The continuation unlocks the mutex. The reference to the mutex is kept
+in the coroutine frame. But this still reduces to supporting structs
+with reference data members. In this case it’s not a user-defined type,
+but a compiler-defined coroutine frame. The coroutine solution is an
+unidiomatic fit for C++ for several reasons: static allocation of the
 coroutine frame requires exposing the definition of the coroutine to the
 caller, which breaks C++’s approach to modularity; the continuation is
 called immediately after the last use of the yielded reference, which
 runs counter to expectation that cleanup runs at the end of the
 enclosing scope; and since the continuation is called implicitly,
 there’s nothing textual on the caller side to indicate an unlock.</li>
-<li>Defer expressions. Some garbage-collected languages include
-<em>defer</em> expressions, which run after some condition is met. We
-could defer a call to the mutex unlock until the end of the enclosing
-lexical scope. This has the benefit of being explicit to the caller and
-not requiring computation of a coroutine frame. But it introduces a
-fundamental new control flow mechanism to the language with
+<li><strong>Defer expressions</strong>. Some garbage-collected languages
+include <em>defer</em> expressions, which run after some condition is
+met. We could defer a call to the mutex unlock until the end of the
+enclosing lexical scope. This has the benefit of being explicit to the
+caller and not requiring computation of a coroutine frame. But it
+introduces a fundamental new control flow mechanism to the language with
 applicability that almost perfectly overlaps with destructors.</li>
-<li>Destructors. This is the idiomatic C++ choice. A local object is
-destroyed when it goes out of scope (or is dropped, with the Safe C++
-<code class="sourceCode cpp">drop</code> keyword). The destructor calls
-the mutex unlock.</li>
+<li><strong>Destructors</strong>. This is the idiomatic C++ choice. A
+local object is destroyed when it goes out of scope (or is dropped, with
+the Safe C++ <code class="sourceCode cpp">drop</code> keyword). The
+destructor calls the mutex unlock.</li>
 </ul>
 <p>It makes sense to strengthen safe references to support current RAII
 practice. How do we support safe references as data members? A
@@ -1040,34 +1082,34 @@ reasonable starting point is to declare a class as having <em>safe
 reference semantics</em>. <code class="sourceCode cpp"><span class="kw">class</span> name <span class="op">%</span>;</code>
 is a possible syntax. Inside these classes, you can declare data members
 and base classes with safe reference semantics: that includes both safe
-reference and other classes with safe reference semantics.</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> lock_guard <span class="op">%</span> <span class="op">{</span></span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Permitted because the containing class has safe reference semantics.</span></span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  std2<span class="op">::</span>mutex<span class="op">%</span> mutex;</span>
-<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  <span class="op">~</span>lock_guard<span class="op">()</span> safe <span class="op">{</span></span>
-<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    mutex<span class="op">.</span>unlock<span class="op">()</span>;</span>
-<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
-<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
+references and other classes with safe reference semantics.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> lock_guard <span class="op">%</span> <span class="op">{</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Permitted because the containing class has safe reference semantics.</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  std2<span class="op">::</span>mutex<span class="op">%</span> mutex;</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  <span class="op">~</span>lock_guard<span class="op">()</span> safe <span class="op">{</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    mutex<span class="op">.</span>unlock<span class="op">()</span>;</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
 <p>The constraint rules can apply to the new
 <code class="sourceCode cpp">lock_guard</code> class exactly as it
 applies to safe references. Returning a
-<code class="sourceCode cpp">lock_guard</code> constraints its lifetime
+<code class="sourceCode cpp">lock_guard</code> constrains its lifetime
 by the lifetimes of the function arguments. Transitively, the lifetimes
 of the data members are constrained by the lifetime of the containing
 class.</p>
 <p>Unfortunately, we run into problems immediately upon declaring member
 functions that take safe reference objects or safe reference parameter
 types.</p>
-<div class="sourceCode" id="cb15"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> string_view <span class="op">%</span>;</span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">&gt;</span></span>
-<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> info <span class="op">%</span> <span class="op">{</span></span>
-<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Has reference semantics, but that&#39;s okay because the containing class does.</span></span>
-<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>  string_view sv;</span>
-<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
-<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> swap<span class="op">(</span>info<span class="op">%</span> rhs<span class="op">)</span> <span class="op">%</span> safe;</span>
-<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> string_view <span class="op">%</span>;</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">&gt;</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> info <span class="op">%</span> <span class="op">{</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Has reference semantics, but that&#39;s okay because the containing class does.</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>  string_view sv;</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> swap<span class="op">(</span>info<span class="op">%</span> rhs<span class="op">)</span> <span class="op">%</span> safe;</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
 <p>Consider an <code class="sourceCode cpp">info</code> class that has
 <em>safe reference semantics</em> and keeps a
 <code class="sourceCode cpp">string_view</code> as a data member. The
@@ -1092,33 +1134,33 @@ under-specified when dealing with references to references. We need a
 fix that respects the lifetimes on the class’s data members.</p>
 <p><a href="https://github.com/cppalliance/safe-cpp/blob/master/lifetimes/lifetimes5.cxx"><strong>lifetimes5.cxx</strong></a>
 – <a href="https://godbolt.org/z/Gj7zoq343">(Compiler Explorer)</a></p>
-<div class="sourceCode" id="cb16"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> string_view<span class="op">/(</span>a<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Keep a borrow to a slice over the string data.</span></span>
-<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> <span class="op">[</span><span class="dt">char</span>; dyn<span class="op">]^/</span>a p_;</span>
-<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
-<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span>
-<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> info<span class="op">/(</span>a<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The handle has lifetime /a.</span></span>
-<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>  string_view<span class="op">/</span>a sv;</span>
-<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
-<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> swap<span class="op">(</span>self<span class="op">^</span>, info<span class="op">^</span> rhs<span class="op">)</span> safe <span class="op">{</span></span>
-<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>    string_view temp <span class="op">=</span> self<span class="op">-&gt;</span>sv;</span>
-<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>    self<span class="op">-&gt;</span>sv <span class="op">=</span> rhs<span class="op">-&gt;</span>sv;</span>
-<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>    rhs<span class="op">-&gt;</span>sv <span class="op">=</span> temp;</span>
-<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
-<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span>
-<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> func<span class="op">/(</span>a<span class="op">)(</span>info<span class="op">/</span>a<span class="op">^</span> lhs, info<span class="op">/</span>a<span class="op">^</span> rhs<span class="op">)</span> safe <span class="op">{</span></span>
-<span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a>  lhs<span class="op">.</span>swap<span class="op">(</span>rhs<span class="op">)</span>;</span>
-<span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
-<span id="cb16-24"><a href="#cb16-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-25"><a href="#cb16-25" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> func2<span class="op">(</span>info<span class="op">^</span> lhs, info<span class="op">^</span> rhs<span class="op">)</span> safe <span class="op">{</span></span>
-<span id="cb16-26"><a href="#cb16-26" aria-hidden="true" tabindex="-1"></a>  lhs<span class="op">.</span>swap<span class="op">(</span>rhs<span class="op">)</span>;</span>
-<span id="cb16-27"><a href="#cb16-27" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb17"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#</span><span class="er">feature on safety</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> string_view<span class="op">/(</span>a<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Keep a borrow to a slice over the string data.</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> <span class="op">[</span><span class="dt">char</span>; dyn<span class="op">]^/</span>a p_;</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> info<span class="op">/(</span>a<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The handle has lifetime /a.</span></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>  string_view<span class="op">/</span>a sv;</span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> swap<span class="op">(</span>self<span class="op">^</span>, info<span class="op">^</span> rhs<span class="op">)</span> safe <span class="op">{</span></span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>    string_view temp <span class="op">=</span> self<span class="op">-&gt;</span>sv;</span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a>    self<span class="op">-&gt;</span>sv <span class="op">=</span> rhs<span class="op">-&gt;</span>sv;</span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a>    rhs<span class="op">-&gt;</span>sv <span class="op">=</span> temp;</span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span>
+<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> func<span class="op">/(</span>a<span class="op">)(</span>info<span class="op">/</span>a<span class="op">^</span> lhs, info<span class="op">/</span>a<span class="op">^</span> rhs<span class="op">)</span> safe <span class="op">{</span></span>
+<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a>  lhs<span class="op">.</span>swap<span class="op">(</span>rhs<span class="op">)</span>;</span>
+<span id="cb17-23"><a href="#cb17-23" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb17-24"><a href="#cb17-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-25"><a href="#cb17-25" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> func2<span class="op">(</span>info<span class="op">^</span> lhs, info<span class="op">^</span> rhs<span class="op">)</span> safe <span class="op">{</span></span>
+<span id="cb17-26"><a href="#cb17-26" aria-hidden="true" tabindex="-1"></a>  lhs<span class="op">.</span>swap<span class="op">(</span>rhs<span class="op">)</span>;</span>
+<span id="cb17-27"><a href="#cb17-27" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
 <p>Rust and Safe C++ have a way to keep the lifetime of the
 <code class="sourceCode cpp">string_view</code> member distinct from the
 lifetimes of the <code class="sourceCode cpp">self</code> and
@@ -1133,16 +1175,16 @@ the <code class="sourceCode cpp">swap</code> call.
 <code class="sourceCode cpp">func</code> compiles and doesn’t clobber
 the lifetimes of the contained
 <code class="sourceCode cpp">string_view</code>s.</p>
-<div class="sourceCode" id="cb17"><pre class="sourceCode default"><code class="sourceCode default"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>safety: during safety checking of void func2(info^, info^) safe</span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  error: lifetimes5.cxx:26:12</span>
-<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    lhs.swap(rhs); </span>
-<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>             ^</span>
-<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>  function void func2(info^, info^) safe returns object with lifetime #0, but #0 doesn&#39;t outlive #2</span>
-<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>  error: lifetimes5.cxx:26:3</span>
-<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    lhs.swap(rhs); </span>
-<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>    ^</span>
-<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>  function void func2(info^, info^) safe returns object with lifetime #2, but #2 doesn&#39;t outlive #0</span></code></pre></div>
+<div class="sourceCode" id="cb18"><pre class="sourceCode default"><code class="sourceCode default"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>safety: during safety checking of void func2(info^, info^) safe</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  error: lifetimes5.cxx:26:12</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    lhs.swap(rhs); </span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>             ^</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>  function void func2(info^, info^) safe returns object with lifetime #0, but #0 doesn&#39;t outlive #2</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>  error: lifetimes5.cxx:26:3</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>    lhs.swap(rhs); </span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>    ^</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>  function void func2(info^, info^) safe returns object with lifetime #2, but #2 doesn&#39;t outlive #0</span></code></pre></div>
 <p>Compiling <code class="sourceCode cpp">func2</code> raises borrow
 checker errors. Instead of providing explicit lifetime annotations that
 relate the lifetimes of the <code class="sourceCode cpp">lhs</code> and
@@ -1220,7 +1262,7 @@ references. Additionally, they can reference things important to C++
 users that a garbage collection can’t, such as variables on the stack.
 Do we want more expressive references at the cost of annotations, or do
 we want to get rid of lifetime parameters to make a simpler language?
-Those are opposite goals.</li>
+Those are opposing goals.</li>
 <li><strong>Borrow checking with lifetimes is too different from normal
 C++.</strong> Borrow checking is the safety technology most similar to
 current C++ practice. This model replaces unchecked references with

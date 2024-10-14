@@ -1,5 +1,5 @@
 ---
-title: "Memory safety without lifetime parameters"
+title: "Memory Safety without Lifetime Parameters"
 document: D3444
 date: 2024-10-15
 audience: SG23
@@ -80,7 +80,7 @@ With a desire to simplify, you may suggest "rather than adding a new safe refere
 
 If safe code calls legacy code that returns a struct with a pair of references, do those references alias? Of course they may alias, but the parsimonious treatment claims that mutable references don't alias under the `[safety]` feature. We've already stumbled on a soundness bug.
 
-Coming from the other direction, it may be necessary to form aliasing references just to use the APIs for existing code. Consider a function that takes an lvalue reference to a container and an lvalue reference to one of its elements. If safe code can't even form aliased lvalue references, it wouldn't be able to use that API at all.
+Coming from the other direction, it may be necessary to form aliasing references just to use the APIs for existing code. Consider a call to `vec.push_back(vec[0])`. This is _impossible to express_ without mutable aliasing: we form a mutable lvalue reference to `vec` and a const lvalue reference to one of `vec`'s elements. If safe code can't even form aliased lvalue references, it won't be able to use this API at all.
 
 Exclusivity is a program-wide invariant on safe references. We need separate safe and unsafe reference types for both soundness and expressiveness.
 
@@ -152,6 +152,30 @@ safety: during safety checking of int main() safe
 Rewrite the example using our simplified safe references. In `main`, the user attempts to pass a safe reference to `vec` and a safe reference to one of its elements. This violates exclusivity, causing the program to be ill-formed.
 
 Mutable safe references are prohibited from aliasing. Exclusivity is enforced by the same MIR analysis that polices Safe C++'s more general borrow type `T^`. While enforcing exclusivity involves more complicated tooling, it simplifies reasoning about your functions. Since safe reference parameters don't alias, users don't even have to think about aliasing bugs. You're free to store to references without worrying about iterator invalidation or other side effects leading to use-after-free defects.
+
+[**exclusive1.cxx**](https://github.com/cppalliance/safe-cpp/blob/master/lifetimes/exclusive1.cxx) -- [(Compiler Explorer)](https://godbolt.org/z/xEh9arYK4)
+```cpp
+#feature on safety
+
+void f(int% x, int% y) safe;
+
+void g(int& x, int& y) safe {
+  unsafe {
+    // Enter an unsafe block to dereference legacy references.
+    // The precondition to the unsafe-block is that the legacy
+    // references *do not alias* and *do not dangle*.
+    f(%*x, %*y);
+  }
+}
+
+void f(int% x, int% y) safe {
+  // We can demote safe references to legacy references without 
+  // an unsafe block. The are no preconditions to enforce.
+  g(&*x, &*y);
+}
+```
+
+While safe references and legacy references are different types, they're inter-convertible. Converting a safe reference to legacy reference can be done safely, because it doesn't involve any preconditions. Function `f` converts a safe reference `x` to an lvalue reference with a dereference and borrow: `&*x`. Going the other way is unsafe: the precondition of the _unsafe-block_ is that the legacy references _do not alias_ and _do not dangle_: `%*x`.
 
 ## Constraint rules
 
@@ -328,7 +352,7 @@ In this fragment, the reference parameters `vec` and `x` serve as _second-class 
 
 The safe references presented here are more powerful than second-class references. While they don't support all the capabilities of borrows, they can be returned from functions and made into objects. The compiler must implement borrow checking to support this additional capability.
 
-Borrow checking operates on a function lowering called mid-level IR (MIR). A fresh region variable is provisioned for each local variable with a safe reference type. Dataflow analysis populates each region variable with the liveness of its reference. Assignments and function calls involving references generate _lifetime constraints_. The compiler _solves the constraint equation_ to find the liveness of each _loan_. All instructions in the MIR are scanned for _conflicting actions_ with any of the loans in scope at that point. Conflicting actions raise borrow checker errors.
+Borrow checking operates on a function lowering called mid-level IR (MIR). A fresh region variable is provisioned for each local variable with a safe reference type. Dataflow analysis populates each region variable with the liveness of its reference. Assignments and function calls involving references generate _lifetime constraints_. The compiler _solves the constraint equation_ to find the liveness of each _loan_. All instructions in the MIR are scanned for _conflicting actions_ with any of the loans in scope at that point. Examples of conflicting actions are stores to places with live shared borrows or loads from places with live mutable borrows. Conflicting actions raise borrow checker errors.
 
 The Hylo[@hylo] model is largely equivalent to this model and it requires borrow checking technology. `let` and `inout` parameter directives use mutable value semantics to ensure memory safety for objects passed by reference into functions. But Hylo also supports returning references in the form of subscripts:
 
@@ -349,7 +373,7 @@ public conformance Array: Collection {
 }
 ```
 
-Subscripts are reference-returning _coroutines_. Coroutines with a single yield point are split into two normal functions: a ramp function that starts at the top and returns the expression of the yield statement, and a continuation function which resumes after the yield and runs to the end. Local state that's live over the yield point must live in a _coroutine frame_ so that it's available to the continuation function. These `Array` subscripts don't have instructions after the yield, so the continuation function is empty and hopefully elided by the optimizer.
+Subscripts are reference-returning _coroutines_. Coroutines with a single yield point are split into two normal functions: a ramp function that starts at the top and returns the expression of the yield statement, and a continuation function which resumes after the yield and runs to the end. Local state that's live over the yield point must live in a _coroutine frame_ so that it's available to the continuation function. These `Array` subscripts don't have instructions after the yield, so the continuation function is empty and hopefully optimized away.
 
 ```cpp
 template<typename T>
@@ -372,7 +396,7 @@ As detailed in the Safe C++[@safecpp] proposal, there are four categories of mem
 1. **Lifetime safety** - This proposal advances a simpler form of safe references that provides safety against use-after-free defects. The feature is complementary with borrow types `T^` that take lifetime arguments. Both types can be used in the same translation unit, and even the same function, without conflict.
 2. **Type safety** - Relocation must replace move semantics to eliminate unsafe null pointer exposure. Choice types and pattern matching must be included for safe modeling of optional types.
 3. **Thread safety** - The `send` and `sync` interfaces account for which types can be copied and shared between threads. 
-4. **Runtime checks** - The compiler automatically emits runtime bounds checks on array and slice subscripts. It emits checks for integer divide-by-zero and INT_MIN / -1, which are undefined behavior. Conforming safe library functions must also implement panics to prevent out-of-bounds access to heap allocations.
+4. **Runtime checks** - The compiler automatically emits runtime bounds checks on array and slice subscripts. It emits checks for integer divide-by-zero and INT_MIN / -1, which are undefined behavior. Conforming safe library functions must panic to prevent out-of-bounds access to heap allocations.
 
 Most critically, the _safe-specifier_ is added to a function's type. Inside a safe function, only safe operations may be used, unless escaped by an _unsafe-block_. 
 
@@ -392,11 +416,11 @@ Robust support for user-defined types with reference data members isn't just a c
 
 What are some options for RAII reference semantics?
 
-* Coroutines. This is the Hylo strategy. The ramp function locks a mutex and returns a safe reference to the data within. The continuation unlocks the mutex. The reference to the mutex is kept in the coroutine frame. But this still reduces to supporting structs with reference data members. In this case it's not a user-defined type, but a compiler-defined coroutine frame. I feel that the coroutine solution is an unidiomatic fit for C++ for several reasons: static allocation of the coroutine frame requires exposing the definition of the coroutine to the caller, which breaks C++'s approach to modularity; the continuation is called immediately after the last use of the yielded reference, which runs counter to expectation that cleanup runs at the end of the enclosing scope; and since the continuation is called implicitly, there's nothing textual on the caller side to indicate an unlock.
-* Defer expressions. Some garbage-collected languages include _defer_ expressions, which run after some condition is met. We could defer a call to the mutex unlock until the end of the enclosing lexical scope. This has the benefit of being explicit to the caller and not requiring computation of a coroutine frame. But it introduces a fundamental new control flow mechanism to the language with applicability that almost perfectly overlaps with destructors.
-* Destructors. This is the idiomatic C++ choice. A local object is destroyed when it goes out of scope (or is dropped, with the Safe C++ `drop` keyword). The destructor calls the mutex unlock.
+* **Coroutines**. This is the Hylo strategy. The ramp function locks a mutex and returns a safe reference to the data within. The continuation unlocks the mutex. The reference to the mutex is kept in the coroutine frame. But this still reduces to supporting structs with reference data members. In this case it's not a user-defined type, but a compiler-defined coroutine frame. The coroutine solution is an unidiomatic fit for C++ for several reasons: static allocation of the coroutine frame requires exposing the definition of the coroutine to the caller, which breaks C++'s approach to modularity; the continuation is called immediately after the last use of the yielded reference, which runs counter to expectation that cleanup runs at the end of the enclosing scope; and since the continuation is called implicitly, there's nothing textual on the caller side to indicate an unlock.
+* **Defer expressions**. Some garbage-collected languages include _defer_ expressions, which run after some condition is met. We could defer a call to the mutex unlock until the end of the enclosing lexical scope. This has the benefit of being explicit to the caller and not requiring computation of a coroutine frame. But it introduces a fundamental new control flow mechanism to the language with applicability that almost perfectly overlaps with destructors.
+* **Destructors**. This is the idiomatic C++ choice. A local object is destroyed when it goes out of scope (or is dropped, with the Safe C++ `drop` keyword). The destructor calls the mutex unlock.
 
-It makes sense to strengthen safe references to support current RAII practice. How do we support safe references as data members? A reasonable starting point is to declare a class as having _safe reference semantics_. `class name %;` is a possible syntax. Inside these classes, you can declare data members and base classes with safe reference semantics: that includes both safe reference and other classes with safe reference semantics.
+It makes sense to strengthen safe references to support current RAII practice. How do we support safe references as data members? A reasonable starting point is to declare a class as having _safe reference semantics_. `class name %;` is a possible syntax. Inside these classes, you can declare data members and base classes with safe reference semantics: that includes both safe references and other classes with safe reference semantics.
 
 ```cpp
 class lock_guard % {
@@ -409,7 +433,7 @@ public:
 };
 ```
 
-The constraint rules can apply to the new `lock_guard` class exactly as it applies to safe references. Returning a `lock_guard` constraints its lifetime by the lifetimes of the function arguments. Transitively, the lifetimes of the data members are constrained by the lifetime of the containing class.
+The constraint rules can apply to the new `lock_guard` class exactly as it applies to safe references. Returning a `lock_guard` constrains its lifetime by the lifetimes of the function arguments. Transitively, the lifetimes of the data members are constrained by the lifetime of the containing class.
 
 Unfortunately, we run into problems immediately upon declaring member functions that take safe reference objects or safe reference parameter types.
 
@@ -490,7 +514,7 @@ This is the only known viable solution for first-class safe references without g
 Consider common objections to Rust's lifetime-annotation flavor of borrow checking:
 
 1. **You need heavy annotations.** This concern is misplaced. Are you intrigued by mutable value semantics, parameter-passing directives or second-class references? Borrow checking gives you those, without ever having to write lifetime arguments. If your function only uses references as parameters, elision implicitly annotates them in a way that can't fail. You only have to involve lifetime arguments when going beyond the capabilities of second-class references or mutable value semantics. More advanced usages such as the implementation of iterators, views and RAII wrappers with reference semantics are where annotations most often appear, because those designs deal with multiple levels of references.
-2. **Borrow checking doesn't permit patterns such as self-references.** It's true that checked references are less flexible than unsafe references or pointers, but this objection is at odds with the claim that lifetime parameters are too burdensome. Lifetime parameters _increase_ the expressiveness of safe references. Additionally, they can reference things important to C++ users that a garbage collection can't, such as variables on the stack. Do we want more expressive references at the cost of annotations, or do we want to get rid of lifetime parameters to make a simpler language? Those are opposite goals.
+2. **Borrow checking doesn't permit patterns such as self-references.** It's true that checked references are less flexible than unsafe references or pointers, but this objection is at odds with the claim that lifetime parameters are too burdensome. Lifetime parameters _increase_ the expressiveness of safe references. Additionally, they can reference things important to C++ users that a garbage collection can't, such as variables on the stack. Do we want more expressive references at the cost of annotations, or do we want to get rid of lifetime parameters to make a simpler language? Those are opposing goals.
 3. **Borrow checking with lifetimes is too different from normal C++.** Borrow checking is the safety technology most similar to current C++ practice. This model replaces unchecked references with checked references. Other safety models get rid of reference types entirely or replace them with garbage collection which is incompatible with C++'s manual memory management and RAII. The design philosophy of borrow checking is to take normal references but constrain them to uses that can be checked for soundness by the compiler.
 
 It's not surprising that the C++ community hasn't discovered a better way to approach safe references than the lifetime parameter model. After all, there isn't a well-funded effort to advance C++ language-level lifetime safety. But there is in the Rust community. Rust has made valuable improvements to its lifetime safety design. Lots of effort goes into making borrow checking more permissive: The integration of mid-level IR and non-lexical lifetimes in 2016 revitalized the toolchain. Polonius[@polonius] approaches dataflow analysis from the opposite direction, hoping to shake loose more improvements. Ideas like view types[@view-types] and the sentinel pattern[@sentinel-pattern] are being investigated. But all this activity has not discovered a mechanism that's superior to lifetime parameters for specifying constraints. If something had been discovered, it would be integrated into the Rust language and I'd be proposing to adopt _that_ into C++. For now, lifetime parameters are the best solution that the world has to offer.
