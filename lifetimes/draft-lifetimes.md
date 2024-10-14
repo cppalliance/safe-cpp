@@ -14,7 +14,7 @@ toc: false
 This proposal describes the implementation of a memory-safe reference type that does not use lifetime annotations. The goal of the proposal is to:
 
 1. Explore the viability of memory safety without lifetime parameters.
-2. Explain the infeasibility of making legacy lvalue and rvalue references memory safe.
+2. Explain the infeasibility of making legacy lvalue- and rvalue-references memory safe.
 3. Address common objections to safety models that use lifetime annotations.
 
 # Safe references
