@@ -106,6 +106,7 @@ endfunction()
 
 add_test(NAME "safecxx-verify-headers" COMMAND "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target "safe_cxx_verify_interface_header_sets" --config $<CONFIG)
 
+safe_cxx_compile_fail_test(array1 "use of bi depends on expired loan")
 safe_cxx_compile_fail_test(string_view1 "use of sv depends on expired loan")
 safe_cxx_compile_fail_test(box_incomplete "class incomplete is incomplete")
 safe_cxx_compile_fail_test(box1 "cannot convert prvalue int to std2::box<int>")
