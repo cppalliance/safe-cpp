@@ -802,7 +802,7 @@ technology.</p>
 two mainstream lifetime safety technologies: garbage collection and
 borrow checking. Garbage collection is simple to implement and use, but
 moves object allocations to the heap, making it incompatible with manual
-memory manegement. It keeps objects initialized as long as there are
+memory management. It keeps objects initialized as long as there are
 live references to them, making it incompatible with C++’s RAII<span class="citation" data-cites="raii">[<a href="https://en.wikipedia.org/wiki/Resource_acquisition_is_initialization" role="doc-biblioref">raii</a>]</span> object model.</p>
 <p>Borrow checking is an advanced form of live analysis. It keeps track
 of the <em>live references</em> at every point in the function, and
