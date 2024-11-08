@@ -484,10 +484,12 @@ mutability<span></span></a></li>
 <li><a href="#unresolved-design-issues" id="toc-unresolved-design-issues"><span class="toc-section-number">2.8</span> Unresolved design
 issues<span></span></a></li>
 </ul></li>
-<li><a href="#implementation-guidance" id="toc-implementation-guidance"><span class="toc-section-number">3</span> Implementation
+<li><a href="#post-submission-developments" id="toc-post-submission-developments"><span class="toc-section-number">3</span> Post-submission
+developments<span></span></a></li>
+<li><a href="#implementation-guidance" id="toc-implementation-guidance"><span class="toc-section-number">4</span> Implementation
 guidance<span></span></a></li>
-<li><a href="#conclusion" id="toc-conclusion"><span class="toc-section-number">4</span> Conclusion<span></span></a></li>
-<li><a href="#bibliography" id="toc-bibliography"><span class="toc-section-number">5</span> References<span></span></a></li>
+<li><a href="#conclusion" id="toc-conclusion"><span class="toc-section-number">5</span> Conclusion<span></span></a></li>
+<li><a href="#bibliography" id="toc-bibliography"><span class="toc-section-number">6</span> References<span></span></a></li>
 </ul>
 </div>
 <h1 data-number="1" id="introduction"><span class="header-section-number">1</span> Introduction<a href="#introduction" class="self-link"></a></h1>
@@ -3240,6 +3242,8 @@ specialization.</p>
 bound lifetime template parameters with the <code class="sourceCode cpp"><span class="kw">typename</span> T<span class="op">+</span></code>
 syntax. It’s not done for all template parameters, because that would
 interfere with C++’s partial and explicit specialization facilities.</p>
+<p><strong>(See <a href="#post-submission-developments">post-submission
+note</a> from November 2024)</strong></p>
 <div class="sourceCode" id="cb64"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span><span class="op">&lt;</span><span class="kw">typename</span> T0, <span class="kw">typename</span> T1<span class="op">&gt;</span></span>
 <span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> is_same <span class="op">{</span></span>
 <span id="cb64-3"><a href="#cb64-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">static</span> <span class="kw">constexpr</span> <span class="dt">bool</span> value <span class="op">=</span> <span class="kw">false</span>;</span>
@@ -4338,13 +4342,13 @@ an object. Types with a deconfliction strategy use
 <code class="sourceCode cpp">unsafe_cell</code> to safely strip the
 const off shared borrows, allowing users to mutate the protected
 resource.</p>
-<p>Safe C++ and Rust and conflate exclusive access with mutable borrows
-and shared access with const borrows. It’s is an economical choice,
-because one type qualifier,
+<p>Safe C++ and Rust conflate exclusive access with mutable borrows and
+shared access with const borrows. It’s is an economical choice, because
+one type qualifier,
 <code class="sourceCode cpp"><span class="kw">const</span></code> or
 <code class="sourceCode cpp">mut</code>, also determines exclusivity.
 But the cast-away-const model of interior mutability is an awkward
-consequence. But this design is not the only way: The Ante language<span class="citation" data-cites="ante">[<a href="https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability" role="doc-biblioref">ante</a>]</span> experiments with separate
+consequence. This design may not be the only way: The Ante language<span class="citation" data-cites="ante">[<a href="https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability" role="doc-biblioref">ante</a>]</span> experiments with separate
 <code class="sourceCode cpp">own mut</code> and
 <code class="sourceCode cpp">shared mut</code> qualifiers. That’s really
 attractive, because you’re never mutating something through a const
@@ -4734,7 +4738,61 @@ there, helping justify the cost of more complex initialization
 analysis.</p>
 <p>This extended relocation feature is some of the ripest low-hanging
 fruit for improving the safety experience in Safe C++.</p>
-<h1 data-number="3" id="implementation-guidance"><span class="header-section-number">3</span> Implementation guidance<a href="#implementation-guidance" class="self-link"></a></h1>
+<h1 data-number="3" id="post-submission-developments"><span class="header-section-number">3</span> Post-submission developments<a href="#post-submission-developments" class="self-link"></a></h1>
+<p><strong>November 2024:</strong></p>
+<p>The treatment of lifetime binder template parameters can be greatly
+simplified by dropping the <a href="#lifetimes-and-templates"><code class="sourceCode cpp"><span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">+&gt;</span></code></a>
+syntax and <em>always</em> generating lifetime template parameters when
+used in class or function templates. This is discussed in a <a href="https://github.com/cppalliance/safe-cpp/issues/12">Github
+Issue</a>.</p>
+<p>We can walk through the formerly problematic case of
+<code class="sourceCode cpp">std<span class="op">::</span>is_same</code>.
+We want the partial selected even when the specialization’s template
+arguments have lifetime binders.</p>
+<div class="sourceCode" id="cb91"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb91-1"><a href="#cb91-1" aria-hidden="true" tabindex="-1"></a>std<span class="op">::</span>is_same<span class="op">&lt;</span><span class="dt">int</span><span class="op">^</span>, <span class="dt">int</span><span class="op">^&gt;::</span>value;</span>
+<span id="cb91-2"><a href="#cb91-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb91-3"><a href="#cb91-3" aria-hidden="true" tabindex="-1"></a><span class="co">// Implicitly add placeholders to unbound binders in class template arguments.</span></span>
+<span id="cb91-4"><a href="#cb91-4" aria-hidden="true" tabindex="-1"></a><span class="co">// The above transforms to:</span></span>
+<span id="cb91-5"><a href="#cb91-5" aria-hidden="true" tabindex="-1"></a>std<span class="op">::</span>is_same<span class="op">&lt;</span><span class="dt">int</span><span class="op">^/</span>_, <span class="dt">int</span><span class="op">^</span>_<span class="op">&gt;::</span>value; </span>
+<span id="cb91-6"><a href="#cb91-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb91-7"><a href="#cb91-7" aria-hidden="true" tabindex="-1"></a><span class="co">// During normalization, replace lifetime arguments with invented</span></span>
+<span id="cb91-8"><a href="#cb91-8" aria-hidden="true" tabindex="-1"></a><span class="co">// template lifetime parameters. </span></span>
+<span id="cb91-9"><a href="#cb91-9" aria-hidden="true" tabindex="-1"></a><span class="co">// If the complete template was chosen (but it won&#39;t be), you&#39;d get:</span></span>
+<span id="cb91-10"><a href="#cb91-10" aria-hidden="true" tabindex="-1"></a>std<span class="op">::</span>is_same<span class="op">&lt;</span><span class="dt">int</span><span class="op">^/</span><span class="er">#T0, int^/#T1&gt;/_/_::value</span></span></code></pre></div>
+<p>The <code class="sourceCode cpp">is_same</code> specialization is
+created with two <em>proxy lifetimes</em>. When a complete type is
+needed the compiler searches for the best partial or explicit
+specialization. This will now involve stripping all lifetime binders.
+<code class="sourceCode cpp"><span class="dt">int</span><span class="op">^/</span><span class="er">#T0</span></code>
+and <code class="sourceCode cpp"><span class="dt">int</span><span class="op">^/</span><span class="er">#T1</span></code>
+are different types, but after being stripped, you’re left with <code class="sourceCode cpp"><span class="dt">int</span><span class="op">^</span></code>
+and <code class="sourceCode cpp"><span class="dt">int</span><span class="op">^</span></code>
+which are the same type. They’ll match the partial specialization when
+that’s also stripped of its proxy lifetimes.</p>
+<p>The template arguments of the partial or explicit specialization have
+different lifetimes than the template arguments of the complete
+template. But this should be expected: the template arguments of partial
+or explicit specializations are already different than the primary
+template’s. Outside of the template definition, users always refer to
+the specialization through the template arguments on the complete
+template. That remains the case in this modification.</p>
+<p>If a partial or explicit specialization is chosen, that could be
+regarded as a loss of information, since two invented lifetime
+parameters that were independent get collapsed into one. Fortunately
+this doesn’t compromise safety since borrow checking is performed after
+instantiation on complete templates. It was misguided for me to worry
+about the loss of lifetime independence that would result from partial
+specialization, since why else would the class provide those
+specializations if they didn’t want them to be used?</p>
+<p>We should also revise the policy for using lifetime parameters in
+class definitions. Named lifetimes must be used by non-static data
+members, or else the definition is ill-formed. Template lifetime
+parameters, which are implicit, need not be used by non-static data
+members. These are <em>unbound lifetimes</em>, and that should be okay.
+The lifetimes in the specialization of
+<code class="sourceCode cpp">std<span class="op">::</span>is_same</code>
+don’t mean anything, and can be safely ignored.</p>
+<h1 data-number="4" id="implementation-guidance"><span class="header-section-number">4</span> Implementation guidance<a href="#implementation-guidance" class="self-link"></a></h1>
 <p>The intelligence behind the <em>ownership and borrowing</em> safety
 model resides in the compiler’s middle-end, in its <em>MIR analysis</em>
 passes. The first thing compiler engineers should focus on when pursuing
@@ -4879,7 +4937,7 @@ are the iterator support for ranged-for statements,
 <code class="sourceCode cpp">send</code>/<code class="sourceCode cpp">sync</code>
 for thread safety and the upcoming
 <code class="sourceCode cpp">fmt</code> interfaces for f-strings.</p>
-<h1 data-number="4" id="conclusion"><span class="header-section-number">4</span> Conclusion<a href="#conclusion" class="self-link"></a></h1>
+<h1 data-number="5" id="conclusion"><span class="header-section-number">5</span> Conclusion<a href="#conclusion" class="self-link"></a></h1>
 <p>The US Government is telling industry to stop using C++ for reasons
 of national security. Academia is turning away in favor of languages
 like Rust and Swift which are built on modern technology. Tech
@@ -4935,7 +4993,7 @@ build.</p>
 2024 ISO meeting, with the closing poll “We should promise more
 committee time on borrow checking?” — SF: 20, WF: 7, N: 1, WA: 0, SA:
 0.</p>
-<h1 data-number="5" id="bibliography"><span class="header-section-number">5</span> References<a href="#bibliography" class="self-link"></a></h1>
+<h1 data-number="6" id="bibliography"><span class="header-section-number">6</span> References<a href="#bibliography" class="self-link"></a></h1>
 <div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="1" role="doc-bibliography">
 <div id="ref-ante" class="csl-entry" role="doc-biblioentry">
 [ante] Ante Shared Interior Mutability. <a href="https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability"><div class="csl-block">https://antelang.org/blog/safe_shared_mutability/#shared-interior-mutability</div></a>

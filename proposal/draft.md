@@ -1821,6 +1821,8 @@ A class template's instantiation doesn't depend on the lifetimes of its users. `
 
 In the current safety model, this transformation only occurs for bound lifetime template parameters with the `typename T+` syntax. It's not done for all template parameters, because that would interfere with C++'s partial and explicit specialization facilities.
 
+**(See [post-submission note](#post-submission-developments) from November 2024)**
+
 ```cpp
 template<typename T0, typename T1>
 struct is_same {
@@ -2553,7 +2555,7 @@ Lifetime safety also guarantees that the `lock_guard` is in scope (meaning the m
 
 Interior mutability is a legal loophole around exclusivity. You're still limited to one mutable borrow or any number of shared borrows to an object. Types with a deconfliction strategy use `unsafe_cell` to safely strip the const off shared borrows, allowing users to mutate the protected resource. 
 
-Safe C++ and Rust and conflate exclusive access with mutable borrows and shared access with const borrows. It's is an economical choice, because one type qualifier, `const` or `mut`, also determines exclusivity. But the cast-away-const model of interior mutability is an awkward consequence. But this design is not the only way: The Ante language[@ante] experiments with separate `own mut` and `shared mut` qualifiers. That's really attractive, because you're never mutating something through a const reference. This three-state system doesn't map onto C++'s existing type system as easily, but that doesn't mean the const/mutable borrow treatment, which does integrate elegantly, is the most expressive. A `shared` type qualifier merits investigation during the course of this project.
+Safe C++ and Rust conflate exclusive access with mutable borrows and shared access with const borrows. It's is an economical choice, because one type qualifier, `const` or `mut`, also determines exclusivity. But the cast-away-const model of interior mutability is an awkward consequence. This design may not be the only way: The Ante language[@ante] experiments with separate `own mut` and `shared mut` qualifiers. That's really attractive, because you're never mutating something through a const reference. This three-state system doesn't map onto C++'s existing type system as easily, but that doesn't mean the const/mutable borrow treatment, which does integrate elegantly, is the most expressive. A `shared` type qualifier merits investigation during the course of this project.
 
 * `T^` - Exclusive mutable access. Permits standard conversion to `shared T^` and `const T^`.
 * `shared T^` - Shared mutable access. Permits standard conversion to `const T^`. Only types that enforce interior mutability have overloads with shared mutable access.
@@ -2739,6 +2741,35 @@ In Rust, every function call is potentially throwing, including destructors. In 
 It's already possible to write C++ code that is less burdened by cleanup paths than Rust. If Safe C++ adopted the `throw()` specifier from the Static Exception Specification,[@P3166R0] we could statically verify that functions don't have internal cleanup paths. It may be worthwhile to give `noexcept` interfaces to `vector` and similar containers. Exceptions are a poor way to signal out-of-memory states. If containers panicked on out-of-memory, we'd enormously reduce the cleanup paths in most functions. Reducing cleanup paths extends the supported interval between relocating out of a reference and restoring an object there, helping justify the cost of more complex initialization analysis.
 
 This extended relocation feature is some of the ripest low-hanging fruit for improving the safety experience in Safe C++.
+
+# Post-submission developments
+
+**November 2024:**
+
+The treatment of lifetime binder template parameters can be greatly simplified by dropping the [`<typename T+>`](#lifetimes-and-templates) syntax and _always_ generating lifetime template parameters when used in class or function templates. This is discussed in a [Github Issue](https://github.com/cppalliance/safe-cpp/issues/12).
+
+We can walk through the formerly problematic case of `std::is_same`. We want the partial selected even when the specialization's template arguments have lifetime binders.
+
+```cpp
+std::is_same<int^, int^>::value;
+
+// Implicitly add placeholders to unbound binders in class template arguments.
+// The above transforms to:
+std::is_same<int^/_, int^_>::value; 
+
+// During normalization, replace lifetime arguments with invented
+// template lifetime parameters. 
+// If the complete template was chosen (but it won't be), you'd get:
+std::is_same<int^/#T0, int^/#T1>/_/_::value
+```
+
+The `is_same` specialization is created with two _proxy lifetimes_. When a complete type is needed the compiler searches for the best partial or explicit specialization. This will now involve stripping all lifetime binders. `int^/#T0` and `int^/#T1` are different types, but after being stripped, you're left with `int^` and `int^` which are the same type. They'll match the partial specialization when that's also stripped of its proxy lifetimes.
+
+The template arguments of the partial or explicit specialization have different lifetimes than the template arguments of the complete template. But this should be expected: the template arguments of partial or explicit specializations are already different than the primary template's. Outside of the template definition, users always refer to the specialization through the template arguments on the complete template. That remains the case in this modification.
+
+If a partial or explicit specialization is chosen, that could be regarded as a loss of information, since two invented lifetime parameters that were independent get collapsed into one. Fortunately this doesn't compromise safety since borrow checking is performed after instantiation on complete templates. It was misguided for me to worry about the loss of lifetime independence that would result from partial specialization, since why else would the class provide those specializations if they didn't want them to be used?
+
+We should also revise the policy for using lifetime parameters in class definitions. Named lifetimes must be used by non-static data members, or else the definition is ill-formed. Template lifetime parameters, which are implicit, need not be used by non-static data members. These are _unbound lifetimes_, and that should be okay. The lifetimes in the specialization of `std::is_same` don't mean anything, and can be safely ignored.
 
 # Implementation guidance
 
