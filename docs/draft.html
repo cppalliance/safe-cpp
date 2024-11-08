@@ -926,7 +926,7 @@ Safe C++ features a new kind of move: <a href="#relocation-object-model"><em>rel
 or a <em>linear</em> type system. Unless explicitly initialized, objects
 start out <em>uninitialized</em>. They can’t be used in this state. When
 you assign to an object, it becomes initialized. When you relocate from
-an object, it’s value is moved and it’s reset to uninitialized. If you
+an object, its value is moved and it’s reset to uninitialized. If you
 relocate from an object inside control flow, it becomes <em>potentially
 uninitialized</em>, and its destructor is conditionally executed after
 reading a compiler-generated drop flag.</p>
@@ -1341,9 +1341,9 @@ the effects of runtime checks.</p>
 establishes rules for where library code must insert panic calls. If a
 function is marked safe but is internally unsound for some values of its
 arguments, it should check those arguments and panic before executing
-the unsafe operation. Unsafe functions generally don’t panic because its
-the responsibility of their callers to observe the preconditions of the
-function.</p>
+the unsafe operation. Unsafe functions generally don’t panic because
+it’s the responsibility of their callers to observe the preconditions of
+the function.</p>
 <h1 data-number="2" id="design-overview"><span class="header-section-number">2</span> Design overview<a href="#design-overview" class="self-link"></a></h1>
 <h2 data-number="2.1" id="the-safe-context"><span class="header-section-number">2.1</span> The
 <code class="sourceCode cpp">safe</code> context<a href="#the-safe-context" class="self-link"></a></h2>
@@ -1892,7 +1892,7 @@ invalidation bugs.</p>
 <p><code class="sourceCode cpp">std<span class="op">::</span>string_view</code>
 was added to C++17 as a safer alternative to passing character pointers
 around. Unfortunately, its rvalue-reference constructor is so
-dangerously designed that its reported to <em>encourage</em>
+dangerously designed that it’s reported to <em>encourage</em>
 use-after-free bugs.<span class="citation" data-cites="string-view-use-after-free">[<a href="https://github.com/isocpp/CppCoreGuidelines/issues/1038" role="doc-biblioref">string-view-use-after-free</a>]</span></p>
 <p><a href="https://github.com/cppalliance/safe-cpp/blob/master/proposal/string_view0.cxx"><strong>string_view0.cxx</strong></a>
 – <a href="https://godbolt.org/z/e3TG6W5Me">(Compiler Explorer)</a></p>
@@ -2560,7 +2560,7 @@ types with regions.</p>
 <p>I’ve relabelled the example to show function points and region names
 of variables and loans. If we run live analysis on ’R0, the region for
 the variable <code class="sourceCode cpp">ref</code>, we see it’s live
-at points ’R0 = { 4, 8, 9, 10, 11 }. These are the points where its
+at points ’R0 = { 4, 8, 9, 10, 11 }. These are the points where it’s
 subsequently used. We’ll grow the loan regions ’R1 and ’R2 until their
 constraint equations are satisfied.</p>
 <p><code class="sourceCode cpp"><span class="ch">&#39;R</span><span class="er">1 : </span><span class="ch">&#39;</span>R0 <span class="op">@</span> P3</code>
@@ -2642,8 +2642,8 @@ that extends the loan. More completely describing the chain of
 constraints could help users diagnose borrow checker errors. But there’s
 a fine line between presenting an error like the one above, which is
 already pretty wordy, and overwhelming programmers with information.</p>
-<h3 data-number="2.2.7" id="lifetime-constraints-on-called-functinos"><span class="header-section-number">2.2.7</span> Lifetime constraints on
-called functinos<a href="#lifetime-constraints-on-called-functinos" class="self-link"></a></h3>
+<h3 data-number="2.2.7" id="lifetime-constraints-on-called-functions"><span class="header-section-number">2.2.7</span> Lifetime constraints on
+called functions<a href="#lifetime-constraints-on-called-functions" class="self-link"></a></h3>
 <p>Borrow checking is easiest to understand when applied to a single
 function. The function is lowered to a control flow graph, the compiler
 assigns regions to loans and borrow variables, emits lifetime
@@ -4343,8 +4343,8 @@ an object. Types with a deconfliction strategy use
 const off shared borrows, allowing users to mutate the protected
 resource.</p>
 <p>Safe C++ and Rust conflate exclusive access with mutable borrows and
-shared access with const borrows. It’s is an economical choice, because
-one type qualifier,
+shared access with const borrows. It’s an economical choice, because one
+type qualifier,
 <code class="sourceCode cpp"><span class="kw">const</span></code> or
 <code class="sourceCode cpp">mut</code>, also determines exclusivity.
 But the cast-away-const model of interior mutability is an awkward
@@ -4485,7 +4485,7 @@ is <code class="sourceCode cpp">send</code> and
 <code class="sourceCode cpp">T</code> is
 <code class="sourceCode cpp">send</code>. Since most types are
 <code class="sourceCode cpp">send</code> by construction, we can safely
-mutate shared state over multiple threads as long as its wrapped in a
+mutate shared state over multiple threads as long as it’s wrapped in a
 <code class="sourceCode cpp">std2<span class="op">::</span>mutex</code>
 and that’s owned by an
 <code class="sourceCode cpp">std2<span class="op">::</span>arc</code>.
@@ -4798,7 +4798,7 @@ model resides in the compiler’s middle-end, in its <em>MIR analysis</em>
 passes. The first thing compiler engineers should focus on when pursuing
 memory safety is to lower their frontend’s AST to MIR. Several compiled
 languages already pass through a mid-level IR: Swift passes through
-SIL,<span class="citation" data-cites="sil">[<a href="https://github.com/swiftlang/swift/blob/main/docs/SIL.rst" role="doc-biblioref">sil</a>]</span> Rust passes through MIR,<span class="citation" data-cites="mir">[<a href="https://rustc-dev-guide.rust-lang.org/mir/index.html" role="doc-biblioref">mir</a>]</span> and Circle passes through it’s
+SIL,<span class="citation" data-cites="sil">[<a href="https://github.com/swiftlang/swift/blob/main/docs/SIL.rst" role="doc-biblioref">sil</a>]</span> Rust passes through MIR,<span class="citation" data-cites="mir">[<a href="https://rustc-dev-guide.rust-lang.org/mir/index.html" role="doc-biblioref">mir</a>]</span> and Circle passes through its
 mid-level IR when targeting the new object model. There is an effort
 called ClangIR<span class="citation" data-cites="clangir">[<a href="https://discourse.llvm.org/t/rfc-upstreaming-clangir/76587" role="doc-biblioref">clangir</a>]</span> to lower Clang to an MLIR
 dialect called CIR, but the project is in an early phase and doesn’t
