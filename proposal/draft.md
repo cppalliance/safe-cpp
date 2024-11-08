@@ -263,7 +263,7 @@ The compiler can only relocate local variables. How do we move objects that live
 
 The C++ Standard Library has an optional type, but it's not safe to use. The optional API is full of undefined behaviors: using `operator*` or `operator->` while the value is disengaged raises undefined behavior. `std::expected`, new to C++23, exhibits the same undefined behaviors for out-of-contract uses of its `operator*`, `operator->` and `error` APIs.
 
-If we were to represent the null state by wrapping the safe `std2::box` in a `std::optional`, that would be just as unsafe as using `std::unique_ptr`. The `operator->` is unsafe either way. We need a new _sum type_ that doesn't exhibit the union-like safety defects of `std::optional` and `std::expected`.
+If we were to represent the null state by wrapping the safe `std2::box` in an `std::optional`, that would be just as unsafe as using `std::unique_ptr`. The `operator->` is unsafe either way. We need a new _sum type_ that doesn't exhibit the union-like safety defects of `std::optional` and `std::expected`.
 
 ```cpp
 template<class T+>
@@ -414,11 +414,11 @@ Hello world - 🔥🔥🔥🔥🔥🔥🔥🔥🔥
 Hello world - 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
 ```
 
-We spawn ten threads which append a fire emoji to a shared string. The string is stored in a `std2::mutex` which is owned by an `arc`, which stands for "atomic reference count." The `arc` provides _shared ownership_ of the data. The `mutex` provides _shared access_ to it. C++ programmers often think that `std::shared_ptr` pointer provides safe shared access to objects. It does not. It only provides shared ownership.
+We spawn ten threads which append a fire emoji to a shared string. The string is stored in an `std2::mutex` which is owned by an `arc`, which stands for "atomic reference count." The `arc` provides _shared ownership_ of the data. The `mutex` provides _shared access_ to it. C++ programmers often think that `std::shared_ptr` pointer provides safe shared access to objects. It does not. It only provides shared ownership.
 
 `arc`'s accessor `operator->` returns const-qualified borrows to the owned data. You can't mutate through most const-qualified types. You can only mutate through const-qualified types that encapsulate `unsafe_cell`, such as `cell`, `ref_cell`, `mutex` and `shared_mutex`. This is how [interior mutability](#interior-mutability) implements shared mutable access. The safe standard library provides `mutex` and `shared_mutex` which satisfy the [`send` and `sync`](#send-and-sync) interfaces. Only types satisfying `send` may be copied through the `std2::thread` constructor.
 
-Inside the worker thread, we `lock` the mutex to initialize a lock guard object. The lock guard is a RAII type: on its construction the mutex is locked and on its destruction the mutex is unlocked. We call `borrow` on the lock guard to gain a mutable borrow to the string it contains. It's only correct to use the reference while the lock guard is in scope, that is, while the thread has the mutex locked. Now we have exclusive access to the string inside the mutex and append the fire emoji without risking a data race.
+Inside the worker thread, we `lock` the mutex to initialize a lock guard object. The lock guard is an RAII type: on its construction the mutex is locked and on its destruction the mutex is unlocked. We call `borrow` on the lock guard to gain a mutable borrow to the string it contains. It's only correct to use the reference while the lock guard is in scope, that is, while the thread has the mutex locked. Now we have exclusive access to the string inside the mutex and append the fire emoji without risking a data race.
 
 But the thread safety isn't yet demonstrated: the claim isn't that we _can_ write thread-safe software; the claim is that it's _ill-formed_ to write thread unsafe software.
 
@@ -732,7 +732,7 @@ int main() safe {
   // Requires unsafe type specifier because std::string's dtor is unsafe.
   std2::vector<unsafe std::string> vec { };
 
-  // Construct a std::string from a const char* (unsafe)
+  // Construct an std::string from a const char* (unsafe)
   // Pass by relocation (unsafe)
   mut vec.push_back("Hello unsafe type qualifier!");
 
@@ -1095,7 +1095,7 @@ impl vector<T> : make_iter {
 
 To opt into safe ranged-for iteration, containers implement the `std2::make_iter` interface. They can provide const iterators, mutable iterators or _consuming iterators_ which take ownership of the operand's data and destroy its container in the process.
 
-Because the _range-initializer_ of the loop is an lvalue of `vector` that's outside the mutable context, the const iterator overload of `vector<T>::iter` gets chosen. That returns a `std2::slice_iterator<T const>` into the vector's contents. Here's the first borrow: lifetime elision invents a lifetime parameter for the `self const^` parameter, which is also used for the named lifetime argument `/a` of the `slice_iterator` return type. As with the use-after-free example, the `vector<T>::iter` function declaration establishes an _outlives-constraint_: the lifetime on the `self const^` operand must outlive the lifetime on the result object.
+Because the _range-initializer_ of the loop is an lvalue of `vector` that's outside the mutable context, the const iterator overload of `vector<T>::iter` gets chosen. That returns an `std2::slice_iterator<T const>` into the vector's contents. Here's the first borrow: lifetime elision invents a lifetime parameter for the `self const^` parameter, which is also used for the named lifetime argument `/a` of the `slice_iterator` return type. As with the use-after-free example, the `vector<T>::iter` function declaration establishes an _outlives-constraint_: the lifetime on the `self const^` operand must outlive the lifetime on the result object.
 
 ```cpp
 template<class T>
@@ -2125,7 +2125,7 @@ struct Pair {
 Pair g { 10, 20 };
 
 int main() {
-  // Relocate from a std::tuple element.
+  // Relocate from an std::tuple element.
   auto tup = std::make_tuple(5, 1.619);
   int x = rel *get<0>(&tup);
 
@@ -2218,7 +2218,7 @@ Use `circle -print-mir` to dump the MIR of this program.
    20  InstEnd _4
 ```
 
-The assignment `t3.0.0.1` lowers to `_4.0.0.1`. This is a place name of a local variable. Importantly, it doesn't involve dereferences, unlike the result of a `std::get` call. It's an _owned place_ which the compiler is able to relocate out of.
+The assignment `t3.0.0.1` lowers to `_4.0.0.1`. This is a place name of a local variable. Importantly, it doesn't involve dereferences, unlike the result of an `std::get` call. It's an _owned place_ which the compiler is able to relocate out of.
 
 C++'s native array decays to pointers and doesn't support pass-by-value semantics. `std::array` encapsulates arrays to fix these problems and provides an `operator[]` API for consistent subscripting syntax. But `std::array` is broken for our purposes. Since `operator[]` returns a reference, the `std::array`'s elements are not _owned places_ and can't be relocated out of.
 
@@ -2610,7 +2610,7 @@ class [[
 
 `std2::mutex` is another candidate for use with `std2::arc`. This type is thread-safe. As shown in the [thread safety](#thread-safety) example, it provides threads with exclusive access to its interior data using a synchronization object. The borrow checker prevents the reference to the inner data from being used outside of the mutex's lock. Therefore, `std2::mutex` is `sync` if its inner type is `send`. Why make it conditional on `send` when the mutex is already providing threads with exclusive access to the inner value? This provides protection for the rare type with thread affinity. A type is `send` if it can both be copied to a different thread _and used_ by a different thread.
 
-`std2::arc<std2::mutex<T>>` is `send` if `std2::mutex<T>` is `send` and `sync`. `std2::mutex<T>` is `send` and `sync` if `T` is `send`. Since most types are `send` by construction, we can safely mutate shared state over multiple threads as long as its wrapped in a `std2::mutex` and that's owned by a `std2::arc`. The `arc` provides shared ownership. The `mutex` provides shared mutation.
+`std2::arc<std2::mutex<T>>` is `send` if `std2::mutex<T>` is `send` and `sync`. `std2::mutex<T>` is `send` and `sync` if `T` is `send`. Since most types are `send` by construction, we can safely mutate shared state over multiple threads as long as its wrapped in a `std2::mutex` and that's owned by an `std2::arc`. The `arc` provides shared ownership. The `mutex` provides shared mutation.
 
 ```cpp
 class thread {
@@ -2633,7 +2633,7 @@ The `send` constraint against demonstrates the safety model's [theme of responsi
 
 `std2::thread` is designed defensively with the safety promise that it won't produce undefined behavior no matter how it's used. Can we fool `thread` into producing a data race? 
 
-**Pass a borrow to a value on the stack.** There's no guarantee that the thread will join before the stack object is destroyed. Is that a potential use-after-free? No, because the thread has an _outlives-constraint_ which checks that all function arguments outlive `/static`. A `std2::arc` doesn't have lifetime arguments (unless its inner type is a lifetime binder), so that checks out. But a shared or mutable borrow does have a lifetime argument, and if it refers to an object on the stack, it's not `/static`. Those are arguments are accepted by the _requires-clause_ but are rejected by the borrow checker.
+**Pass a borrow to a value on the stack.** There's no guarantee that the thread will join before the stack object is destroyed. Is that a potential use-after-free? No, because the thread has an _outlives-constraint_ which checks that all function arguments outlive `/static`. An `std2::arc` doesn't have lifetime arguments (unless its inner type is a lifetime binder), so that checks out. But a shared or mutable borrow does have a lifetime argument, and if it refers to an object on the stack, it's not `/static`. Those are arguments are accepted by the _requires-clause_ but are rejected by the borrow checker.
 
 **Pass a borrow to a global variable.** If the global's type is not `sync`, then a borrow to it is not `send`, and that's a constraint violation. If the global variable is mutable, that could cause a data race. Fortunately, it's ill-formed to name mutable global objects in a [safe context](#the-safe-context). Otherwise, it's safe to share const global objects between threads.
 
